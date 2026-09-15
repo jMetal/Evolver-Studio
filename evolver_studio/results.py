@@ -1,5 +1,6 @@
 """Parsing of Evolver's training results (results.yaml, METADATA.txt, CSVs)."""
 
+import io
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,15 +54,51 @@ def read_results_pointer(results_yaml: Path, evolver_home: Path) -> ResultsPoint
 
 
 def load_indicators(indicators_csv: Path) -> pd.DataFrame:
-    """Load the meta-level non-dominated archive's indicator values.
+    """Load the accumulated per-checkpoint non-dominated archives.
+
+    INDICATORS.csv is appended to on every meta-optimizer generation, one
+    block of rows per checkpoint (tagged by the `Evaluation` column) — it is
+    never overwritten. Since this may be read while Evolver is mid-write, a
+    trailing line not yet terminated by a newline is dropped before parsing.
 
     Args:
         indicators_csv: Path to INDICATORS.csv.
 
     Returns:
-        One row per non-dominated configuration, one column per indicator.
+        One row per non-dominated configuration, per checkpoint written so far.
     """
-    return pd.read_csv(indicators_csv)
+    text = indicators_csv.read_text()
+    lines = text.splitlines(keepends=True)
+    if lines and not lines[-1].endswith("\n"):
+        lines = lines[:-1]
+    return pd.read_csv(io.StringIO("".join(lines)))
+
+
+def latest_checkpoint_evaluation(history: pd.DataFrame) -> int | None:
+    """Return the most recent checkpoint's evaluation count.
+
+    Args:
+        history: Rows loaded by `load_indicators`, possibly spanning several
+            checkpoints.
+
+    Returns:
+        The maximum `Evaluation` value, or None if `history` is empty.
+    """
+    return int(history["Evaluation"].max()) if not history.empty else None
+
+
+def checkpoint_front(history: pd.DataFrame, evaluation: int) -> pd.DataFrame:
+    """Select one checkpoint's non-dominated archive.
+
+    Args:
+        history: Rows loaded by `load_indicators`, possibly spanning several
+            checkpoints.
+        evaluation: The checkpoint's evaluation count.
+
+    Returns:
+        Only the rows belonging to that checkpoint.
+    """
+    return history[history["Evaluation"] == evaluation]
 
 
 def read_metadata(metadata_txt: Path) -> str:
