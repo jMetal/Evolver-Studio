@@ -4,9 +4,10 @@ import datetime as dt
 import time
 from pathlib import Path
 
-import plotly.express as px
 import streamlit as st
+from streamlit.delta_generator import DeltaGenerator
 
+from evolver_studio.adaptive_poll import AdaptivePollInterval
 from evolver_studio.evolver_client import (
     RunState,
     RunStatus,
@@ -15,9 +16,12 @@ from evolver_studio.evolver_client import (
     read_status,
     start_training,
 )
+from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.request import BaseLevelConfig, FlatMetaSearchConfig, to_request_yaml
 from evolver_studio.result import Err
 from evolver_studio.results import (
+    checkpoint_front,
+    latest_checkpoint_evaluation,
     list_output_dir,
     load_indicators,
     read_metadata,
@@ -25,7 +29,6 @@ from evolver_studio.results import (
 )
 
 DEFAULT_EVOLVER_HOME = "/Users/ajnebro/Softw/Evolver"
-POLL_INTERVAL_SECONDS = 1.0
 
 
 def _base_level_config(output_directory: str) -> BaseLevelConfig:
@@ -70,46 +73,91 @@ def _meta_search_config(meta_max_evaluations: int, number_of_cores: int) -> Flat
     )
 
 
+def _poll_tick(
+    status_yaml: Path,
+    indicators_csv: Path,
+    progress: DeltaGenerator,
+    chart_placeholder: DeltaGenerator,
+    renderer: LiveFrontRenderer,
+    interval: AdaptivePollInterval,
+) -> RunStatus | None:
+    """Read the latest status, redraw the live front if due, and adapt the poll interval.
+
+    Args:
+        status_yaml: Path to the run's status file.
+        indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
+        progress: Progress bar to update with the latest evaluation count.
+        chart_placeholder: Placeholder to redraw the live front into.
+        renderer: Tracks render-throttling state across polls.
+        interval: Tracks the adaptive sleep interval across polls.
+
+    Returns:
+        The latest parsed status, or None if not yet available.
+    """
+    status = read_status(status_yaml)
+    if status is not None:
+        fraction = status.evaluations_done / max(status.max_evaluations, 1)
+        progress.progress(fraction, text=f"{status.evaluations_done}/{status.max_evaluations}")
+    update = renderer.poll(indicators_csv)
+    interval.record_poll(update.changed, time.monotonic())
+    if update.figure is not None:
+        chart_placeholder.plotly_chart(update.figure, use_container_width=True)
+    return status
+
+
 def _run_and_wait(
-    evolver_home: Path, jar: Path, request_yaml: Path, status_yaml: Path
+    evolver_home: Path,
+    jar: Path,
+    request_yaml: Path,
+    status_yaml: Path,
+    indicators_csv: Path,
+    update_every_evaluations: int,
 ) -> RunStatus:
-    """Launch training and poll status.yaml until it reaches a terminal state.
+    """Launch training and poll status.yaml, refreshing a live front preview.
+
+    The poll interval self-adjusts (see AdaptivePollInterval): it isn't meant
+    to keep the preview in tight real-time sync with INDICATORS.csv, only to
+    avoid wasted polls while backing off, and to catch up once data appears.
 
     Args:
         evolver_home: Path to the Evolver checkout (JVM working directory).
         jar: Path to Evolver's fat jar.
         request_yaml: Path to the written training request.
         status_yaml: Path where progress is reported.
+        indicators_csv: Path where checkpoints of the indicator front are appended.
+        update_every_evaluations: Minimum evaluations between live-preview redraws.
 
     Returns:
         The final run status (FINISHED or FAILED).
     """
     start_training(evolver_home, jar, request_yaml, status_yaml)
     progress = st.progress(0.0, text="Starting…")
-    status = read_status(status_yaml)
+    chart_placeholder = st.empty()
+    renderer = LiveFrontRenderer(update_every_evaluations)
+    interval = AdaptivePollInterval()
+    status = _poll_tick(
+        status_yaml, indicators_csv, progress, chart_placeholder, renderer, interval
+    )
     while status is None or status.state == RunState.RUNNING:
-        time.sleep(POLL_INTERVAL_SECONDS)
-        status = read_status(status_yaml)
-        if status is not None:
-            fraction = status.evaluations_done / max(status.max_evaluations, 1)
-            progress.progress(fraction, text=f"{status.evaluations_done}/{status.max_evaluations}")
+        time.sleep(interval.seconds())
+        status = _poll_tick(
+            status_yaml, indicators_csv, progress, chart_placeholder, renderer, interval
+        )
     return status
 
 
 def _render_indicator_front(indicators_csv: Path) -> None:
-    """Plot the meta-level non-dominated archive as a scatter of two indicators.
-
-    INDICATORS.csv's indicator columns are named after jMetal's short indicator
-    codes (e.g. "EP", "NHV"), not the full names given in the request — so the
-    axes are taken from the CSV header itself rather than from indicator_names.
+    """Plot the training's final non-dominated indicator front.
 
     Args:
-        indicators_csv: Path to INDICATORS.csv, with columns
-            Evaluation, SolutionId, <indicator1>, <indicator2>, ...
+        indicators_csv: Path to the completed run's INDICATORS.csv.
     """
-    indicators = load_indicators(indicators_csv)
-    x_axis, y_axis = indicators.columns[2], indicators.columns[3]
-    st.plotly_chart(px.scatter(indicators, x=x_axis, y=y_axis, title="Meta-level indicator front"))
+    history = load_indicators(indicators_csv)
+    latest = latest_checkpoint_evaluation(history)
+    if latest is None:
+        st.info("No indicator data was written.")
+        return
+    st.plotly_chart(build_front_figure(checkpoint_front(history, latest), latest))
 
 
 def _render_output_directory(output_directory: Path, metadata_file: Path) -> None:
@@ -136,11 +184,14 @@ if st.sidebar.button("Compilar Evolver"):
     else:
         st.sidebar.success("Jar built successfully.")
 
-output_directory = st.text_input("Output directory", "results/nsgaii/ZDT4")
+output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
 meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
 number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
+update_every_evaluations = st.number_input(
+    "Actualizar cada N evaluaciones", value=100, min_value=1, step=100
+)
 
-base_level = _base_level_config(output_directory)
+base_level = _base_level_config(output_directory_base)
 meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
 st.code(to_request_yaml(base_level, meta_search), language="yaml")
 
@@ -150,9 +201,21 @@ if st.button("Ejecutar entrenamiento"):
     run_dir.mkdir(parents=True, exist_ok=True)
     request_yaml = run_dir / "request.yaml"
     status_yaml = run_dir / "status.yaml"
-    request_yaml.write_text(to_request_yaml(base_level, meta_search))
 
-    final_status = _run_and_wait(evolver_home, jar_path(evolver_home), request_yaml, status_yaml)
+    # Nest under run_id so INDICATORS.csv (append-only in Evolver) never mixes
+    # checkpoints across runs that share the same output_directory_base.
+    run_base_level = _base_level_config(f"{output_directory_base}/{run_id}")
+    request_yaml.write_text(to_request_yaml(run_base_level, meta_search))
+    indicators_csv = evolver_home / run_base_level.output_directory / "INDICATORS.csv"
+
+    final_status = _run_and_wait(
+        evolver_home,
+        jar_path(evolver_home),
+        request_yaml,
+        status_yaml,
+        indicators_csv,
+        int(update_every_evaluations),
+    )
     if final_status.state == RunState.FAILED:
         st.error(final_status.error_message)
     else:
