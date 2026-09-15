@@ -101,6 +101,43 @@ def checkpoint_front(history: pd.DataFrame, evaluation: int) -> pd.DataFrame:
     return history[history["Evaluation"] == evaluation]
 
 
+def _front_values(
+    history: pd.DataFrame, evaluation: int, indicator_columns: list[str]
+) -> frozenset:
+    """The indicator-value set for one checkpoint, order-independent for comparison."""
+    front = history.loc[history["Evaluation"] == evaluation, indicator_columns]
+    return frozenset(map(tuple, front.to_numpy()))
+
+
+def deduplicate_consecutive_checkpoints(history: pd.DataFrame) -> pd.DataFrame:
+    """Drop a checkpoint when its indicator values match the previous checkpoint's.
+
+    Meant for a multi-checkpoint scatter: plotting the same front repeatedly
+    at different evaluation counts adds visual clutter without new
+    information, so a run that has converged (or stalled) collapses to a
+    single entry instead of one per unchanged checkpoint.
+
+    Args:
+        history: Rows loaded by `load_indicators`, possibly spanning several
+            checkpoints.
+
+    Returns:
+        The same rows, minus any checkpoint whose indicator-value set equals
+        the immediately preceding (lower-Evaluation) checkpoint kept so far.
+    """
+    if history.empty:
+        return history
+    indicator_columns = [c for c in history.columns if c not in ("Evaluation", "SolutionId")]
+    kept_evaluations = []
+    previous_front = None
+    for evaluation in sorted(history["Evaluation"].unique()):
+        front = _front_values(history, evaluation, indicator_columns)
+        if front != previous_front:
+            kept_evaluations.append(evaluation)
+            previous_front = front
+    return history[history["Evaluation"].isin(kept_evaluations)]
+
+
 def read_metadata(metadata_txt: Path) -> str:
     """Read METADATA.txt's free-text run summary.
 
