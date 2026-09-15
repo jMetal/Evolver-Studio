@@ -31,8 +31,7 @@ from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.request import BaseLevelConfig, FlatMetaSearchConfig, to_request_yaml
 from evolver_studio.result import Err
 from evolver_studio.results import (
-    checkpoint_front,
-    latest_checkpoint_evaluation,
+    deduplicate_consecutive_checkpoints,
     list_output_dir,
     load_indicators,
     read_metadata,
@@ -191,19 +190,17 @@ def _poll_tick(
 
 
 def _render_indicator_front(indicators_csv: Path) -> None:
-    """Plot the training's final non-dominated indicator front.
+    """Plot the indicator front's evolution across all checkpoints written.
 
     Args:
         indicators_csv: Path to the completed run's INDICATORS.csv.
     """
     history = load_indicators(indicators_csv)
-    latest = latest_checkpoint_evaluation(history)
-    if latest is None:
+    if history.empty:
         st.info("No indicator data was written.")
         return
-    st.plotly_chart(
-        build_front_figure(checkpoint_front(history, latest), latest), key="final_indicator_front"
-    )
+    figure = build_front_figure(deduplicate_consecutive_checkpoints(history))
+    st.plotly_chart(figure, key="final_indicator_front")
 
 
 def _render_output_directory(output_directory: Path, metadata_file: Path) -> None:
