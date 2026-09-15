@@ -101,7 +101,11 @@ def _poll_tick(
     update = renderer.poll(indicators_csv)
     interval.record_poll(update.changed, time.monotonic())
     if update.figure is not None:
-        chart_placeholder.plotly_chart(update.figure, use_container_width=True)
+        chart_placeholder.plotly_chart(
+            update.figure,
+            use_container_width=True,
+            key=f"live_indicator_front_{update.evaluation}",
+        )
     return status
 
 
@@ -157,7 +161,9 @@ def _render_indicator_front(indicators_csv: Path) -> None:
     if latest is None:
         st.info("No indicator data was written.")
         return
-    st.plotly_chart(build_front_figure(checkpoint_front(history, latest), latest))
+    st.plotly_chart(
+        build_front_figure(checkpoint_front(history, latest), latest), key="final_indicator_front"
+    )
 
 
 def _render_output_directory(output_directory: Path, metadata_file: Path) -> None:

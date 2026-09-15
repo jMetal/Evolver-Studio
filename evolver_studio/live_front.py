@@ -56,10 +56,13 @@ class LiveFrontUpdate:
         changed: Whether the file grew since the previous poll — independent
             of the render throttle, useful to drive an adaptive poll interval.
         figure: A new figure for the latest checkpoint, only if one was due.
+        evaluation: That checkpoint's evaluation count, set whenever `figure`
+            is — lets callers build a stable, unique widget key per redraw.
     """
 
     changed: bool
     figure: go.Figure | None
+    evaluation: int | None = None
 
 
 class LiveFrontRenderer:
@@ -84,7 +87,8 @@ class LiveFrontRenderer:
             return LiveFrontUpdate(changed=False, figure=None)
         history = load_indicators(indicators_csv)
         latest = latest_checkpoint_evaluation(history)
-        return LiveFrontUpdate(changed=True, figure=self._figure_if_due(history, latest))
+        figure = self._figure_if_due(history, latest)
+        return LiveFrontUpdate(changed=True, figure=figure, evaluation=latest if figure else None)
 
     def _figure_if_due(self, history: pd.DataFrame, latest: int | None) -> go.Figure | None:
         """Build a figure for `latest` only if the render throttle allows it now."""
