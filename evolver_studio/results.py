@@ -138,6 +138,27 @@ def deduplicate_consecutive_checkpoints(history: pd.DataFrame) -> pd.DataFrame:
     return history[history["Evaluation"].isin(kept_evaluations)]
 
 
+def last_n_checkpoints(history: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Keep only the N most recent distinct checkpoints.
+
+    Early checkpoints often have much larger indicator values than later,
+    converged ones, which can visually swamp the late-stage detail in a
+    combined plot — this lets a caller zoom into just the recent history.
+
+    Args:
+        history: Rows loaded by `load_indicators`, possibly spanning several
+            checkpoints (typically already deduplicated).
+        n: How many of the most recent distinct Evaluation values to keep.
+
+    Returns:
+        Rows belonging only to the N largest Evaluation values present.
+    """
+    if history.empty:
+        return history
+    kept_evaluations = sorted(history["Evaluation"].unique())[-n:]
+    return history[history["Evaluation"].isin(kept_evaluations)]
+
+
 def read_metadata(metadata_txt: Path) -> str:
     """Read METADATA.txt's free-text run summary.
 
