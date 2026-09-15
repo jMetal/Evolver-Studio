@@ -70,68 +70,72 @@ class LiveFrontUpdate:
     Attributes:
         changed: Whether the file grew since the previous poll — independent
             of the render throttle, useful to drive an adaptive poll interval.
-        figure: A new figure for the latest checkpoint, only if one was due.
-        evaluation: That checkpoint's evaluation count, set whenever `figure`
-            is — lets callers build a stable, unique widget key per redraw.
+        updated: Whether a new checkpoint was folded into `last_history` this
+            poll (i.e. the render throttle allowed it through).
     """
 
     changed: bool
-    figure: go.Figure | None
-    evaluation: int | None = None
+    updated: bool
 
 
 class LiveFrontRenderer:
-    """Tracks throttling state across repeated polls of a growing INDICATORS.csv."""
+    """Tracks the deduplicated checkpoint history available for display, throttled.
+
+    Deliberately doesn't build a Plotly figure itself: how much of the
+    history to actually plot (e.g. only the last N checkpoints, to keep
+    early, large indicator values from swamping later convergence detail) is
+    a display choice left to the caller, via `build_front_figure` and
+    `last_n_checkpoints`.
+    """
 
     def __init__(self, update_every_evaluations: int) -> None:
         self._update_every_evaluations = update_every_evaluations
         self._last_rendered_evaluation: int | None = None
         self._last_file_size = -1
-        self._last_figure: go.Figure | None = None
+        self._last_history: pd.DataFrame | None = None
 
     @property
-    def last_figure(self) -> go.Figure | None:
-        """The most recently built figure, if any — for redrawing every tick.
+    def last_history(self) -> pd.DataFrame | None:
+        """The deduplicated checkpoint history as of the last due poll.
 
         A fragment fully replaces its own contents each time it reruns, so a
-        caller must redraw this every tick (not only when `poll` reports a new
-        figure) to avoid the preview flickering away between throttled redraws.
+        caller must redraw from this every tick (not only when `poll` reports
+        an update) to avoid the preview flickering away between throttled
+        redraws.
         """
-        return self._last_figure
+        return self._last_history
 
     @property
     def last_rendered_evaluation(self) -> int | None:
-        """The evaluation count of `last_figure`, or None if nothing rendered yet."""
+        """The most recent checkpoint's evaluation count in `last_history`."""
         return self._last_rendered_evaluation
 
     def poll(self, indicators_csv: Path) -> LiveFrontUpdate:
-        """Check INDICATORS.csv once for new data and, if due, a figure to show.
+        """Check INDICATORS.csv once and, if due, fold new data into `last_history`.
 
         Args:
             indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
 
         Returns:
-            Whether the file grew since the last poll, and a new figure only
-            if a checkpoint is due to be (re)rendered.
+            Whether the file grew since the last poll, and whether a new
+            checkpoint was folded into `last_history` this time.
         """
         if not self._file_grew(indicators_csv):
-            return LiveFrontUpdate(changed=False, figure=None)
+            return LiveFrontUpdate(changed=False, updated=False)
         history = load_indicators(indicators_csv)
         latest = latest_checkpoint_evaluation(history)
-        figure = self._figure_if_due(history, latest)
-        return LiveFrontUpdate(changed=True, figure=figure, evaluation=latest if figure else None)
+        return LiveFrontUpdate(changed=True, updated=self._update_if_due(history, latest))
 
-    def _figure_if_due(self, history: pd.DataFrame, latest: int | None) -> go.Figure | None:
-        """Build a figure from every checkpoint so far, if the render throttle allows it now."""
+    def _update_if_due(self, history: pd.DataFrame, latest: int | None) -> bool:
+        """Fold `history` into `last_history` only if the render throttle allows it now."""
         is_due = latest is not None and should_render_checkpoint(
             latest, self._last_rendered_evaluation, self._update_every_evaluations
         )
         if not is_due:
-            return None
+            return False
         self._last_rendered_evaluation = latest
-        figure = build_front_figure(deduplicate_consecutive_checkpoints(history))
-        self._last_figure = figure
-        return figure
+        self._last_history = deduplicate_consecutive_checkpoints(history)
+        return True
 
     def _file_grew(self, indicators_csv: Path) -> bool:
         """Check INDICATORS.csv's size against the last poll, to skip a no-op reparse."""
