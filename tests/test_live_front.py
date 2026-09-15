@@ -129,3 +129,19 @@ class TestLiveFrontRenderer:
         # Assert
         assert renderer.last_figure is not None
         assert renderer.last_rendered_evaluation == 50
+
+    def test_should_plot_every_distinct_checkpoint_seen_so_far(self, tmp_path: Path):
+        """The figure must show the front's evolution, not just the latest checkpoint."""
+        # Arrange
+        renderer = LiveFrontRenderer(update_every_evaluations=100)
+        indicators_csv = tmp_path / "INDICATORS.csv"
+        indicators_csv.write_text(CSV_HEADER + "50,0,0.5,0.8\n")
+        renderer.poll(indicators_csv)
+        with indicators_csv.open("a") as handle:
+            handle.write("200,0,0.2,0.95\n")
+
+        # Act
+        update = renderer.poll(indicators_csv)
+
+        # Assert
+        assert list(update.figure.data[0].x) == [0.5, 0.2]
