@@ -1,20 +1,31 @@
-"""Streamlit prototype: run Evolver's ZDT4 training and show its results."""
+"""Streamlit prototype: run Evolver's ZDT4 training and show its results.
+
+Training runs as a detached subprocess, independent of this page's session —
+matching the file-based request/status/results contract described in
+CLAUDE.md, meant for long batch jobs that shouldn't need the UI to stay
+connected. Reopening the app reconnects to an in-progress run instead of
+losing track of it; a running job can be stopped with a Cancel button. The
+polling loop uses `st.fragment` so it never blocks the rest of the page —
+without it, a Cancel click couldn't be processed until the loop returned.
+"""
 
 import datetime as dt
 import time
 from pathlib import Path
 
 import streamlit as st
-from streamlit.delta_generator import DeltaGenerator
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
 from evolver_studio.evolver_client import (
     RunState,
     RunStatus,
     build_jar,
+    cancel_training,
     jar_path,
+    read_pid,
     read_status,
     start_training,
+    write_pid_file,
 )
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.request import BaseLevelConfig, FlatMetaSearchConfig, to_request_yaml
@@ -27,8 +38,11 @@ from evolver_studio.results import (
     read_metadata,
     read_results_pointer,
 )
+from evolver_studio.runs import ActiveRun, find_active_run, mark_cancelled
 
 DEFAULT_EVOLVER_HOME = "/Users/ajnebro/Softw/Evolver"
+DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
+LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
 
 
 def _base_level_config(output_directory: str) -> BaseLevelConfig:
@@ -73,21 +87,86 @@ def _meta_search_config(meta_max_evaluations: int, number_of_cores: int) -> Flat
     )
 
 
+def _launch_run(
+    evolver_home: Path,
+    run_id: str,
+    base_level: BaseLevelConfig,
+    meta_search: FlatMetaSearchConfig,
+    update_every_evaluations: int,
+) -> None:
+    """Write the request, launch training, and persist its PID for later control.
+
+    Args:
+        evolver_home: Path to the Evolver checkout (JVM working directory).
+        run_id: This run's timestamp-based identifier.
+        base_level: Base-level config, with output_directory nested under run_id
+            so INDICATORS.csv (append-only in Evolver) never mixes checkpoints
+            across runs that share the same base output directory.
+        meta_search: Meta-search config.
+        update_every_evaluations: Chosen live-preview redraw threshold.
+    """
+    run_dir = evolver_home / "cli-runner-runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    request_yaml = run_dir / "request.yaml"
+    request_yaml.write_text(to_request_yaml(base_level, meta_search))
+    process = start_training(
+        evolver_home, jar_path(evolver_home), request_yaml, run_dir / "status.yaml"
+    )
+    write_pid_file(run_dir / "pid.txt", process.pid)
+    st.session_state[f"update_every_evaluations_{run_id}"] = update_every_evaluations
+    st.session_state.pop("last_finished_run", None)
+
+
+def _cancel(active_run: ActiveRun) -> None:
+    """Terminate a run's subprocess and mark it as no longer active.
+
+    Args:
+        active_run: The run to cancel.
+    """
+    pid = read_pid(active_run.pid_file)
+    if pid is not None:
+        cancel_training(pid)
+    mark_cancelled(active_run.run_dir)
+
+
+def _live_state(
+    run_id: str, update_every_evaluations: int
+) -> tuple[LiveFrontRenderer, AdaptivePollInterval]:
+    """Get or create a run's live-preview state, persisted across fragment reruns.
+
+    Args:
+        run_id: The run's identifier, used to key the stashed state.
+        update_every_evaluations: Redraw threshold used only when first created.
+
+    Returns:
+        The renderer and poll interval tracking this run's live preview.
+    """
+    key = f"live_state_{run_id}"
+    if key not in st.session_state:
+        st.session_state[key] = (
+            LiveFrontRenderer(update_every_evaluations),
+            AdaptivePollInterval(),
+        )
+    return st.session_state[key]
+
+
 def _poll_tick(
     status_yaml: Path,
     indicators_csv: Path,
-    progress: DeltaGenerator,
-    chart_placeholder: DeltaGenerator,
     renderer: LiveFrontRenderer,
     interval: AdaptivePollInterval,
 ) -> RunStatus | None:
-    """Read the latest status, redraw the live front if due, and adapt the poll interval.
+    """Read the latest status, redraw the live front, and adapt the poll interval.
+
+    Draws directly into whatever container is active when called — meant to
+    run inside a fragment, which fully replaces its own contents each time it
+    reruns, so both the progress bar and the front preview (last known figure,
+    not just a newly-due one, to avoid it flickering away between throttled
+    redraws) are (re)drawn unconditionally on every call.
 
     Args:
         status_yaml: Path to the run's status file.
         indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
-        progress: Progress bar to update with the latest evaluation count.
-        chart_placeholder: Placeholder to redraw the live front into.
         renderer: Tracks render-throttling state across polls.
         interval: Tracks the adaptive sleep interval across polls.
 
@@ -97,55 +176,16 @@ def _poll_tick(
     status = read_status(status_yaml)
     if status is not None:
         fraction = status.evaluations_done / max(status.max_evaluations, 1)
-        progress.progress(fraction, text=f"{status.evaluations_done}/{status.max_evaluations}")
+        st.progress(fraction, text=f"{status.evaluations_done}/{status.max_evaluations}")
+    else:
+        st.progress(0.0, text="Starting…")
     update = renderer.poll(indicators_csv)
     interval.record_poll(update.changed, time.monotonic())
-    if update.figure is not None:
-        chart_placeholder.plotly_chart(
-            update.figure,
+    if renderer.last_figure is not None:
+        st.plotly_chart(
+            renderer.last_figure,
             use_container_width=True,
-            key=f"live_indicator_front_{update.evaluation}",
-        )
-    return status
-
-
-def _run_and_wait(
-    evolver_home: Path,
-    jar: Path,
-    request_yaml: Path,
-    status_yaml: Path,
-    indicators_csv: Path,
-    update_every_evaluations: int,
-) -> RunStatus:
-    """Launch training and poll status.yaml, refreshing a live front preview.
-
-    The poll interval self-adjusts (see AdaptivePollInterval): it isn't meant
-    to keep the preview in tight real-time sync with INDICATORS.csv, only to
-    avoid wasted polls while backing off, and to catch up once data appears.
-
-    Args:
-        evolver_home: Path to the Evolver checkout (JVM working directory).
-        jar: Path to Evolver's fat jar.
-        request_yaml: Path to the written training request.
-        status_yaml: Path where progress is reported.
-        indicators_csv: Path where checkpoints of the indicator front are appended.
-        update_every_evaluations: Minimum evaluations between live-preview redraws.
-
-    Returns:
-        The final run status (FINISHED or FAILED).
-    """
-    start_training(evolver_home, jar, request_yaml, status_yaml)
-    progress = st.progress(0.0, text="Starting…")
-    chart_placeholder = st.empty()
-    renderer = LiveFrontRenderer(update_every_evaluations)
-    interval = AdaptivePollInterval()
-    status = _poll_tick(
-        status_yaml, indicators_csv, progress, chart_placeholder, renderer, interval
-    )
-    while status is None or status.state == RunState.RUNNING:
-        time.sleep(interval.seconds())
-        status = _poll_tick(
-            status_yaml, indicators_csv, progress, chart_placeholder, renderer, interval
+            key=f"live_indicator_front_{renderer.last_rendered_evaluation}",
         )
     return status
 
@@ -180,6 +220,55 @@ def _render_output_directory(output_directory: Path, metadata_file: Path) -> Non
         st.text(read_metadata(metadata_file))
 
 
+def _render_last_finished_run_if_any(evolver_home: Path) -> None:
+    """Show the most recently completed run's results, if one is pending display.
+
+    Args:
+        evolver_home: Path to the Evolver checkout, to resolve results.yaml's paths.
+    """
+    pending = st.session_state.get("last_finished_run")
+    if pending is None:
+        return
+    status, run_dir = pending
+    if status.state == RunState.FAILED:
+        st.error(status.error_message)
+        return
+    pointer = read_results_pointer(run_dir / "results.yaml", evolver_home)
+    st.success("Training finished.")
+    if st.checkbox("Mostrar frente de indicadores", value=True):
+        _render_indicator_front(pointer.indicators_file)
+    _render_output_directory(pointer.output_directory, pointer.metadata_file)
+
+
+def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
+    """Show progress and a live front preview for an in-progress run.
+
+    Args:
+        evolver_home: Path to the Evolver checkout, to resolve results.yaml's paths.
+        active_run: The run currently in progress.
+    """
+    st.info(f"Entrenamiento en curso (run {active_run.run_id}).")
+    if st.button("Cancelar entrenamiento"):
+        _cancel(active_run)
+        st.rerun()
+
+    default_n = st.session_state.get(
+        f"update_every_evaluations_{active_run.run_id}", DEFAULT_UPDATE_EVERY_EVALUATIONS
+    )
+    renderer, interval = _live_state(active_run.run_id, default_n)
+
+    @st.fragment(
+        run_every=LIVE_FRAGMENT_RUN_EVERY_SECONDS, key=f"poll_fragment_{active_run.run_id}"
+    )
+    def _poll() -> None:
+        status = _poll_tick(active_run.status_yaml, active_run.indicators_csv, renderer, interval)
+        if status is not None and status.state != RunState.RUNNING:
+            st.session_state["last_finished_run"] = (status, active_run.run_dir)
+            st.rerun()
+
+    _poll()
+
+
 st.title("Evolver-Studio — ZDT4 training prototype")
 
 evolver_home = Path(st.sidebar.text_input("Evolver checkout path", DEFAULT_EVOLVER_HOME))
@@ -190,44 +279,31 @@ if st.sidebar.button("Compilar Evolver"):
     else:
         st.sidebar.success("Jar built successfully.")
 
-output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
-meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
-number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
-update_every_evaluations = st.number_input(
-    "Actualizar cada N evaluaciones", value=100, min_value=1, step=100
-)
+active_run = find_active_run(evolver_home)
 
-base_level = _base_level_config(output_directory_base)
-meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
-st.code(to_request_yaml(base_level, meta_search), language="yaml")
-
-if st.button("Ejecutar entrenamiento"):
-    run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = evolver_home / "cli-runner-runs" / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    request_yaml = run_dir / "request.yaml"
-    status_yaml = run_dir / "status.yaml"
-
-    # Nest under run_id so INDICATORS.csv (append-only in Evolver) never mixes
-    # checkpoints across runs that share the same output_directory_base.
-    run_base_level = _base_level_config(f"{output_directory_base}/{run_id}")
-    request_yaml.write_text(to_request_yaml(run_base_level, meta_search))
-    indicators_csv = evolver_home / run_base_level.output_directory / "INDICATORS.csv"
-
-    final_status = _run_and_wait(
-        evolver_home,
-        jar_path(evolver_home),
-        request_yaml,
-        status_yaml,
-        indicators_csv,
-        int(update_every_evaluations),
+if active_run is not None:
+    _render_active_run(evolver_home, active_run)
+else:
+    output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
+    meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
+    number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
+    update_every_evaluations = st.number_input(
+        "Actualizar cada N evaluaciones",
+        value=DEFAULT_UPDATE_EVERY_EVALUATIONS,
+        min_value=1,
+        step=100,
     )
-    if final_status.state == RunState.FAILED:
-        st.error(final_status.error_message)
-    else:
-        results_yaml = run_dir / "results.yaml"
-        pointer = read_results_pointer(results_yaml, evolver_home)
-        st.success("Training finished.")
-        if st.checkbox("Mostrar frente de indicadores", value=True):
-            _render_indicator_front(pointer.indicators_file)
-        _render_output_directory(pointer.output_directory, pointer.metadata_file)
+
+    base_level = _base_level_config(output_directory_base)
+    meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
+    st.code(to_request_yaml(base_level, meta_search), language="yaml")
+
+    if st.button("Ejecutar entrenamiento"):
+        run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        run_base_level = _base_level_config(f"{output_directory_base}/{run_id}")
+        _launch_run(
+            evolver_home, run_id, run_base_level, meta_search, int(update_every_evaluations)
+        )
+        st.rerun()
+
+    _render_last_finished_run_if_any(evolver_home)
