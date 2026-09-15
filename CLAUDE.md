@@ -12,8 +12,12 @@ job is to make Evolver usable without writing Java or hand-editing YAML, and to 
 layer (Wilcoxon tests, plots, comparison tables) on top of the raw results — leveraging the Python
 scientific stack (`pandas`, `scipy.stats`, `seaborn`/`plotly`) and, where useful, `jMetalPy`.
 
-This is a **new, currently empty project** — this file documents the intended architecture agreed on
-before implementation started, to be corrected/expanded as real code lands.
+This file documents the intended architecture agreed on before implementation started. A first,
+deliberately minimal prototype now lives in the repo (`app.py`, `evolver_studio/`): it drives Evolver's
+`org.uma.evolver.cli.runner.TrainingRunnerMain` (see `/Users/ajnebro/Softw/Evolver/docs/proposals/
+cli-runner-prototype.md`) to run the single ZDT4 training case, as a smoke test of the
+request/status/results contract before building the full MVP surface below. Expect this file's
+architecture sections to be corrected/expanded as more of the real code lands.
 
 Evolver lives in a sibling repository: `/Users/ajnebro/Softw/Evolver` (or wherever it's checked out
 locally — do not assume a fixed absolute path in code, make it configurable).
@@ -40,9 +44,10 @@ Streamlit UI (this repo)
   ├─> Discovery: list algorithms / parameter spaces / training sets / indicators
   │     (reads Evolver's YAML parameter spaces directly, or via a small Java helper — TBD)
   ├─> Run control: launch training / validation runs
-  │     -> writes a request.json, invokes the Evolver JAR as a subprocess
-  │     -> polls a status.json for progress (RUNNING/FINISHED/FAILED, evaluations done/total)
-  │     -> reads a results.json (or parses INDICATORS.csv/CONFIGURATIONS.csv) once finished
+  │     -> writes a request.yaml, invokes the Evolver fat jar as a subprocess
+  │        (java -cp ... org.uma.evolver.cli.runner.TrainingRunnerMain request.yaml status.yaml)
+  │     -> polls a status.yaml for progress (RUNNING/FINISHED/FAILED, evaluations done/total)
+  │     -> reads a results.yaml (pointing at METADATA.txt/INDICATORS.csv/CONFIGURATIONS.csv) once finished
   └─> Analysis: statistical comparison of runs/configurations
         (pandas + scipy.stats for Wilcoxon/other tests, seaborn/plotly for plots,
          optionally jMetalPy's own comparison utilities)
@@ -73,11 +78,29 @@ preferred over a persistent HTTP server (simpler to debug, nothing to keep alive
 
 ## Build and Test Commands
 
-Not yet established — this is a placeholder. Once the project has real code, document here the actual
-commands (expected to be a `pyproject.toml`/`requirements.txt`-based Python project, e.g. `uv`/`pip`,
-`pytest` for tests, `streamlit run app.py` to launch locally).
+Python dependencies are managed with a dedicated **Conda environment** named `evolver-studio`
+(`environment.yml`, backed by `pyproject.toml` with a `setuptools` build backend — see
+`CODING_GUIDELINES.md`). To set it up:
+
+```bash
+conda env create -n evolver-studio -f environment.yml   # first time
+conda env update -n evolver-studio -f environment.yml   # after dependency changes
+```
+
+Common commands (also available as `make` targets, which run inside the env via `conda run -n
+evolver-studio`):
+
+```bash
+make lint    # ruff check .
+make format  # ruff format .
+make test    # pytest tests/ -x
+make run     # streamlit run app.py
+```
+
+The prototype also needs a working Evolver checkout to build/run against (JDK ≥ 21, Maven) — the
+checkout path is provided at runtime via the Streamlit sidebar, default `/Users/ajnebro/Softw/Evolver`.
 
 ## Conventions
 
-Not yet established. Follow standard Python conventions (PEP 8, type hints) until a project-specific
-style guide is written here.
+Follow `CODING_GUIDELINES.md` (Python style, typing, testing) and `GIT_GUIDELINES.md` (Conventional
+Commits, atomic commits) in this repo's root.
