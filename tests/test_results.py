@@ -7,6 +7,7 @@ import pandas as pd
 from evolver_studio.results import (
     checkpoint_front,
     deduplicate_consecutive_checkpoints,
+    last_n_checkpoints,
     latest_checkpoint_evaluation,
     list_output_dir,
     load_indicators,
@@ -195,6 +196,47 @@ class TestDeduplicateConsecutiveCheckpoints:
 
         # Assert
         assert deduplicated.empty
+
+
+class TestLastNCheckpoints:
+    def test_should_keep_only_the_n_most_recent_checkpoints(self):
+        """Early, large-scale checkpoints must be dropped when N is smaller than the total."""
+        # Arrange
+        history = pd.DataFrame(
+            {
+                "Evaluation": [100, 100, 200, 300],
+                "SolutionId": [0, 1, 0, 0],
+                "Epsilon": [9, 8, 2, 1],
+            }
+        )
+
+        # Act
+        limited = last_n_checkpoints(history, n=2)
+
+        # Assert
+        assert sorted(limited["Evaluation"].unique()) == [200, 300]
+
+    def test_should_keep_everything_when_n_covers_all_checkpoints(self):
+        """N at least as large as the number of checkpoints must be a no-op."""
+        # Arrange
+        history = pd.DataFrame({"Evaluation": [100, 200], "SolutionId": [0, 0], "Epsilon": [9, 1]})
+
+        # Act
+        limited = last_n_checkpoints(history, n=10)
+
+        # Assert
+        assert sorted(limited["Evaluation"].unique()) == [100, 200]
+
+    def test_should_return_empty_history_unchanged(self):
+        """An empty history must not raise."""
+        # Arrange
+        history = pd.DataFrame({"Evaluation": [], "SolutionId": [], "Epsilon": []})
+
+        # Act
+        limited = last_n_checkpoints(history, n=5)
+
+        # Assert
+        assert limited.empty
 
 
 class TestReadMetadata:
