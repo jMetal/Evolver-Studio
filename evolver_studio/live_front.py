@@ -11,7 +11,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from evolver_studio.results import checkpoint_front, latest_checkpoint_evaluation, load_indicators
+from evolver_studio.results import (
+    deduplicate_consecutive_checkpoints,
+    latest_checkpoint_evaluation,
+    load_indicators,
+)
 
 
 def should_render_checkpoint(
@@ -32,19 +36,30 @@ def should_render_checkpoint(
     return latest_evaluation - last_rendered_evaluation >= update_every_evaluations
 
 
-def build_front_figure(front: pd.DataFrame, evaluation: int) -> go.Figure:
-    """Plot one checkpoint's non-dominated archive as an indicator scatter.
+def build_front_figure(history: pd.DataFrame) -> go.Figure:
+    """Plot every checkpoint's non-dominated archive as one scatter, colored by evaluation.
+
+    A single checkpoint's front can be as small as one point — showing every
+    checkpoint seen so far together, colored on a gradient from early
+    (evaluation count) to late, makes the front's evolution visible at a
+    glance instead of one sparse snapshot at a time.
 
     Args:
-        front: Rows of a single checkpoint (same Evaluation value).
-        evaluation: That checkpoint's evaluation count, shown in the title.
+        history: Rows spanning one or more checkpoints, typically already
+            thinned by `deduplicate_consecutive_checkpoints`. Columns are
+            Evaluation, SolutionId, <indicator1>, <indicator2>, ...
 
     Returns:
-        A Plotly scatter figure, axes taken from the front's own columns.
+        A Plotly scatter figure, axes taken from the history's own columns.
     """
-    x_axis, y_axis = front.columns[2], front.columns[3]
+    x_axis, y_axis = history.columns[2], history.columns[3]
     return px.scatter(
-        front, x=x_axis, y=y_axis, title=f"Indicator front @ {evaluation} evaluations"
+        history,
+        x=x_axis,
+        y=y_axis,
+        color="Evaluation",
+        color_continuous_scale="Viridis",
+        title="Indicator front evolution",
     )
 
 
@@ -107,14 +122,14 @@ class LiveFrontRenderer:
         return LiveFrontUpdate(changed=True, figure=figure, evaluation=latest if figure else None)
 
     def _figure_if_due(self, history: pd.DataFrame, latest: int | None) -> go.Figure | None:
-        """Build a figure for `latest` only if the render throttle allows it now."""
+        """Build a figure from every checkpoint so far, if the render throttle allows it now."""
         is_due = latest is not None and should_render_checkpoint(
             latest, self._last_rendered_evaluation, self._update_every_evaluations
         )
         if not is_due:
             return None
         self._last_rendered_evaluation = latest
-        figure = build_front_figure(checkpoint_front(history, latest), latest)
+        figure = build_front_figure(deduplicate_consecutive_checkpoints(history))
         self._last_figure = figure
         return figure
 
