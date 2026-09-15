@@ -72,6 +72,22 @@ class LiveFrontRenderer:
         self._update_every_evaluations = update_every_evaluations
         self._last_rendered_evaluation: int | None = None
         self._last_file_size = -1
+        self._last_figure: go.Figure | None = None
+
+    @property
+    def last_figure(self) -> go.Figure | None:
+        """The most recently built figure, if any — for redrawing every tick.
+
+        A fragment fully replaces its own contents each time it reruns, so a
+        caller must redraw this every tick (not only when `poll` reports a new
+        figure) to avoid the preview flickering away between throttled redraws.
+        """
+        return self._last_figure
+
+    @property
+    def last_rendered_evaluation(self) -> int | None:
+        """The evaluation count of `last_figure`, or None if nothing rendered yet."""
+        return self._last_rendered_evaluation
 
     def poll(self, indicators_csv: Path) -> LiveFrontUpdate:
         """Check INDICATORS.csv once for new data and, if due, a figure to show.
@@ -98,7 +114,9 @@ class LiveFrontRenderer:
         if not is_due:
             return None
         self._last_rendered_evaluation = latest
-        return build_front_figure(checkpoint_front(history, latest), latest)
+        figure = build_front_figure(checkpoint_front(history, latest), latest)
+        self._last_figure = figure
+        return figure
 
     def _file_grew(self, indicators_csv: Path) -> bool:
         """Check INDICATORS.csv's size against the last poll, to skip a no-op reparse."""
