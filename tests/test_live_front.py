@@ -2,15 +2,41 @@
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
-from evolver_studio.live_front import LiveFrontRenderer, should_render_checkpoint
+from evolver_studio.live_front import (
+    LiveFrontRenderer,
+    build_front_figure,
+    should_render_checkpoint,
+)
 
 CSV_HEADER = "Evaluation,SolutionId,Epsilon,NormalizedHypervolume\n"
 
 
 def _checkpoint_row(evaluation: int) -> str:
     return f"{evaluation},0,0.5,0.8\n"
+
+
+class TestBuildFrontFigure:
+    def test_should_plot_one_point_per_row_colored_by_evaluation(self):
+        """Every checkpoint's rows must appear, with color driven by Evaluation."""
+        # Arrange
+        history = pd.DataFrame(
+            {
+                "Evaluation": [50, 200],
+                "SolutionId": [0, 0],
+                "Epsilon": [0.5, 0.2],
+                "NHV": [0.8, 0.95],
+            }
+        )
+
+        # Act
+        figure = build_front_figure(history)
+
+        # Assert
+        assert list(figure.data[0].x) == [0.5, 0.2]
+        assert list(figure.data[0].marker.color) == [50, 200]
 
 
 class TestShouldRenderCheckpoint:
@@ -49,9 +75,10 @@ class TestLiveFrontRenderer:
 
         # Assert
         assert update.changed is False
-        assert update.figure is None
+        assert update.updated is False
+        assert renderer.last_history is None
 
-    def test_should_return_figure_on_first_checkpoint(self, tmp_path: Path):
+    def test_should_fold_in_first_checkpoint(self, tmp_path: Path):
         """The first checkpoint seen is always due, regardless of N."""
         # Arrange
         renderer = LiveFrontRenderer(update_every_evaluations=100)
@@ -63,8 +90,8 @@ class TestLiveFrontRenderer:
 
         # Assert
         assert update.changed is True
-        assert update.figure is not None
-        assert update.evaluation == 50
+        assert update.updated is True
+        assert renderer.last_rendered_evaluation == 50
 
     def test_should_report_no_change_when_file_unchanged(self, tmp_path: Path):
         """Polling again with no new bytes written must skip re-parsing and redrawing."""
@@ -79,10 +106,10 @@ class TestLiveFrontRenderer:
 
         # Assert
         assert update.changed is False
-        assert update.figure is None
+        assert update.updated is False
 
-    def test_should_report_change_but_skip_figure_before_threshold_is_reached(self, tmp_path: Path):
-        """A new checkpoint that hasn't advanced by N evaluations yet is skipped for redraw."""
+    def test_should_report_change_but_skip_update_before_threshold_is_reached(self, tmp_path: Path):
+        """A new checkpoint that hasn't advanced by N evaluations yet is skipped."""
         # Arrange
         renderer = LiveFrontRenderer(update_every_evaluations=100)
         indicators_csv = tmp_path / "INDICATORS.csv"
@@ -96,10 +123,10 @@ class TestLiveFrontRenderer:
 
         # Assert
         assert update.changed is True
-        assert update.figure is None
-        assert update.evaluation is None
+        assert update.updated is False
+        assert renderer.last_rendered_evaluation == 50
 
-    def test_should_render_again_once_threshold_is_reached(self, tmp_path: Path):
+    def test_should_update_again_once_threshold_is_reached(self, tmp_path: Path):
         """A checkpoint at least N evaluations past the last render is due."""
         # Arrange
         renderer = LiveFrontRenderer(update_every_evaluations=100)
@@ -113,10 +140,11 @@ class TestLiveFrontRenderer:
         update = renderer.poll(indicators_csv)
 
         # Assert
-        assert update.figure is not None
+        assert update.updated is True
+        assert renderer.last_rendered_evaluation == 160
 
-    def test_should_keep_last_figure_available_across_unchanged_polls(self, tmp_path: Path):
-        """A caller redrawing every tick (e.g. inside a fragment) must not lose the figure."""
+    def test_should_keep_last_history_available_across_unchanged_polls(self, tmp_path: Path):
+        """A caller redrawing every tick (e.g. inside a fragment) must not lose the history."""
         # Arrange
         renderer = LiveFrontRenderer(update_every_evaluations=100)
         indicators_csv = tmp_path / "INDICATORS.csv"
@@ -127,11 +155,11 @@ class TestLiveFrontRenderer:
         renderer.poll(indicators_csv)
 
         # Assert
-        assert renderer.last_figure is not None
+        assert renderer.last_history is not None
         assert renderer.last_rendered_evaluation == 50
 
-    def test_should_plot_every_distinct_checkpoint_seen_so_far(self, tmp_path: Path):
-        """The figure must show the front's evolution, not just the latest checkpoint."""
+    def test_should_accumulate_every_distinct_checkpoint_seen_so_far(self, tmp_path: Path):
+        """last_history must include earlier checkpoints too, not just the latest."""
         # Arrange
         renderer = LiveFrontRenderer(update_every_evaluations=100)
         indicators_csv = tmp_path / "INDICATORS.csv"
@@ -141,7 +169,7 @@ class TestLiveFrontRenderer:
             handle.write("200,0,0.2,0.95\n")
 
         # Act
-        update = renderer.poll(indicators_csv)
+        renderer.poll(indicators_csv)
 
         # Assert
-        assert list(update.figure.data[0].x) == [0.5, 0.2]
+        assert sorted(renderer.last_history["Evaluation"].unique()) == [50, 200]
