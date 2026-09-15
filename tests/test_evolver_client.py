@@ -1,11 +1,20 @@
 """Tests for Evolver subprocess integration (status parsing, jar build)."""
 
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-from evolver_studio.evolver_client import RunState, build_jar, read_status
+from evolver_studio.evolver_client import (
+    RunState,
+    build_jar,
+    cancel_training,
+    read_pid,
+    read_status,
+    write_pid_file,
+)
 from evolver_studio.result import Err, Ok
 
 
@@ -100,3 +109,68 @@ class TestBuildJar:
         # Assert
         assert isinstance(result, Err)
         assert "compile error" in result.message
+
+
+class TestPidFile:
+    def test_should_round_trip_a_pid(self, tmp_path: Path):
+        """A written PID must be read back unchanged."""
+        # Arrange
+        pid_file = tmp_path / "pid.txt"
+
+        # Act
+        write_pid_file(pid_file, 12345)
+        pid = read_pid(pid_file)
+
+        # Assert
+        assert pid == 12345
+
+    def test_should_return_none_when_pid_file_missing(self, tmp_path: Path):
+        """Checking before a process has been launched must not raise."""
+        # Arrange
+        pid_file = tmp_path / "missing.txt"
+
+        # Act
+        pid = read_pid(pid_file)
+
+        # Assert
+        assert pid is None
+
+    def test_should_return_none_when_pid_file_is_not_an_integer(self, tmp_path: Path):
+        """A corrupted PID file must not raise."""
+        # Arrange
+        pid_file = tmp_path / "pid.txt"
+        pid_file.write_text("not-a-pid")
+
+        # Act
+        pid = read_pid(pid_file)
+
+        # Assert
+        assert pid is None
+
+
+class TestCancelTraining:
+    def test_should_stop_a_running_process(self, monkeypatch: pytest.MonkeyPatch):
+        """SIGTERM must reach and terminate a genuinely running process."""
+        # Arrange
+        monkeypatch.setattr("evolver_studio.evolver_client.CANCEL_GRACE_PERIOD_SECONDS", 0.2)
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+
+        # Act
+        result = cancel_training(process.pid)
+        process.wait(timeout=5)
+
+        # Assert
+        assert isinstance(result, Ok)
+        assert process.poll() is not None
+
+    def test_should_return_ok_when_process_is_already_gone(self):
+        """Cancelling an already-finished process must be a no-op success."""
+        # Arrange
+        process = subprocess.Popen([sys.executable, "-c", "pass"])
+        process.wait(timeout=5)
+
+        # Act
+        result = cancel_training(process.pid)
+
+        # Assert
+        assert isinstance(result, Ok)
