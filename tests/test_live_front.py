@@ -114,3 +114,18 @@ class TestLiveFrontRenderer:
 
         # Assert
         assert update.figure is not None
+
+    def test_should_keep_last_figure_available_across_unchanged_polls(self, tmp_path: Path):
+        """A caller redrawing every tick (e.g. inside a fragment) must not lose the figure."""
+        # Arrange
+        renderer = LiveFrontRenderer(update_every_evaluations=100)
+        indicators_csv = tmp_path / "INDICATORS.csv"
+        indicators_csv.write_text(CSV_HEADER + _checkpoint_row(50))
+        renderer.poll(indicators_csv)
+
+        # Act
+        renderer.poll(indicators_csv)
+
+        # Assert
+        assert renderer.last_figure is not None
+        assert renderer.last_rendered_evaluation == 50
