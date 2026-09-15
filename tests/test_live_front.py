@@ -64,6 +64,7 @@ class TestLiveFrontRenderer:
         # Assert
         assert update.changed is True
         assert update.figure is not None
+        assert update.evaluation == 50
 
     def test_should_report_no_change_when_file_unchanged(self, tmp_path: Path):
         """Polling again with no new bytes written must skip re-parsing and redrawing."""
@@ -96,6 +97,7 @@ class TestLiveFrontRenderer:
         # Assert
         assert update.changed is True
         assert update.figure is None
+        assert update.evaluation is None
 
     def test_should_render_again_once_threshold_is_reached(self, tmp_path: Path):
         """A checkpoint at least N evaluations past the last render is due."""
