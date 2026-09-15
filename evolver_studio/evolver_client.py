@@ -1,6 +1,9 @@
 """Subprocess integration with Evolver's cli.runner (build + launch + poll)."""
 
+import os
+import signal
 import subprocess
+import time
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -8,6 +11,8 @@ from pathlib import Path
 import yaml
 
 from evolver_studio.result import Err, Ok
+
+CANCEL_GRACE_PERIOD_SECONDS = 2.0
 
 TRAINING_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.runner.TrainingRunnerMain"
 JAR_RELATIVE_PATH = Path("target/Evolver-2.1-SNAPSHOT-jar-with-dependencies.jar")
@@ -91,6 +96,73 @@ def start_training(
         stderr=subprocess.STDOUT,
         text=True,
     )
+
+
+def write_pid_file(pid_file: Path, pid: int) -> None:
+    """Persist a launched subprocess's PID so it can be found after this process exits.
+
+    Args:
+        pid_file: Path to write the PID to.
+        pid: The subprocess's process ID.
+    """
+    pid_file.write_text(str(pid))
+
+
+def read_pid(pid_file: Path) -> int | None:
+    """Read a previously written PID file.
+
+    Args:
+        pid_file: Path written by `write_pid_file`.
+
+    Returns:
+        The PID, or None if the file is missing or not a valid integer.
+    """
+    try:
+        return int(pid_file.read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def is_alive(pid: int) -> bool:
+    """Check whether a process with the given PID is still running.
+
+    Args:
+        pid: The process ID to check.
+
+    Returns:
+        True if a process with that PID currently exists.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def cancel_training(pid: int) -> Ok[None] | Err:
+    """Stop a running TrainingRunnerMain subprocess by PID.
+
+    Sends SIGTERM and, if the process hasn't exited after a short grace
+    period, follows up with SIGKILL. Idempotent: a PID that's already gone
+    counts as success.
+
+    Args:
+        pid: The subprocess's process ID, as written by `write_pid_file`.
+
+    Returns:
+        Ok(None) once the process is confirmed gone, Err(message) if it
+        couldn't be signaled (e.g. permission denied).
+    """
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return Ok(None)
+    except PermissionError as error:
+        return Err(f"Could not signal process {pid}: {error}")
+    time.sleep(CANCEL_GRACE_PERIOD_SECONDS)
+    if is_alive(pid):
+        os.kill(pid, signal.SIGKILL)
+    return Ok(None)
 
 
 def read_status(status_yaml: Path) -> RunStatus | None:
