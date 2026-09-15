@@ -13,6 +13,7 @@ import datetime as dt
 import time
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
@@ -32,12 +33,14 @@ from evolver_studio.request import BaseLevelConfig, FlatMetaSearchConfig, to_req
 from evolver_studio.result import Err
 from evolver_studio.results import (
     deduplicate_consecutive_checkpoints,
+    last_n_checkpoints,
     list_output_dir,
     load_indicators,
     read_metadata,
     read_results_pointer,
 )
 from evolver_studio.runs import ActiveRun, find_active_run, mark_cancelled
+from evolver_studio.slider_state import next_slider_value
 
 DEFAULT_EVOLVER_HOME = "/Users/ajnebro/Softw/Evolver"
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
@@ -149,25 +152,69 @@ def _live_state(
     return st.session_state[key]
 
 
+def _sync_last_n_slider_value(slider_key: str, available: int) -> None:
+    """Pre-seed the "last N" slider's session-state value before it's created.
+
+    Called with no `value=` kwarg on the slider itself, since Streamlit
+    re-applies `value=` whenever `max_value` changes (not only on first
+    creation), which would silently override a value the user had chosen.
+
+    Args:
+        slider_key: The slider's widget key.
+        available: The current number of distinct checkpoints to show by
+            default, before the user narrows it.
+    """
+    tracked_key = f"{slider_key}_auto_tracked_available"
+    next_value, next_tracked = next_slider_value(
+        st.session_state.get(slider_key), st.session_state.get(tracked_key), available
+    )
+    st.session_state[slider_key] = next_value
+    st.session_state[tracked_key] = next_tracked
+
+
+def _render_front_with_slider(history: pd.DataFrame, slider_key: str, chart_key: str) -> None:
+    """Draw the front evolution, letting the viewer narrow it to the last N checkpoints.
+
+    Early checkpoints often have much larger indicator values than later,
+    converged ones, which can swamp the late-stage detail in a combined plot.
+
+    Args:
+        history: Deduplicated checkpoint history to show.
+        slider_key: Stable widget key so the chosen N persists across reruns.
+        chart_key: Stable widget key for the chart itself.
+    """
+    available = history["Evaluation"].nunique()
+    if available <= 1:
+        # st.slider rejects min_value == max_value; nothing to narrow down yet anyway.
+        st.plotly_chart(build_front_figure(history), width="stretch", key=chart_key)
+        return
+    _sync_last_n_slider_value(slider_key, available)
+    n = st.slider("Mostrar últimos N frentes", min_value=1, max_value=available, key=slider_key)
+    figure = build_front_figure(last_n_checkpoints(history, n))
+    st.plotly_chart(figure, width="stretch", key=chart_key)
+
+
 def _poll_tick(
     status_yaml: Path,
     indicators_csv: Path,
     renderer: LiveFrontRenderer,
     interval: AdaptivePollInterval,
+    slider_key: str,
 ) -> RunStatus | None:
     """Read the latest status, redraw the live front, and adapt the poll interval.
 
     Draws directly into whatever container is active when called — meant to
     run inside a fragment, which fully replaces its own contents each time it
-    reruns, so both the progress bar and the front preview (last known figure,
-    not just a newly-due one, to avoid it flickering away between throttled
-    redraws) are (re)drawn unconditionally on every call.
+    reruns, so both the progress bar and the front preview (from the last due
+    history, not just a newly-due one, to avoid it flickering away between
+    throttled redraws) are (re)drawn unconditionally on every call.
 
     Args:
         status_yaml: Path to the run's status file.
         indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
         renderer: Tracks render-throttling state across polls.
         interval: Tracks the adaptive sleep interval across polls.
+        slider_key: Stable widget key for the "last N checkpoints" slider.
 
     Returns:
         The latest parsed status, or None if not yet available.
@@ -180,27 +227,26 @@ def _poll_tick(
         st.progress(0.0, text="Starting…")
     update = renderer.poll(indicators_csv)
     interval.record_poll(update.changed, time.monotonic())
-    if renderer.last_figure is not None:
-        st.plotly_chart(
-            renderer.last_figure,
-            use_container_width=True,
-            key=f"live_indicator_front_{renderer.last_rendered_evaluation}",
-        )
+    if renderer.last_history is not None:
+        _render_front_with_slider(renderer.last_history, slider_key, f"{slider_key}_chart")
     return status
 
 
-def _render_indicator_front(indicators_csv: Path) -> None:
+def _render_indicator_front(indicators_csv: Path, run_id: str) -> None:
     """Plot the indicator front's evolution across all checkpoints written.
 
     Args:
         indicators_csv: Path to the completed run's INDICATORS.csv.
+        run_id: The run's identifier, to key the "last N" slider.
     """
     history = load_indicators(indicators_csv)
     if history.empty:
         st.info("No indicator data was written.")
         return
-    figure = build_front_figure(deduplicate_consecutive_checkpoints(history))
-    st.plotly_chart(figure, key="final_indicator_front")
+    deduplicated = deduplicate_consecutive_checkpoints(history)
+    _render_front_with_slider(
+        deduplicated, f"final_last_n_slider_{run_id}", "final_indicator_front"
+    )
 
 
 def _render_output_directory(output_directory: Path, metadata_file: Path) -> None:
@@ -233,7 +279,7 @@ def _render_last_finished_run_if_any(evolver_home: Path) -> None:
     pointer = read_results_pointer(run_dir / "results.yaml", evolver_home)
     st.success("Training finished.")
     if st.checkbox("Mostrar frente de indicadores", value=True):
-        _render_indicator_front(pointer.indicators_file)
+        _render_indicator_front(pointer.indicators_file, run_dir.name)
     _render_output_directory(pointer.output_directory, pointer.metadata_file)
 
 
@@ -258,7 +304,13 @@ def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
         run_every=LIVE_FRAGMENT_RUN_EVERY_SECONDS, key=f"poll_fragment_{active_run.run_id}"
     )
     def _poll() -> None:
-        status = _poll_tick(active_run.status_yaml, active_run.indicators_csv, renderer, interval)
+        status = _poll_tick(
+            active_run.status_yaml,
+            active_run.indicators_csv,
+            renderer,
+            interval,
+            f"last_n_slider_{active_run.run_id}",
+        )
         if status is not None and status.state != RunState.RUNNING:
             st.session_state["last_finished_run"] = (status, active_run.run_dir)
             st.rerun()
