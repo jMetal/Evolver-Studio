@@ -6,6 +6,7 @@ import pandas as pd
 
 from evolver_studio.results import (
     checkpoint_front,
+    deduplicate_consecutive_checkpoints,
     latest_checkpoint_evaluation,
     list_output_dir,
     load_indicators,
@@ -127,6 +128,73 @@ class TestCheckpointFront:
 
         # Assert
         assert list(front["SolutionId"]) == [0, 1]
+
+
+class TestDeduplicateConsecutiveCheckpoints:
+    def test_should_keep_all_checkpoints_when_fronts_differ(self):
+        """Distinct fronts must all survive, in every case an improvement."""
+        # Arrange
+        history = pd.DataFrame(
+            {
+                "Evaluation": [100, 200],
+                "SolutionId": [0, 0],
+                "Epsilon": [0.5, 0.3],
+                "NHV": [0.8, 0.9],
+            }
+        )
+
+        # Act
+        deduplicated = deduplicate_consecutive_checkpoints(history)
+
+        # Assert
+        assert sorted(deduplicated["Evaluation"].unique()) == [100, 200]
+
+    def test_should_drop_a_checkpoint_identical_to_the_previous_one(self):
+        """A stalled run's repeated identical front must collapse to one entry."""
+        # Arrange
+        history = pd.DataFrame(
+            {
+                "Evaluation": [100, 200],
+                "SolutionId": [0, 0],
+                "Epsilon": [0.5, 0.5],
+                "NHV": [0.8, 0.8],
+            }
+        )
+
+        # Act
+        deduplicated = deduplicate_consecutive_checkpoints(history)
+
+        # Assert
+        assert list(deduplicated["Evaluation"].unique()) == [100]
+
+    def test_should_keep_a_checkpoint_that_changes_after_a_repeat(self):
+        """A->A->B must drop the second A but keep the later, different B."""
+        # Arrange
+        history = pd.DataFrame(
+            {
+                "Evaluation": [100, 200, 300],
+                "SolutionId": [0, 0, 0],
+                "Epsilon": [0.5, 0.5, 0.2],
+                "NHV": [0.8, 0.8, 0.95],
+            }
+        )
+
+        # Act
+        deduplicated = deduplicate_consecutive_checkpoints(history)
+
+        # Assert
+        assert sorted(deduplicated["Evaluation"].unique()) == [100, 300]
+
+    def test_should_return_empty_history_unchanged(self):
+        """An empty history (no checkpoints written yet) must not raise."""
+        # Arrange
+        history = pd.DataFrame({"Evaluation": [], "SolutionId": [], "Epsilon": []})
+
+        # Act
+        deduplicated = deduplicate_consecutive_checkpoints(history)
+
+        # Assert
+        assert deduplicated.empty
 
 
 class TestReadMetadata:
