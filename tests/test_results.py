@@ -2,7 +2,11 @@
 
 from pathlib import Path
 
+import pandas as pd
+
 from evolver_studio.results import (
+    checkpoint_front,
+    latest_checkpoint_evaluation,
     list_output_dir,
     load_indicators,
     read_metadata,
@@ -53,6 +57,76 @@ class TestLoadIndicators:
             "NormalizedHypervolume",
         ]
         assert indicators.iloc[0]["Epsilon"] == 0.1
+
+    def test_should_ignore_incomplete_trailing_line(self, tmp_path: Path):
+        """A checkpoint write caught mid-flush must not break parsing of prior rows."""
+        # Arrange
+        indicators_csv = tmp_path / "INDICATORS.csv"
+        indicators_csv.write_text(
+            "Evaluation,SolutionId,Epsilon,NormalizedHypervolume\n"
+            "100,0,0.5,0.8\n"
+            "200,0,0.3,0.9\n"
+            "300,0,0.1"  # cut off mid-write, no trailing newline
+        )
+
+        # Act
+        indicators = load_indicators(indicators_csv)
+
+        # Assert
+        assert list(indicators["Evaluation"]) == [100, 200]
+
+    def test_should_load_multiple_checkpoints(self, tmp_path: Path):
+        """Rows from every checkpoint written so far must all be present."""
+        # Arrange
+        indicators_csv = tmp_path / "INDICATORS.csv"
+        indicators_csv.write_text(
+            "Evaluation,SolutionId,Epsilon,NormalizedHypervolume\n100,0,0.5,0.8\n200,0,0.3,0.9\n"
+        )
+
+        # Act
+        indicators = load_indicators(indicators_csv)
+
+        # Assert
+        assert list(indicators["Evaluation"]) == [100, 200]
+
+
+class TestLatestCheckpointEvaluation:
+    def test_should_return_max_evaluation(self):
+        """The most recent checkpoint is the one with the highest Evaluation."""
+        # Arrange
+        history = pd.DataFrame({"Evaluation": [100, 300, 200]})
+
+        # Act
+        latest = latest_checkpoint_evaluation(history)
+
+        # Assert
+        assert latest == 300
+
+    def test_should_return_none_for_empty_history(self):
+        """No checkpoints written yet must not raise."""
+        # Arrange
+        history = pd.DataFrame({"Evaluation": []})
+
+        # Act
+        latest = latest_checkpoint_evaluation(history)
+
+        # Assert
+        assert latest is None
+
+
+class TestCheckpointFront:
+    def test_should_filter_rows_by_evaluation(self):
+        """Only the requested checkpoint's rows are returned, others are excluded."""
+        # Arrange
+        history = pd.DataFrame(
+            {"Evaluation": [100, 100, 200], "SolutionId": [0, 1, 0], "Epsilon": [0.5, 0.4, 0.1]}
+        )
+
+        # Act
+        front = checkpoint_front(history, 100)
+
+        # Assert
+        assert list(front["SolutionId"]) == [0, 1]
 
 
 class TestReadMetadata:
