@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from evolver_studio.catalogue import BASE_ALGORITHMS
 from evolver_studio.parameter_space import (
     CategoricalParameter,
     RangeParameter,
@@ -14,10 +15,13 @@ from evolver_studio.parameter_space import (
     with_selected_choices,
 )
 
+PARAMETER_SPACES_DIR = Path("/Users/ajnebro/Softw/Evolver/src/main/resources/parameterSpaces")
 REAL_PARAMETER_SPACE_FILES = [
-    Path("/Users/ajnebro/Softw/Evolver/src/main/resources/parameterSpaces/NSGAIIDouble.yaml"),
-    Path(
-        "/Users/ajnebro/Softw/Evolver/src/main/resources/parameterSpaces/NSGAIIDoubleReduced.yaml"
+    PARAMETER_SPACES_DIR / "NSGAIIDoubleReduced.yaml",
+    *(
+        PARAMETER_SPACES_DIR / filename
+        for algorithm in BASE_ALGORITHMS
+        for filename in algorithm.encodings.values()
     ),
 ]
 
@@ -96,6 +100,21 @@ class TestParseParameterSpace:
         assert parameter.global_sub_parameters == (
             RangeParameter("crossoverProbability", "double", 0.0, 1.0),
         )
+
+    @pytest.mark.parametrize(
+        ("yaml_type", "expected_kind"),
+        [("integer", "integer"), ("int", "integer"), ("double", "double"), ("real", "double")],
+    )
+    def test_should_normalize_type_synonyms(self, yaml_type: str, expected_kind: str):
+        """Evolver accepts int/integer and double/real interchangeably (confirmed in MOPSO.yaml)."""
+        # Arrange
+        text = f"x:\n  type: {yaml_type}\n  range: [0, 1]\n"
+
+        # Act
+        (parameter,) = parse_parameter_space(text)
+
+        # Assert
+        assert parameter.kind == expected_kind
 
     def test_should_raise_on_unknown_type(self):
         """An unrecognized `type` must fail loudly rather than being silently ignored."""
