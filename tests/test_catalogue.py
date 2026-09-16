@@ -1,0 +1,123 @@
+"""Tests for the provisional algorithm catalogue."""
+
+from pathlib import Path
+
+import pytest
+
+from evolver_studio.catalogue import (
+    BASE_ALGORITHMS,
+    KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
+    META_ALGORITHMS,
+)
+
+EVOLVER_PARAMETER_SPACES_DIR = Path(
+    "/Users/ajnebro/Softw/Evolver/src/main/resources/parameterSpaces"
+)
+
+
+class TestBaseAlgorithms:
+    def test_should_have_unique_names(self):
+        """Two entries with the same name would make lookups ambiguous."""
+        # Act
+        names = [algorithm.name for algorithm in BASE_ALGORITHMS]
+
+        # Assert
+        assert len(names) == len(set(names))
+
+    def test_should_have_at_least_one_encoding_each(self):
+        """An algorithm with no encodings would have nothing to explore or run."""
+        # Act / Assert
+        assert all(algorithm.encodings for algorithm in BASE_ALGORITHMS)
+
+    def test_should_mark_only_nsgaii_and_moead_as_runnable_today(self):
+        """BaseAlgorithmRegistry in cli.runner only resolves these two names."""
+        # Act
+        runnable = {a.name for a in BASE_ALGORITHMS if a.runnable_today}
+
+        # Assert
+        assert runnable == {"NSGA-II", "MOEA/D"}
+
+
+class TestMetaAlgorithms:
+    def test_should_have_unique_names(self):
+        """Two entries with the same name would make lookups ambiguous."""
+        # Act
+        names = [algorithm.name for algorithm in META_ALGORITHMS]
+
+        # Assert
+        assert len(names) == len(set(names))
+
+    def test_should_support_at_least_one_encoding_each(self):
+        """A meta-algorithm supporting neither encoding could never be selected."""
+        # Act / Assert
+        assert all(a.supports_flat or a.supports_tree for a in META_ALGORITHMS)
+
+    def test_should_have_tree_parameters_only_when_tree_is_supported(self):
+        """A non-empty tree_parameters on a flat-only algorithm would be misleading."""
+        # Act / Assert
+        assert all(a.supports_tree or not a.tree_parameters for a in META_ALGORITHMS)
+
+    def test_should_mark_smpso_as_not_supporting_tree(self):
+        """SMPSO's velocity-based representation is structurally incompatible with tree encoding."""
+        # Arrange
+        smpso = next(a for a in META_ALGORITHMS if a.name == "SMPSO")
+
+        # Act / Assert
+        assert smpso.supports_tree is False
+
+    def test_should_mark_only_nsgaii_as_wired_into_cli_runner(self):
+        """TrainingRunner only knows how to build a meta-optimizer for NSGA-II today."""
+        # Act
+        wired = {a.name for a in META_ALGORITHMS if a.wired_into_cli_runner}
+
+        # Assert
+        assert wired == {"NSGA-II"}
+
+
+class TestCatalogueMatchesEvolverCheckout:
+    def test_should_reference_parameter_space_files_that_actually_exist(self):
+        """A stale filename in the catalogue would break the explorer at browse time."""
+        if not EVOLVER_PARAMETER_SPACES_DIR.is_dir():
+            pytest.skip(f"Evolver checkout not found at {EVOLVER_PARAMETER_SPACES_DIR}")
+
+        # Arrange
+        missing = [
+            f"{algorithm.name}/{encoding}: {filename}"
+            for algorithm in BASE_ALGORITHMS
+            for encoding, filename in algorithm.encodings.items()
+            if not (EVOLVER_PARAMETER_SPACES_DIR / filename).is_file()
+        ]
+
+        # Assert
+        assert missing == []
+
+    def test_should_flag_any_untriaged_parameter_space_file(self):
+        """A new YAML file (new algorithm, new encoding) must not go unnoticed.
+
+        Evolver-Studio has no way to learn about a new algorithm on its own —
+        every file under parameterSpaces/ must be accounted for, either in
+        BASE_ALGORITHMS (a real base-level algorithm to add to the catalogue)
+        or in KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES (deliberately not
+        one, with a reason in that constant's comments). This is the
+        Evolver-Studio half of the drift-tracking mechanism described in
+        CLAUDE.md; org.uma.evolver.cli.runner has a companion Java test.
+        """
+        if not EVOLVER_PARAMETER_SPACES_DIR.is_dir():
+            pytest.skip(f"Evolver checkout not found at {EVOLVER_PARAMETER_SPACES_DIR}")
+
+        # Arrange
+        known = {
+            filename for algorithm in BASE_ALGORITHMS for filename in algorithm.encodings.values()
+        } | KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES
+        actual = {path.name for path in EVOLVER_PARAMETER_SPACES_DIR.iterdir() if path.is_file()}
+
+        # Act
+        untriaged = sorted(actual - known)
+
+        # Assert
+        assert untriaged == [], (
+            f"New file(s) under parameterSpaces/ not yet triaged: {untriaged}. Add each one to "
+            "BASE_ALGORITHMS (if it's a real algorithm's parameter space) or to "
+            "KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES (with a reason) in "
+            "evolver_studio/catalogue.py."
+        )
