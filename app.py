@@ -18,6 +18,7 @@ import streamlit as st
 import yaml
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
+from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
 from evolver_studio.evolver_client import (
     RunState,
     RunStatus,
@@ -48,7 +49,7 @@ from evolver_studio.slider_state import next_slider_value
 DEFAULT_EVOLVER_HOME = "/Users/ajnebro/Softw/Evolver"
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
-DEFAULT_PARAMETER_SPACE_RELATIVE_PATH = Path("src/main/resources/parameterSpaces/NSGAIIDouble.yaml")
+PARAMETER_SPACES_RELATIVE_DIR = Path("src/main/resources/parameterSpaces")
 
 
 def _base_level_config(output_directory: str, yaml_parameter_space_file: str) -> BaseLevelConfig:
@@ -296,16 +297,18 @@ def _render_last_finished_run_if_any(evolver_home: Path) -> None:
     _render_output_directory(pointer.output_directory, pointer.metadata_file)
 
 
-def _default_parameter_space_text(evolver_home: Path) -> str:
-    """Read the default base-level parameter space file's raw text.
+def _parameter_space_text(evolver_home: Path, filename: str) -> str:
+    """Read a parameter space file's raw text.
 
     Args:
         evolver_home: Path to the Evolver checkout.
+        filename: The parameter space YAML's filename, under
+            src/main/resources/parameterSpaces/.
 
     Returns:
-        The default NSGAIIDouble.yaml's content.
+        That file's content.
     """
-    return (evolver_home / DEFAULT_PARAMETER_SPACE_RELATIVE_PATH).read_text()
+    return (evolver_home / PARAMETER_SPACES_RELATIVE_DIR / filename).read_text()
 
 
 def _render_expert_editor(default_text: str) -> str | None:
@@ -357,10 +360,70 @@ def _render_parameter_space_editor(evolver_home: Path) -> str | None:
     """
     with st.expander("Espacio de parámetros del algoritmo base (NSGA-II)"):
         mode = st.radio("Modo", ["Guiado", "Experto"], horizontal=True, key="parameter_space_mode")
-        default_text = _default_parameter_space_text(evolver_home)
+        default_text = _parameter_space_text(evolver_home, "NSGAIIDouble.yaml")
         if mode == "Experto":
             return _render_expert_editor(default_text)
         return _render_guided_editor(default_text)
+
+
+def _render_runnable_badge(runnable_today: bool) -> None:
+    """Show whether an algorithm can actually be launched today, or only browsed.
+
+    Args:
+        runnable_today: Whether cli.runner's BaseAlgorithmRegistry supports it.
+    """
+    if runnable_today:
+        st.success("✅ Ejecutable hoy desde esta app.")
+    else:
+        st.info("🔍 Solo explorable por ahora — Evolver aún no lo expone para lanzar un run.")
+
+
+def _render_meta_algorithm_summary(meta: MetaAlgorithm) -> None:
+    """Show one meta-optimizer's encoding support, wiring status, and parameters.
+
+    Args:
+        meta: The meta-optimizer to summarize.
+    """
+    encodings = ", ".join(
+        encoding
+        for encoding, supported in (("flat", meta.supports_flat), ("tree", meta.supports_tree))
+        if supported
+    )
+    wired = (
+        "✅ conectado a cli.runner"
+        if meta.wired_into_cli_runner
+        else "🔍 no conectado a cli.runner"
+    )
+    with st.expander(f"{meta.name} — {encodings} — {wired}"):
+        st.write("**Parámetros (flat):**", ", ".join(meta.flat_parameters))
+        if meta.tree_parameters:
+            st.write("**Parámetros (tree):**", ", ".join(meta.tree_parameters))
+
+
+def _render_algorithm_explorer(evolver_home: Path) -> None:
+    """Browse any base algorithm's parameter space and the available meta-optimizers.
+
+    Read-only exploration: nothing here builds a request or launches a run —
+    only NSGA-II/MOEA-D as base and NSGA-II as meta-optimizer are actually
+    runnable today from this app (see evolver_studio/catalogue.py).
+
+    Args:
+        evolver_home: Path to the Evolver checkout, to read parameter space files.
+    """
+    st.subheader("Algoritmos base")
+    selected_name = st.selectbox(
+        "Algoritmo", [a.name for a in BASE_ALGORITHMS], key="explorer_algorithm"
+    )
+    algorithm = next(a for a in BASE_ALGORITHMS if a.name == selected_name)
+    _render_runnable_badge(algorithm.runnable_today)
+
+    encoding = st.selectbox("Codificación", list(algorithm.encodings), key="explorer_encoding")
+    text = _parameter_space_text(evolver_home, algorithm.encodings[encoding])
+    render_parameter_form(parse_parameter_space(text), f"explorer_{selected_name}_{encoding}")
+
+    st.subheader("Algoritmos de meta-optimización")
+    for meta in META_ALGORITHMS:
+        _render_meta_algorithm_summary(meta)
 
 
 def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
@@ -408,37 +471,43 @@ if st.sidebar.button("Compilar Evolver"):
     else:
         st.sidebar.success("Jar built successfully.")
 
-active_run = find_active_run(evolver_home)
+tab_train, tab_explore = st.tabs(["Entrenamiento", "Explorar algoritmos"])
 
-if active_run is not None:
-    _render_active_run(evolver_home, active_run)
-else:
-    output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
-    meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
-    number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
-    update_every_evaluations = st.number_input(
-        "Actualizar cada N evaluaciones",
-        value=DEFAULT_UPDATE_EVERY_EVALUATIONS,
-        min_value=1,
-        step=100,
-    )
+with tab_train:
+    active_run = find_active_run(evolver_home)
 
-    parameter_space_text = _render_parameter_space_editor(evolver_home)
-
-    base_level = _base_level_config(output_directory_base, "<written to disk at launch>")
-    meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
-    st.code(to_request_yaml(base_level, meta_search), language="yaml")
-
-    if st.button("Ejecutar entrenamiento", disabled=parameter_space_text is None):
-        run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        _launch_run(
-            evolver_home,
-            run_id,
-            output_directory_base,
-            parameter_space_text,
-            meta_search,
-            int(update_every_evaluations),
+    if active_run is not None:
+        _render_active_run(evolver_home, active_run)
+    else:
+        output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
+        meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
+        number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
+        update_every_evaluations = st.number_input(
+            "Actualizar cada N evaluaciones",
+            value=DEFAULT_UPDATE_EVERY_EVALUATIONS,
+            min_value=1,
+            step=100,
         )
-        st.rerun()
 
-    _render_last_finished_run_if_any(evolver_home)
+        parameter_space_text = _render_parameter_space_editor(evolver_home)
+
+        base_level = _base_level_config(output_directory_base, "<written to disk at launch>")
+        meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
+        st.code(to_request_yaml(base_level, meta_search), language="yaml")
+
+        if st.button("Ejecutar entrenamiento", disabled=parameter_space_text is None):
+            run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+            _launch_run(
+                evolver_home,
+                run_id,
+                output_directory_base,
+                parameter_space_text,
+                meta_search,
+                int(update_every_evaluations),
+            )
+            st.rerun()
+
+        _render_last_finished_run_if_any(evolver_home)
+
+with tab_explore:
+    _render_algorithm_explorer(evolver_home)
