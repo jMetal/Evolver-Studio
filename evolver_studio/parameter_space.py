@@ -18,7 +18,10 @@ from typing import Literal
 
 import yaml
 
-RANGE_TYPES = ("integer", "double")
+# YAMLParameterSpace's javadoc documents "int"/"integer" and "double"/"real" as accepted synonyms;
+# normalized to the second spelling of each pair so RangeParameter.kind only ever holds one of two
+# values. Confirmed against real files: MOPSO.yaml uses "real" throughout.
+RANGE_TYPE_ALIASES = {"integer": "integer", "int": "integer", "double": "double", "real": "double"}
 
 
 @dataclass(slots=True, frozen=True)
@@ -95,9 +98,10 @@ def parse_parameter_space(text: str) -> list[ParameterSpec]:
 
 def _parse_parameter(name: str, spec: dict) -> ParameterSpec:
     kind = spec["type"]
-    if kind in RANGE_TYPES:
+    normalized_kind = RANGE_TYPE_ALIASES.get(kind)
+    if normalized_kind is not None:
         lower, upper = spec["range"]
-        return RangeParameter(name=name, kind=kind, lower_bound=lower, upper_bound=upper)
+        return RangeParameter(name=name, kind=normalized_kind, lower_bound=lower, upper_bound=upper)
     if kind == "categorical":
         return _parse_categorical(name, spec)
     raise ValueError(f"Unknown parameter type {kind!r} for parameter {name!r}")
