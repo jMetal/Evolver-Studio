@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import yaml
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
 from evolver_studio.evolver_client import (
@@ -29,6 +30,8 @@ from evolver_studio.evolver_client import (
     write_pid_file,
 )
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
+from evolver_studio.parameter_form import render_parameter_form
+from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
 from evolver_studio.request import BaseLevelConfig, FlatMetaSearchConfig, to_request_yaml
 from evolver_studio.result import Err
 from evolver_studio.results import (
@@ -45,13 +48,16 @@ from evolver_studio.slider_state import next_slider_value
 DEFAULT_EVOLVER_HOME = "/Users/ajnebro/Softw/Evolver"
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
+DEFAULT_PARAMETER_SPACE_RELATIVE_PATH = Path("src/main/resources/parameterSpaces/NSGAIIDouble.yaml")
 
 
-def _base_level_config(output_directory: str) -> BaseLevelConfig:
+def _base_level_config(output_directory: str, yaml_parameter_space_file: str) -> BaseLevelConfig:
     """Build the fixed ZDT4 base-level config, matching Zdt4TrainingRunner.java.
 
     Args:
         output_directory: Where Evolver writes this run's results.
+        yaml_parameter_space_file: Path to the base-level algorithm's parameter
+            space YAML (possibly a run-specific, user-edited copy).
 
     Returns:
         The base-level config for NSGA-II tuned on ZDT4.
@@ -60,7 +66,7 @@ def _base_level_config(output_directory: str) -> BaseLevelConfig:
         algorithm_name="NSGA-II",
         population_size=100,
         number_of_independent_runs=1,
-        yaml_parameter_space_file="NSGAIIDouble.yaml",
+        yaml_parameter_space_file=yaml_parameter_space_file,
         extra_config=None,
         training_problem_names=["ZDT4"],
         training_reference_front_file_names=["resources/referenceFronts/ZDT4.csv"],
@@ -92,23 +98,30 @@ def _meta_search_config(meta_max_evaluations: int, number_of_cores: int) -> Flat
 def _launch_run(
     evolver_home: Path,
     run_id: str,
-    base_level: BaseLevelConfig,
+    output_directory_base: str,
+    parameter_space_text: str,
     meta_search: FlatMetaSearchConfig,
     update_every_evaluations: int,
 ) -> None:
-    """Write the request, launch training, and persist its PID for later control.
+    """Write the parameter space and request, launch training, persist its PID.
 
     Args:
         evolver_home: Path to the Evolver checkout (JVM working directory).
         run_id: This run's timestamp-based identifier.
-        base_level: Base-level config, with output_directory nested under run_id
-            so INDICATORS.csv (append-only in Evolver) never mixes checkpoints
+        output_directory_base: Output directory, nested under run_id so
+            INDICATORS.csv (append-only in Evolver) never mixes checkpoints
             across runs that share the same base output directory.
+        parameter_space_text: The (possibly user-edited) base-level parameter
+            space YAML, written to this run's own file — Evolver accepts an
+            absolute path here regardless of its working directory.
         meta_search: Meta-search config.
         update_every_evaluations: Chosen live-preview redraw threshold.
     """
     run_dir = evolver_home / "cli-runner-runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+    parameter_space_file = run_dir / "base_parameter_space.yaml"
+    parameter_space_file.write_text(parameter_space_text)
+    base_level = _base_level_config(f"{output_directory_base}/{run_id}", str(parameter_space_file))
     request_yaml = run_dir / "request.yaml"
     request_yaml.write_text(to_request_yaml(base_level, meta_search))
     process = start_training(
@@ -283,6 +296,73 @@ def _render_last_finished_run_if_any(evolver_home: Path) -> None:
     _render_output_directory(pointer.output_directory, pointer.metadata_file)
 
 
+def _default_parameter_space_text(evolver_home: Path) -> str:
+    """Read the default base-level parameter space file's raw text.
+
+    Args:
+        evolver_home: Path to the Evolver checkout.
+
+    Returns:
+        The default NSGAIIDouble.yaml's content.
+    """
+    return (evolver_home / DEFAULT_PARAMETER_SPACE_RELATIVE_PATH).read_text()
+
+
+def _render_expert_editor(default_text: str) -> str | None:
+    """A raw YAML text area, validated by re-parsing on every change.
+
+    Args:
+        default_text: Text to pre-fill the text area with, the first time
+            it's shown.
+
+    Returns:
+        The current text if it parses as a valid parameter space, else None
+        (a validation error is already shown).
+    """
+    key = "parameter_space_expert_text"
+    if key not in st.session_state:
+        st.session_state[key] = default_text
+    text = st.text_area("YAML del espacio de parámetros", key=key, height=300)
+    try:
+        parse_parameter_space(text)
+    except (ValueError, KeyError, yaml.YAMLError) as error:
+        st.error(f"YAML inválido: {error}")
+        return None
+    return text
+
+
+def _render_guided_editor(default_text: str) -> str:
+    """A dynamic form built from the default parameter space.
+
+    Args:
+        default_text: The parameter space YAML to build the form from.
+
+    Returns:
+        The edited parameter space, serialized back to YAML.
+    """
+    parameters = parse_parameter_space(default_text)
+    edited = render_parameter_form(parameters, "parameter_space_form")
+    return serialize_parameter_space(edited)
+
+
+def _render_parameter_space_editor(evolver_home: Path) -> str | None:
+    """Let the user pick or edit the base-level parameter space, guided or expert.
+
+    Args:
+        evolver_home: Path to the Evolver checkout, to read the default file.
+
+    Returns:
+        The chosen parameter space's YAML text, or None if invalid (expert
+        mode only — the guided form can't produce invalid YAML).
+    """
+    with st.expander("Espacio de parámetros del algoritmo base (NSGA-II)"):
+        mode = st.radio("Modo", ["Guiado", "Experto"], horizontal=True, key="parameter_space_mode")
+        default_text = _default_parameter_space_text(evolver_home)
+        if mode == "Experto":
+            return _render_expert_editor(default_text)
+        return _render_guided_editor(default_text)
+
+
 def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
     """Show progress and a live front preview for an in-progress run.
 
@@ -343,15 +423,21 @@ else:
         step=100,
     )
 
-    base_level = _base_level_config(output_directory_base)
+    parameter_space_text = _render_parameter_space_editor(evolver_home)
+
+    base_level = _base_level_config(output_directory_base, "<written to disk at launch>")
     meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
     st.code(to_request_yaml(base_level, meta_search), language="yaml")
 
-    if st.button("Ejecutar entrenamiento"):
+    if st.button("Ejecutar entrenamiento", disabled=parameter_space_text is None):
         run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        run_base_level = _base_level_config(f"{output_directory_base}/{run_id}")
         _launch_run(
-            evolver_home, run_id, run_base_level, meta_search, int(update_every_evaluations)
+            evolver_home,
+            run_id,
+            output_directory_base,
+            parameter_space_text,
+            meta_search,
+            int(update_every_evaluations),
         )
         st.rerun()
 
