@@ -37,6 +37,42 @@ Until that uniformization happens on the Evolver side, Evolver-Studio's integrat
 treated as provisional and isolated behind a thin adapter layer (see Architecture below) so it can be
 updated without touching the UI or analysis code.
 
+**Evolver is not only a read-only external dependency.** When Evolver-Studio's needs require it, work
+may extend into the Evolver checkout itself (`/Users/ajnebro/Softw/Evolver`, branch
+`study/uniform-training-runner` — the branch `cli.runner` and this tool's integration code live on) to
+propose or implement the missing pieces — e.g. expanding `BaseAlgorithmRegistry` beyond its current
+NSGA-II/MOEA-D scope, or wiring additional `Meta*Builder` classes (`MetaSPEA2Builder`,
+`MetaSMPSOBuilder`, `MetaAsyncNSGAIIBuilder`, ...) into `TrainingRunner` so more of them are
+selectable as meta-optimizers, not just usable from `example.training`. Prefer proposing such changes
+as a `docs/proposals/*.md` document in Evolver's repo first (matching the existing
+`cli-runner-prototype.md`) before implementing them, consistent with how that branch's design was
+itself introduced.
+
+### Keeping Evolver-Studio's catalogue in sync with Evolver — the drift-detection mechanism
+
+Evolver changes with some regularity (new base algorithms, new parameter-space components, new
+meta-optimizer builders). Nothing forces Evolver-Studio's provisional catalogue
+(`evolver_studio/catalogue.py`) to be updated when that happens, so both sides carry a matching
+**drift-detection test**: a directory/source scan that fails loudly on anything new and untriaged,
+instead of silently going stale.
+
+- **Evolver-Studio side** (`tests/test_catalogue.py::TestCatalogueMatchesEvolverCheckout`): scans
+  Evolver's `src/main/resources/parameterSpaces/` directory and fails if any `.yaml`/`.irace` file is
+  neither referenced by `BASE_ALGORITHMS` nor listed in
+  `KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES` (both in `evolver_studio/catalogue.py`).
+- **Evolver side** (on `study/uniform-training-runner`,
+  `src/test/java/org/uma/evolver/cli/runner/`): two JUnit tests with the same shape —
+  `BaseAlgorithmRegistryCompletenessTest` scans `src/main/java/org/uma/evolver/algorithm/**` for
+  concrete algorithm classes not accounted for in its `KNOWN_ALGORITHM_CLASSES` map;
+  `TrainingRunnerMetaBuilderCompletenessTest` does the same for `Meta*Builder` classes under
+  `src/main/java/org/uma/evolver/meta/builder/`.
+
+When either test fails, the fix is always the same shape: add the new class/file to the relevant
+map/set with a one-line reason (`"not yet registered"`, `"not yet wired into TrainingRunner"`, a
+structural-incompatibility note, etc.), and — separately, as a deliberate choice, not a side effect of
+silencing the test — decide whether to also wire it in for real (`BaseAlgorithmRegistry`,
+`TrainingRunner`, or `evolver_studio/catalogue.py`'s `runnable_today`/`wired_into_cli_runner` flags).
+
 ## Planned Architecture
 
 ```
