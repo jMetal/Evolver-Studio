@@ -37,6 +37,30 @@ class TestBaseAlgorithms:
         # Assert
         assert runnable == {"NSGA-II", "MOEA/D"}
 
+    def test_should_set_registry_name_and_runnable_encoding_iff_runnable_today(self):
+        """A runnable algorithm needs both to build a request; a non-runnable one needs neither."""
+        # Act / Assert
+        for algorithm in BASE_ALGORITHMS:
+            has_registry_fields = (
+                algorithm.registry_name is not None and algorithm.runnable_encoding is not None
+            )
+            assert has_registry_fields is algorithm.runnable_today
+
+    def test_should_use_the_registry_key_for_moead_not_the_display_name(self):
+        """BaseAlgorithmRegistry.resolve() expects "MOEAD", not the display name "MOEA/D"."""
+        # Arrange
+        moead = next(a for a in BASE_ALGORITHMS if a.name == "MOEA/D")
+
+        # Act / Assert
+        assert moead.registry_name == "MOEAD"
+
+    def test_should_make_runnable_encoding_a_real_encoding_of_the_algorithm(self):
+        """A typo'd runnable_encoding would point at a parameter space file that doesn't exist."""
+        # Act / Assert
+        for algorithm in BASE_ALGORITHMS:
+            if algorithm.runnable_encoding is not None:
+                assert algorithm.runnable_encoding in algorithm.encodings
+
 
 class TestMetaAlgorithms:
     def test_should_have_unique_names(self):
