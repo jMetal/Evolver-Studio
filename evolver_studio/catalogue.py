@@ -22,16 +22,27 @@ class BaseAlgorithm:
     """A base-level algorithm Evolver can tune, and its parameter space per encoding.
 
     Attributes:
-        name: The algorithm's name.
+        name: The algorithm's display name.
         encodings: Encoding name to its parameter space YAML filename, under
             Evolver's src/main/resources/parameterSpaces/.
         runnable_today: Whether org.uma.evolver.cli.runner.BaseAlgorithmRegistry
             can currently resolve this algorithm to actually launch a run.
+        registry_name: The exact string BaseAlgorithmRegistry.resolve() expects
+            as its algorithmName argument, when it differs from `name` (e.g.
+            "MOEAD", not "MOEA/D"). None when `runnable_today` is False.
+        runnable_encoding: Which encoding key in `encodings` is the one
+            BaseAlgorithmRegistry actually builds today — it hardcodes the
+            Double-encoded Java class regardless of which parameter space
+            file is passed in, so Binary/Permutation YAML files are only
+            browsable, not launchable, even though the algorithm itself is
+            `runnable_today`. None when `runnable_today` is False.
     """
 
     name: str
     encodings: dict[str, str]
     runnable_today: bool
+    registry_name: str | None = None
+    runnable_encoding: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -69,6 +80,8 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
             "Permutation": "NSGAIIPermutation.yaml",
         },
         runnable_today=True,
+        registry_name="NSGA-II",
+        runnable_encoding="Double",
     ),
     # org.uma.evolver.algorithm.moead.{Double,Binary,Permutation}MOEAD
     BaseAlgorithm(
@@ -79,6 +92,8 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
             "Permutation": "MOEADPermutation.yaml",
         },
         runnable_today=True,
+        registry_name="MOEAD",
+        runnable_encoding="Double",
     ),
     # org.uma.evolver.algorithm.smsemoa.{Double,Binary,Permutation}SMSEMOA
     BaseAlgorithm(
