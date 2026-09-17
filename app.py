@@ -52,23 +52,36 @@ LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
 PARAMETER_SPACES_RELATIVE_DIR = Path("src/main/resources/parameterSpaces")
 
 
-def _base_level_config(output_directory: str, yaml_parameter_space_file: str) -> BaseLevelConfig:
-    """Build the fixed ZDT4 base-level config, matching Zdt4TrainingRunner.java.
+def _base_level_config(
+    algorithm_name: str,
+    output_directory: str,
+    yaml_parameter_space_file: str,
+    extra_config: dict[str, str] | None,
+) -> BaseLevelConfig:
+    """Build the base-level config for the selected algorithm, tuned on ZDT4.
+
+    The training problem (ZDT4) and indicators (Epsilon, NormalizedHypervolume)
+    stay fixed for now — only the algorithm and its parameter space are chosen
+    by the user; see ROADMAP.md for problem/indicator selection as a later step.
 
     Args:
+        algorithm_name: The exact string BaseAlgorithmRegistry.resolve() expects
+            (catalogue.BaseAlgorithm.registry_name, e.g. "MOEAD", not "MOEA/D").
         output_directory: Where Evolver writes this run's results.
         yaml_parameter_space_file: Path to the base-level algorithm's parameter
             space YAML (possibly a run-specific, user-edited copy).
+        extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
+            weightVectorFilesDirectory), or None when the algorithm needs none.
 
     Returns:
-        The base-level config for NSGA-II tuned on ZDT4.
+        The base-level config for the selected algorithm tuned on ZDT4.
     """
     return BaseLevelConfig(
-        algorithm_name="NSGA-II",
+        algorithm_name=algorithm_name,
         population_size=100,
         number_of_independent_runs=1,
         yaml_parameter_space_file=yaml_parameter_space_file,
-        extra_config=None,
+        extra_config=extra_config,
         training_problem_names=["ZDT4"],
         training_reference_front_file_names=["resources/referenceFronts/ZDT4.csv"],
         training_evaluations=[12000],
@@ -77,12 +90,16 @@ def _base_level_config(output_directory: str, yaml_parameter_space_file: str) ->
     )
 
 
-def _meta_search_config(meta_max_evaluations: int, number_of_cores: int) -> FlatMetaSearchConfig:
-    """Build the flat meta-search config, matching Zdt4TrainingRunner.java.
+def _meta_search_config(
+    meta_max_evaluations: int, number_of_cores: int, meta_yaml_parameter_space_file: str
+) -> FlatMetaSearchConfig:
+    """Build the flat meta-search config for the (currently sole) NSGA-II meta-optimizer.
 
     Args:
         meta_max_evaluations: Meta-level evaluation budget.
         number_of_cores: Cores used to parallelize base-level runs.
+        meta_yaml_parameter_space_file: Path to the meta-optimizer's own
+            parameter space YAML (possibly a run-specific, user-edited copy).
 
     Returns:
         The flat meta-search config for the meta-level NSGA-II.
@@ -92,37 +109,60 @@ def _meta_search_config(meta_max_evaluations: int, number_of_cores: int) -> Flat
         meta_population_size=100,
         number_of_cores=number_of_cores,
         mutation_probability_factor=1.5,
-        meta_yaml_parameter_space_file="NSGAIIDoubleReduced.yaml",
+        meta_yaml_parameter_space_file=meta_yaml_parameter_space_file,
     )
 
 
 def _launch_run(
     evolver_home: Path,
     run_id: str,
+    algorithm_name: str,
     output_directory_base: str,
     parameter_space_text: str,
-    meta_search: FlatMetaSearchConfig,
+    extra_config: dict[str, str] | None,
+    meta_parameter_space_text: str,
+    meta_max_evaluations: int,
+    number_of_cores: int,
     update_every_evaluations: int,
 ) -> None:
-    """Write the parameter space and request, launch training, persist its PID.
+    """Write both parameter spaces and the request, launch training, persist its PID.
 
     Args:
         evolver_home: Path to the Evolver checkout (JVM working directory).
         run_id: This run's timestamp-based identifier.
+        algorithm_name: The base algorithm's registry name (catalogue.py's
+            BaseAlgorithm.registry_name), e.g. "MOEAD".
         output_directory_base: Output directory, nested under run_id so
             INDICATORS.csv (append-only in Evolver) never mixes checkpoints
             across runs that share the same base output directory.
         parameter_space_text: The (possibly user-edited) base-level parameter
             space YAML, written to this run's own file — Evolver accepts an
             absolute path here regardless of its working directory.
-        meta_search: Meta-search config.
+        extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
+            weightVectorFilesDirectory), or None.
+        meta_parameter_space_text: The (possibly user-edited) meta-optimizer's
+            own parameter space YAML, written to this run's own file too.
+        meta_max_evaluations: Meta-level evaluation budget.
+        number_of_cores: Cores used to parallelize base-level runs.
         update_every_evaluations: Chosen live-preview redraw threshold.
     """
     run_dir = evolver_home / "cli-runner-runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+
     parameter_space_file = run_dir / "base_parameter_space.yaml"
     parameter_space_file.write_text(parameter_space_text)
-    base_level = _base_level_config(f"{output_directory_base}/{run_id}", str(parameter_space_file))
+    meta_parameter_space_file = run_dir / "meta_parameter_space.yaml"
+    meta_parameter_space_file.write_text(meta_parameter_space_text)
+
+    base_level = _base_level_config(
+        algorithm_name,
+        f"{output_directory_base}/{run_id}",
+        str(parameter_space_file),
+        extra_config,
+    )
+    meta_search = _meta_search_config(
+        meta_max_evaluations, number_of_cores, str(meta_parameter_space_file)
+    )
     request_yaml = run_dir / "request.yaml"
     request_yaml.write_text(to_request_yaml(base_level, meta_search))
     process = start_training(
@@ -311,18 +351,18 @@ def _parameter_space_text(evolver_home: Path, filename: str) -> str:
     return (evolver_home / PARAMETER_SPACES_RELATIVE_DIR / filename).read_text()
 
 
-def _render_expert_editor(default_text: str) -> str | None:
+def _render_expert_editor(default_text: str, key: str) -> str | None:
     """A raw YAML text area, validated by re-parsing on every change.
 
     Args:
         default_text: Text to pre-fill the text area with, the first time
             it's shown.
+        key: Stable session-state key for this text area.
 
     Returns:
         The current text if it parses as a valid parameter space, else None
         (a validation error is already shown).
     """
-    key = "parameter_space_expert_text"
     if key not in st.session_state:
         st.session_state[key] = default_text
     text = st.text_area("YAML del espacio de parámetros", key=key, height=300)
@@ -334,36 +374,41 @@ def _render_expert_editor(default_text: str) -> str | None:
     return text
 
 
-def _render_guided_editor(default_text: str) -> str:
+def _render_guided_editor(default_text: str, key_prefix: str) -> str:
     """A dynamic form built from the default parameter space.
 
     Args:
         default_text: The parameter space YAML to build the form from.
+        key_prefix: Prefix for the form's widget keys.
 
     Returns:
         The edited parameter space, serialized back to YAML.
     """
     parameters = parse_parameter_space(default_text)
-    edited = render_parameter_form(parameters, "parameter_space_form")
+    edited = render_parameter_form(parameters, key_prefix)
     return serialize_parameter_space(edited)
 
 
-def _render_parameter_space_editor(evolver_home: Path) -> str | None:
-    """Let the user pick or edit the base-level parameter space, guided or expert.
+def _render_parameter_space_editor(title: str, default_text: str, key_prefix: str) -> str | None:
+    """Let the user pick or edit a parameter space, guided or expert.
 
     Args:
-        evolver_home: Path to the Evolver checkout, to read the default file.
+        title: This editor's expander title.
+        default_text: The default parameter space YAML's text.
+        key_prefix: Prefix for this editor's widget keys — unique per context
+            (base-level vs. meta-level, and per selected algorithm) so
+            switching algorithms doesn't carry over stale edited text or
+            form state from a different parameter space.
 
     Returns:
         The chosen parameter space's YAML text, or None if invalid (expert
         mode only — the guided form can't produce invalid YAML).
     """
-    with st.expander("Espacio de parámetros del algoritmo base (NSGA-II)"):
-        mode = st.radio("Modo", ["Guiado", "Experto"], horizontal=True, key="parameter_space_mode")
-        default_text = _parameter_space_text(evolver_home, "NSGAIIDouble.yaml")
+    with st.expander(title):
+        mode = st.radio("Modo", ["Guiado", "Experto"], horizontal=True, key=f"{key_prefix}_mode")
         if mode == "Experto":
-            return _render_expert_editor(default_text)
-        return _render_guided_editor(default_text)
+            return _render_expert_editor(default_text, f"{key_prefix}_expert_text")
+        return _render_guided_editor(default_text, f"{key_prefix}_form")
 
 
 def _render_runnable_badge(runnable_today: bool) -> None:
@@ -479,6 +524,30 @@ with tab_train:
     if active_run is not None:
         _render_active_run(evolver_home, active_run)
     else:
+        runnable_algorithms = [a for a in BASE_ALGORITHMS if a.runnable_today]
+        selected_algorithm_name = st.selectbox(
+            "Algoritmo base", [a.name for a in runnable_algorithms], key="train_base_algorithm"
+        )
+        algorithm = next(a for a in runnable_algorithms if a.name == selected_algorithm_name)
+        st.caption(
+            f"Codificación: {algorithm.runnable_encoding} — la única que "
+            "BaseAlgorithmRegistry construye hoy, sea cual sea el YAML elegido."
+        )
+
+        extra_config = None
+        if algorithm.name == "MOEA/D":
+            weight_vectors_directory = st.text_input(
+                "Weight vector files directory", "resources/weightVectors"
+            )
+            extra_config = {"weightVectorFilesDirectory": weight_vectors_directory}
+
+        wired_meta_algorithms = [m for m in META_ALGORITHMS if m.wired_into_cli_runner]
+        selected_meta_algorithm_name = st.selectbox(
+            "Meta-optimizador",
+            [m.name for m in wired_meta_algorithms],
+            key="train_meta_algorithm",
+        )
+
         output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
         meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
         number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
@@ -489,20 +558,46 @@ with tab_train:
             step=100,
         )
 
-        parameter_space_text = _render_parameter_space_editor(evolver_home)
+        default_base_text = _parameter_space_text(
+            evolver_home, algorithm.encodings[algorithm.runnable_encoding]
+        )
+        parameter_space_text = _render_parameter_space_editor(
+            f"Espacio de parámetros del algoritmo base ({algorithm.name})",
+            default_base_text,
+            f"base_{algorithm.name}",
+        )
 
-        base_level = _base_level_config(output_directory_base, "<written to disk at launch>")
-        meta_search = _meta_search_config(int(meta_max_evaluations), int(number_of_cores))
+        default_meta_text = _parameter_space_text(evolver_home, "NSGAIIDoubleReduced.yaml")
+        meta_parameter_space_text = _render_parameter_space_editor(
+            f"Espacio de parámetros del meta-optimizador ({selected_meta_algorithm_name})",
+            default_meta_text,
+            f"meta_{selected_meta_algorithm_name}",
+        )
+
+        base_level = _base_level_config(
+            algorithm.registry_name,
+            output_directory_base,
+            "<written to disk at launch>",
+            extra_config,
+        )
+        meta_search = _meta_search_config(
+            int(meta_max_evaluations), int(number_of_cores), "<written to disk at launch>"
+        )
         st.code(to_request_yaml(base_level, meta_search), language="yaml")
 
-        if st.button("Ejecutar entrenamiento", disabled=parameter_space_text is None):
+        can_launch = parameter_space_text is not None and meta_parameter_space_text is not None
+        if st.button("Ejecutar entrenamiento", disabled=not can_launch):
             run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
             _launch_run(
                 evolver_home,
                 run_id,
+                algorithm.registry_name,
                 output_directory_base,
                 parameter_space_text,
-                meta_search,
+                extra_config,
+                meta_parameter_space_text,
+                int(meta_max_evaluations),
+                int(number_of_cores),
                 int(update_every_evaluations),
             )
             st.rerun()
