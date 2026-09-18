@@ -1,7 +1,7 @@
 """Explorar: read-only browsing of Evolver's algorithms and their parameter spaces.
 
 Nothing here builds a request or launches a run — only NSGA-II/MOEA-D as base
-and ParallelNSGA-II/SPEA2/SMPSO/AsyncNSGA-II as meta-optimizer are actually
+and NSGA-II/SPEA2/SMPSO/AsyncNSGA-II as meta-optimizer are actually
 runnable today from this app (see evolver_studio/catalogue.py and the
 Entrenamiento page).
 """

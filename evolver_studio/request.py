@@ -78,7 +78,7 @@ class FlatMetaSearchConfig:
 
     Attributes:
         algorithm: The meta-optimizer algorithm name, resolved via
-            MetaAlgorithmRegistry (e.g. "ParallelNSGA-II", "SPEA2",
+            MetaAlgorithmRegistry (e.g. "NSGA-II", "SPEA2",
             "AsyncNSGA-II", "SMPSO").
         meta_max_evaluations: Meta-level evaluation budget.
         meta_population_size: Meta-level population size, or None to use

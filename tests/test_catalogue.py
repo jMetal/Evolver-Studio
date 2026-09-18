@@ -96,17 +96,17 @@ class TestMetaAlgorithms:
         wired = {a.name for a in META_ALGORITHMS if a.wired_into_cli_runner}
 
         # Assert
-        assert wired == {"ParallelNSGA-II", "SPEA2", "SMPSO", "AsyncNSGA-II"}
+        assert wired == {"NSGA-II", "SPEA2", "SMPSO", "AsyncNSGA-II"}
 
     def test_should_mark_only_parallel_nsgaii_as_supporting_tree_among_wired_algorithms(self):
-        """MetaAlgorithmRegistry.validateTreeAlgorithm only accepts ParallelNSGA-II."""
+        """MetaAlgorithmRegistry.validateTreeAlgorithm only accepts NSGA-II."""
         # Act
         tree_wired = {
             a.name for a in META_ALGORITHMS if a.wired_into_cli_runner and a.supports_tree
         }
 
         # Assert
-        assert tree_wired == {"ParallelNSGA-II"}
+        assert tree_wired == {"NSGA-II"}
 
 
 class TestCatalogueMatchesEvolverCheckout:

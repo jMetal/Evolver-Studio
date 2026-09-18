@@ -59,7 +59,7 @@ LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
 # The single meta-optimizer exposed in this app's launch form for now. MetaAlgorithmRegistry
 # also registers SPEA2/SMPSO/AsyncNSGA-II for the flat encoding (see catalogue.py), but each
 # needs its own operator-flags editing UI to be genuinely useful — deferred, see ROADMAP.md.
-LAUNCHABLE_META_ALGORITHM_NAME = "ParallelNSGA-II"
+LAUNCHABLE_META_ALGORITHM_NAME = "NSGA-II"
 LAUNCHABLE_META_ALGORITHM_EXAMPLE_CONFIG_FILE = "MetaParallelNSGAIIFlatConfiguration.yaml"
 
 

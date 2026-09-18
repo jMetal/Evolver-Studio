@@ -31,7 +31,7 @@ def _base_level(**overrides) -> BaseLevelConfig:
 
 def _meta_search(**overrides) -> FlatMetaSearchConfig:
     defaults = {
-        "algorithm": "ParallelNSGA-II",
+        "algorithm": "NSGA-II",
         "meta_max_evaluations": 2000,
         "meta_population_size": 100,
         "number_of_cores": 8,
@@ -119,7 +119,7 @@ class TestFlatMetaSearchToYaml:
         parsed = yaml.safe_load(flat_meta_search_to_yaml(meta_search))
 
         # Assert
-        assert parsed["algorithm"] == "ParallelNSGA-II"
+        assert parsed["algorithm"] == "NSGA-II"
         assert parsed["metaMaxEvaluations"] == 2000
         assert parsed["metaPopulationSize"] == 100
         assert parsed["numberOfCores"] == 8

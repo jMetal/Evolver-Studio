@@ -15,8 +15,8 @@ real checkout.
 `runnable_today`/`wired_into_cli_runner` distinguish "Evolver-Studio can browse this algorithm's
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can
 actually launch a training run with it" (true only where org.uma.evolver.cli.training already
-supports it: NSGA-II/MOEA-D as base algorithms; ParallelNSGA-II/SPEA2/SMPSO/AsyncNSGA-II as
-flat-encoding meta-optimizers, only ParallelNSGA-II for tree).
+supports it: NSGA-II/MOEA-D as base algorithms; NSGA-II/SPEA2/SMPSO/AsyncNSGA-II as
+flat-encoding meta-optimizers, only NSGA-II for tree).
 """
 
 from dataclasses import dataclass
@@ -140,7 +140,7 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         "MOPSOReduced.yaml",
         # Internal operator catalogues for the meta-optimizer itself (cli.training's
         # MetaAlgorithmRegistry), not a base-level algorithm's own parameter space — not
-        # user-facing, hardcoded per registered meta-algorithm (ParallelNSGA-II/AsyncNSGA-II).
+        # user-facing, hardcoded per registered meta-algorithm (NSGA-II/AsyncNSGA-II).
         "NSGAIIMetaDouble.yaml",
         "AsyncNSGAIIMetaDouble.yaml",
         # Orphaned: no Java class under org.uma.evolver.algorithm implements SSMOEA at all.
@@ -172,12 +172,12 @@ _TREE_NSGAII_PARAMETERS = (
 )
 
 META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
-    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("ParallelNSGA-II") — built on
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("NSGA-II") — built on
     # DoubleNSGAII, wired for both flat (resolveFlat) and tree (validateTreeAlgorithm) encodings;
     # renamed from Evolver's own "NSGA-II" since every NSGA-II-shaped meta-optimizer evaluates in
     # parallel (MultiThreadedEvaluation).
     MetaAlgorithm(
-        name="ParallelNSGA-II",
+        name="NSGA-II",
         supports_flat=True,
         supports_tree=True,
         flat_parameters=_FLAT_NSGAII_PARAMETERS,
@@ -246,7 +246,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         wired_into_cli_runner=False,
     ),
     # org.uma.evolver.meta.builder.MetaRandomSearchBuilder<S> — generic over the solution type, so
-    # the only one (besides ParallelNSGA-II) genuinely usable with either encoding.
+    # the only one (besides NSGA-II) genuinely usable with either encoding.
     MetaAlgorithm(
         name="Random Search",
         supports_flat=True,
