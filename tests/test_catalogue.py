@@ -9,10 +9,11 @@ from evolver_studio.catalogue import (
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
 )
+from evolver_studio.evolver_client import describe, jar_path
+from evolver_studio.result import Ok
 
-EVOLVER_PARAMETER_SPACES_DIR = Path(
-    "/Users/ajnebro/Softw/Evolver/src/main/resources/parameterSpaces"
-)
+EVOLVER_HOME = Path("/Users/ajnebro/Softw/Evolver")
+EVOLVER_PARAMETER_SPACES_DIR = EVOLVER_HOME / "src/main/resources/parameterSpaces"
 
 
 class TestBaseAlgorithms:
@@ -89,13 +90,23 @@ class TestMetaAlgorithms:
         # Act / Assert
         assert smpso.supports_tree is False
 
-    def test_should_mark_only_nsgaii_as_wired_into_cli_runner(self):
-        """TrainingRunner only knows how to build a meta-optimizer for NSGA-II today."""
+    def test_should_mark_the_four_registered_meta_algorithms_as_wired(self):
+        """MetaAlgorithmRegistry registers exactly these four for the flat encoding."""
         # Act
         wired = {a.name for a in META_ALGORITHMS if a.wired_into_cli_runner}
 
         # Assert
-        assert wired == {"NSGA-II"}
+        assert wired == {"ParallelNSGA-II", "SPEA2", "SMPSO", "AsyncNSGA-II"}
+
+    def test_should_mark_only_parallel_nsgaii_as_supporting_tree_among_wired_algorithms(self):
+        """MetaAlgorithmRegistry.validateTreeAlgorithm only accepts ParallelNSGA-II."""
+        # Act
+        tree_wired = {
+            a.name for a in META_ALGORITHMS if a.wired_into_cli_runner and a.supports_tree
+        }
+
+        # Assert
+        assert tree_wired == {"ParallelNSGA-II"}
 
 
 class TestCatalogueMatchesEvolverCheckout:
@@ -145,3 +156,46 @@ class TestCatalogueMatchesEvolverCheckout:
             "KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES (with a reason) in "
             "evolver_studio/catalogue.py."
         )
+
+
+class TestCatalogueMatchesDescribeManifest:
+    """Cross-checks the hand-maintained catalogue against Evolver's own introspection manifest.
+
+    See Evolver's docs/proposals/cli-describe-manifest.md: DescribeMain lists exactly what
+    BaseAlgorithmRegistry/MetaAlgorithmRegistry register, generated from their own data, so it
+    cannot itself drift — this test instead catches *this* module going stale relative to it.
+    Skipped if the checkout/jar isn't available, same as the other checkout-dependent tests here.
+    """
+
+    def _manifest(self) -> dict | None:
+        jar = jar_path(EVOLVER_HOME)
+        if not jar.is_file():
+            return None
+        result = describe(EVOLVER_HOME, jar)
+        return result.value if isinstance(result, Ok) else None
+
+    def test_should_have_a_wired_meta_algorithm_entry_for_every_manifest_entry(self):
+        """Every algorithm DescribeMain lists as registered must be wired=True here too."""
+        manifest = self._manifest()
+        if manifest is None:
+            pytest.skip(f"Evolver jar not found under {EVOLVER_HOME}")
+
+        # Arrange
+        manifest_names = {a["name"] for a in manifest["metaAlgorithms"]}
+        wired_names = {a.name for a in META_ALGORITHMS if a.wired_into_cli_runner}
+
+        # Assert
+        assert manifest_names == wired_names
+
+    def test_should_have_a_runnable_base_algorithm_entry_for_every_manifest_entry(self):
+        """Every algorithm DescribeMain lists as registered must be runnable_today=True here too."""
+        manifest = self._manifest()
+        if manifest is None:
+            pytest.skip(f"Evolver jar not found under {EVOLVER_HOME}")
+
+        # Arrange
+        manifest_names = {a["name"] for a in manifest["baseAlgorithms"]}
+        runnable_names = {a.registry_name for a in BASE_ALGORITHMS if a.runnable_today}
+
+        # Assert
+        assert manifest_names == runnable_names

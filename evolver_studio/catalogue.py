@@ -1,17 +1,22 @@
 """Provisional catalogue of Evolver's base and meta-optimization algorithms.
 
-No Java registry lists these today — org.uma.evolver.cli.runner.BaseAlgorithmRegistry only resolves
-"NSGA-II"/"MOEAD" (its own javadoc calls this "prototype scope"), and the algorithm+encoding to YAML
-filename mapping is a pure, unenforced naming convention scattered across org.uma.evolver.example.*
-(<Algorithm><Encoding>.yaml). This module mirrors what the underlying org.uma.evolver.algorithm.*
-and org.uma.evolver.meta.builder.* Java classes actually provide, so it must be kept in sync by hand
-if Evolver's algorithm set changes — see tests/test_catalogue.py for a check against the real
-checkout.
+Evolver's org.uma.evolver.cli.training.DescribeMain now exposes a machine-readable manifest of
+what BaseAlgorithmRegistry/MetaAlgorithmRegistry actually register (see
+evolver_client.describe() and Evolver's docs/proposals/cli-describe-manifest.md) — the
+`runnable_today`/`wired_into_cli_runner` flags below should match it. What DescribeMain does
+*not* cover is the broader, browsable-but-unregistered set this module also documents (e.g.
+SMS-EMOA, RDE-MOEA as base algorithms; Async Genetic Algorithm, Random Search as meta-optimizers):
+those exist as org.uma.evolver.algorithm.*/org.uma.evolver.meta.builder.* Java classes, usable
+from org.uma.evolver.example.*, but never registered for cli.training — there is no registry to
+introspect for them, so this module still mirrors them by hand and must be kept in sync manually
+if Evolver's algorithm set changes there — see tests/test_catalogue.py for a check against the
+real checkout.
 
 `runnable_today`/`wired_into_cli_runner` distinguish "Evolver-Studio can browse this algorithm's
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can
-actually launch a training run with it" (true only where org.uma.evolver.cli.runner already supports
-it: NSGA-II/MOEA-D as base algorithms, NSGA-II as meta-optimizer).
+actually launch a training run with it" (true only where org.uma.evolver.cli.training already
+supports it: NSGA-II/MOEA-D as base algorithms; ParallelNSGA-II/SPEA2/SMPSO/AsyncNSGA-II as
+flat-encoding meta-optimizers, only ParallelNSGA-II for tree).
 """
 
 from dataclasses import dataclass
@@ -25,7 +30,7 @@ class BaseAlgorithm:
         name: The algorithm's display name.
         encodings: Encoding name to its parameter space YAML filename, under
             Evolver's src/main/resources/parameterSpaces/.
-        runnable_today: Whether org.uma.evolver.cli.runner.BaseAlgorithmRegistry
+        runnable_today: Whether org.uma.evolver.cli.training.BaseAlgorithmRegistry
             can currently resolve this algorithm to actually launch a run.
         registry_name: The exact string BaseAlgorithmRegistry.resolve() expects
             as its algorithmName argument, when it differs from `name` (e.g.
@@ -58,7 +63,7 @@ class MetaAlgorithm:
         flat_parameters: Its configurable parameters under flat encoding.
         tree_parameters: Its configurable parameters under tree encoding, empty
             if `supports_tree` is False.
-        wired_into_cli_runner: Whether org.uma.evolver.cli.runner.TrainingRunner
+        wired_into_cli_runner: Whether org.uma.evolver.cli.training.MetaAlgorithmRegistry
             can currently use this as the meta-optimizer.
     """
 
@@ -148,11 +153,13 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
 
 _FLAT_NSGAII_PARAMETERS = (
     "populationSize",
-    "offspringPopulationSize",  # supported by MetaNSGAIIBuilder, not yet exposed by cli.runner
     "maxEvaluations",
     "numberOfCores",
-    "mutationProbabilityFactor",
-    "metaYamlParameterSpaceFile",
+    # The rest come from MetaAlgorithmRegistry's internal NSGAIIMetaDouble.yaml catalogue
+    # (algorithmResult/createInitialSolutions/variation are fixed, not user-configurable):
+    "offspringPopulationSize",
+    "crossover",
+    "mutation",
 )
 _TREE_NSGAII_PARAMETERS = (
     "metaPopulationSize",
@@ -165,55 +172,64 @@ _TREE_NSGAII_PARAMETERS = (
 )
 
 META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
-    # org.uma.evolver.meta.builder.MetaNSGAIIBuilder — the only one wired into TrainingRunner today,
-    # for both flat (runFlat) and tree (runTree's hand-assembled NSGA-II-shaped loop) encodings.
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("ParallelNSGA-II") — built on
+    # DoubleNSGAII, wired for both flat (resolveFlat) and tree (validateTreeAlgorithm) encodings;
+    # renamed from Evolver's own "NSGA-II" since every NSGA-II-shaped meta-optimizer evaluates in
+    # parallel (MultiThreadedEvaluation).
     MetaAlgorithm(
-        name="NSGA-II",
+        name="ParallelNSGA-II",
         supports_flat=True,
         supports_tree=True,
         flat_parameters=_FLAT_NSGAII_PARAMETERS,
         tree_parameters=_TREE_NSGAII_PARAMETERS,
         wired_into_cli_runner=True,
     ),
-    # org.uma.evolver.meta.builder.MetaSPEA2Builder — same shape as MetaNSGAIIBuilder, hardcodes its
-    # own meta-level parameter space (RDEMOEADouble.yaml) rather than taking one as an argument.
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SPEA2") — built via MetaSPEA2Builder,
+    # which hardcodes its own operators (SBX, polynomial mutation, KNN density estimator,
+    # tournament selection); only offspringPopulationSize/mutationProbabilityFactor are
+    # configurable, both optional.
     MetaAlgorithm(
         name="SPEA2",
         supports_flat=True,
         supports_tree=False,
         flat_parameters=(
             "populationSize",
-            "offspringPopulationSize",
             "maxEvaluations",
             "numberOfCores",
+            "offspringPopulationSize",
             "mutationProbabilityFactor",
         ),
         tree_parameters=(),
-        wired_into_cli_runner=False,
+        wired_into_cli_runner=True,
     ),
-    # org.uma.evolver.meta.builder.MetaSMPSOBuilder — structurally flat-only: build() requires
-    # a DoubleProblem, and tree encoding's DerivationTreeSolution has no velocity/Double shape.
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SMPSO") — built via MetaSMPSOBuilder,
+    # which exposes no operator catalogue at all (swarm size/evaluations/cores only); structurally
+    # flat-only, since build() requires a DoubleProblem and tree encoding's DerivationTreeSolution
+    # has no velocity/Double shape.
     MetaAlgorithm(
         name="SMPSO",
         supports_flat=True,
         supports_tree=False,
         flat_parameters=("swarmSize", "maxEvaluations", "numberOfCores"),
         tree_parameters=(),
-        wired_into_cli_runner=False,
+        wired_into_cli_runner=True,
     ),
-    # org.uma.evolver.meta.builder.MetaAsyncNSGAIIBuilder
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("AsyncNSGA-II") — built via
+    # MetaAsyncNSGAIIBuilder, which hardcodes its own selection/replacement; only its
+    # crossover/mutation operators are configurable, via a much smaller parameter space.
     MetaAlgorithm(
-        name="Async NSGA-II",
+        name="AsyncNSGA-II",
         supports_flat=True,
         supports_tree=False,
         flat_parameters=(
             "populationSize",
             "maxEvaluations",
             "numberOfCores",
-            "mutationProbabilityFactor",
+            "crossover",
+            "mutation",
         ),
         tree_parameters=(),
-        wired_into_cli_runner=False,
+        wired_into_cli_runner=True,
     ),
     # org.uma.evolver.meta.builder.MetaAsyncGeneticAlgorithmBuilder
     MetaAlgorithm(
@@ -230,7 +246,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         wired_into_cli_runner=False,
     ),
     # org.uma.evolver.meta.builder.MetaRandomSearchBuilder<S> — generic over the solution type, so
-    # the only one (besides NSGA-II) genuinely usable with either encoding.
+    # the only one (besides ParallelNSGA-II) genuinely usable with either encoding.
     MetaAlgorithm(
         name="Random Search",
         supports_flat=True,
