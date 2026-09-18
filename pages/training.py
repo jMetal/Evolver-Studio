@@ -1,4 +1,4 @@
-"""Entrenamiento: configure, launch and monitor a training run.
+"""Training: configure, launch and monitor a training run.
 
 Training runs as a detached subprocess, independent of this page's session —
 matching the file-based request/status/results contract described in
@@ -261,7 +261,7 @@ def _render_front_with_slider(history: pd.DataFrame, slider_key: str, chart_key:
         st.plotly_chart(build_front_figure(history), width="stretch", key=chart_key)
         return
     _sync_last_n_slider_value(slider_key, available)
-    n = st.slider("Mostrar últimos N frentes", min_value=1, max_value=available, key=slider_key)
+    n = st.slider("Show last N fronts", min_value=1, max_value=available, key=slider_key)
     figure = build_front_figure(last_n_checkpoints(history, n))
     st.plotly_chart(figure, width="stretch", key=chart_key)
 
@@ -350,7 +350,7 @@ def _render_last_finished_run_if_any(evolver_home: Path) -> None:
         return
     pointer = read_results_pointer(run_dir / "results.yaml", evolver_home)
     st.success("Training finished.")
-    if st.checkbox("Mostrar frente de indicadores", value=True):
+    if st.checkbox("Show indicator front", value=True):
         _render_indicator_front(pointer.indicators_file, run_dir.name)
     _render_output_directory(pointer.output_directory, pointer.metadata_file)
 
@@ -369,11 +369,11 @@ def _render_expert_editor(default_text: str, key: str) -> str | None:
     """
     if key not in st.session_state:
         st.session_state[key] = default_text
-    text = st.text_area("YAML del espacio de parámetros", key=key, height=300)
+    text = st.text_area("Parameter space YAML", key=key, height=300)
     try:
         parse_parameter_space(text)
     except (ValueError, KeyError, yaml.YAMLError) as error:
-        st.error(f"YAML inválido: {error}")
+        st.error(f"Invalid YAML: {error}")
         return None
     return text
 
@@ -435,7 +435,7 @@ def _render_operator_flags_editor(default_text: str, key: str) -> dict[str, obje
     try:
         return parse_operator_flags_yaml(text)
     except (ValueError, yaml.YAMLError) as error:
-        st.error(f"YAML inválido: {error}")
+        st.error(f"Invalid YAML: {error}")
         return None
 
 
@@ -455,8 +455,8 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
         mode only — the guided form can't produce invalid YAML).
     """
     with st.expander(title):
-        mode = st.radio("Modo", ["Guiado", "Experto"], horizontal=True, key=f"{key_prefix}_mode")
-        if mode == "Experto":
+        mode = st.radio("Mode", ["Guided", "Expert"], horizontal=True, key=f"{key_prefix}_mode")
+        if mode == "Expert":
             return _render_expert_editor(default_text, f"{key_prefix}_expert_text")
         return _render_guided_editor(default_text, f"{key_prefix}_form")
 
@@ -468,8 +468,8 @@ def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
         evolver_home: Path to the Evolver checkout, to resolve results.yaml's paths.
         active_run: The run currently in progress.
     """
-    st.info(f"Entrenamiento en curso (run {active_run.run_id}).")
-    if st.button("Cancelar entrenamiento"):
+    st.info(f"Training in progress (run {active_run.run_id}).")
+    if st.button("Cancel training"):
         _cancel(active_run)
         st.rerun()
 
@@ -496,7 +496,7 @@ def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
     _poll()
 
 
-st.title("Entrenamiento")
+st.title("Training")
 
 evolver_home = render_sidebar()
 
@@ -507,12 +507,12 @@ if active_run is not None:
 else:
     runnable_algorithms = [a for a in BASE_ALGORITHMS if a.runnable_today]
     selected_algorithm_name = st.selectbox(
-        "Algoritmo base", [a.name for a in runnable_algorithms], key="train_base_algorithm"
+        "Base algorithm", [a.name for a in runnable_algorithms], key="train_base_algorithm"
     )
     algorithm = next(a for a in runnable_algorithms if a.name == selected_algorithm_name)
     st.caption(
-        f"Codificación: {algorithm.runnable_encoding} — la única que "
-        "BaseAlgorithmRegistry construye hoy, sea cual sea el YAML elegido."
+        f"Encoding: {algorithm.runnable_encoding} — the only one "
+        "BaseAlgorithmRegistry builds today, whichever YAML is chosen."
     )
 
     extra_config = None
@@ -522,13 +522,13 @@ else:
         )
         extra_config = {"weightVectorFilesDirectory": weight_vectors_directory}
 
-    st.selectbox("Meta-optimizador", [LAUNCHABLE_META_ALGORITHM_NAME], key="train_meta_algorithm")
+    st.selectbox("Meta-optimizer", [LAUNCHABLE_META_ALGORITHM_NAME], key="train_meta_algorithm")
 
     output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
     meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
     number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
     update_every_evaluations = st.number_input(
-        "Actualizar cada N evaluaciones",
+        "Update every N evaluations",
         value=DEFAULT_UPDATE_EVERY_EVALUATIONS,
         min_value=1,
         step=100,
@@ -538,12 +538,12 @@ else:
         evolver_home, algorithm.encodings[algorithm.runnable_encoding]
     )
     parameter_space_text_value = _render_parameter_space_editor(
-        f"Espacio de parámetros del algoritmo base ({algorithm.name})",
+        f"Base algorithm parameter space ({algorithm.name})",
         default_base_text,
         f"base_{algorithm.name}",
     )
 
-    with st.expander(f"Operator flags del meta-optimizador ({LAUNCHABLE_META_ALGORITHM_NAME})"):
+    with st.expander(f"Meta-optimizer operator flags ({LAUNCHABLE_META_ALGORITHM_NAME})"):
         operator_flags = _render_operator_flags_editor(
             _default_operator_flags_text(evolver_home), "meta_operator_flags"
         )
@@ -558,7 +558,7 @@ else:
     st.code(flat_meta_search_to_yaml(meta_search), language="yaml")
 
     can_launch = parameter_space_text_value is not None and operator_flags is not None
-    if st.button("Ejecutar entrenamiento", disabled=not can_launch):
+    if st.button("Launch training", disabled=not can_launch):
         run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         _launch_run(
             evolver_home,

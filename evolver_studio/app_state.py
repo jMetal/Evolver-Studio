@@ -25,7 +25,7 @@ def render_sidebar() -> Path:
     evolver_home = Path(
         st.sidebar.text_input("Evolver checkout path", DEFAULT_EVOLVER_HOME, key="evolver_home")
     )
-    if st.sidebar.button("Compilar Evolver"):
+    if st.sidebar.button("Build Evolver"):
         build_result = build_jar(evolver_home)
         if isinstance(build_result, Err):
             st.sidebar.error(build_result.message)

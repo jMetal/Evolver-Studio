@@ -12,10 +12,10 @@ st.set_page_config(page_title="Evolver-Studio", layout="wide")
 
 pg = st.navigation(
     [
-        st.Page("pages/explorar.py", title="Explorar", icon="🔍", default=True),
-        st.Page("pages/entrenamiento.py", title="Entrenamiento", icon="🏋️"),
-        st.Page("pages/analisis.py", title="Análisis", icon="📊"),
-        st.Page("pages/validacion.py", title="Validación", icon="✅"),
+        st.Page("pages/explore.py", title="Explore", icon="🔍", default=True),
+        st.Page("pages/training.py", title="Training", icon="🏋️"),
+        st.Page("pages/analysis.py", title="Analysis", icon="📊"),
+        st.Page("pages/validation.py", title="Validation", icon="✅"),
     ]
 )
 pg.run()

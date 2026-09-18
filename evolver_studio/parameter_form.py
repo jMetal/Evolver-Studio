@@ -83,7 +83,7 @@ def render_parameter_space_readonly(parameters: list[ParameterSpec]) -> None:
 
     No widgets: a single markdown tree, for browsing a parameter space
     without implying it can be edited here — see parameter_form.py's module
-    docstring, editing lives in the Entrenamiento page's form instead.
+    docstring, editing lives in the Training page's form instead.
 
     Args:
         parameters: The top-level parameters to render.
@@ -113,9 +113,9 @@ def _readonly_categorical_lines(parameter: CategoricalParameter, level: int) -> 
     lines = [f"{indent}- **{parameter.name}**: {values}"]
     for choice in parameter.choices:
         if choice.conditional_parameters:
-            lines.append(f"{indent}    - *si {choice.value}:*")
+            lines.append(f"{indent}    - *if {choice.value}:*")
             lines.extend(_readonly_lines(list(choice.conditional_parameters), level + 2))
     if parameter.global_sub_parameters:
-        lines.append(f"{indent}    - *siempre:*")
+        lines.append(f"{indent}    - *always:*")
         lines.extend(_readonly_lines(list(parameter.global_sub_parameters), level + 2))
     return lines
