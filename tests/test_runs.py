@@ -19,7 +19,10 @@ def _write_run(evolver_home: Path, run_id: str, status_text: str, output_directo
     run_dir = evolver_home / "cli-runner-runs" / run_id
     run_dir.mkdir(parents=True)
     (run_dir / "status.yaml").write_text(status_text)
-    (run_dir / "request.yaml").write_text(f"baseLevel:\n  outputDirectory: {output_directory}\n")
+    (run_dir / "request.yaml").write_text(
+        f"baseLevel: base_level.yaml\nmetaSearch: meta_search.yaml\n"
+        f"outputDirectory: {output_directory}\n"
+    )
     return run_dir
 
 

@@ -83,7 +83,7 @@ def _active_run_in(run_dir: Path) -> ActiveRun | None:
     if pid is not None and not is_alive(pid):
         return None
     request_yaml = run_dir / "request.yaml"
-    output_directory = yaml.safe_load(request_yaml.read_text())["baseLevel"]["outputDirectory"]
+    output_directory = yaml.safe_load(request_yaml.read_text())["outputDirectory"]
     return ActiveRun(
         run_id=run_dir.name,
         run_dir=run_dir,
