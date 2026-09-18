@@ -133,6 +133,11 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         "RDEMOEADoubleReduced.yaml",
         "SMSEMOADoubleReduced.yaml",
         "MOPSOReduced.yaml",
+        # Internal operator catalogues for the meta-optimizer itself (cli.training's
+        # MetaAlgorithmRegistry), not a base-level algorithm's own parameter space — not
+        # user-facing, hardcoded per registered meta-algorithm (ParallelNSGA-II/AsyncNSGA-II).
+        "NSGAIIMetaDouble.yaml",
+        "AsyncNSGAIIMetaDouble.yaml",
         # Orphaned: no Java class under org.uma.evolver.algorithm implements SSMOEA at all.
         "SSMOEADouble.yaml",
         # irace's own text format (see org.uma.evolver.irace.generator), not Evolver's YAML schema.
