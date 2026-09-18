@@ -43,9 +43,14 @@ below; revisit and reorder as real usage surfaces new ones.
   `SPEA2`, `SMPSO`, `AsyncNSGA-II`), each seeding its own operator-flags editor from its real example
   file under `metaOptimizerConfigurations/` (`MetaAlgorithm.example_config_file`). Verified against
   the real jar: all four reach `FINISHED`.
+- **Arbitrary multi-problem training sets**: the single hardcoded ZDT4 problem is gone — Training's
+  launch form has an editable table (`evolver_studio/training_set.py`, `st.data_editor`), one row per
+  problem with its reference front file and evaluation budget (`BaseLevelConfig`'s three parallel
+  fields), problem names validated against Evolver's `DescribeMain` manifest when available. Verified
+  against the real jar with a two-problem set (RE31+RE32). Indicators still stay fixed.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
-`cancel_run`, `get_results`) for the single hardcoded NSGA-II/ZDT4 case.
+`cancel_run`, `get_results`).
 
 ## Phase 3 — Analysis layer
 
