@@ -14,7 +14,8 @@ from evolver_studio.result import Err, Ok
 
 CANCEL_GRACE_PERIOD_SECONDS = 2.0
 
-TRAINING_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.runner.TrainingRunnerMain"
+TRAINING_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.training.TrainingRunnerMain"
+DESCRIBE_MAIN_CLASS = "org.uma.evolver.cli.training.DescribeMain"
 JAR_RELATIVE_PATH = Path("target/Evolver-2.1-SNAPSHOT-jar-with-dependencies.jar")
 
 
@@ -163,6 +164,36 @@ def cancel_training(pid: int) -> Ok[None] | Err:
     if is_alive(pid):
         os.kill(pid, signal.SIGKILL)
     return Ok(None)
+
+
+def describe(evolver_home: Path, jar: Path) -> Ok[dict] | Err:
+    """Run DescribeMain and parse its manifest of what cli.training can resolve today.
+
+    Args:
+        evolver_home: Working directory the JVM resolves relative paths against.
+        jar: Path to Evolver's fat jar.
+
+    Returns:
+        Ok(manifest) with the parsed manifest (base/meta algorithms, problems,
+        indicators, resource directories, request/baseLevel/metaSearch
+        schemas), or Err(message) if the subprocess failed or its output
+        wasn't valid YAML.
+    """
+    result = subprocess.run(
+        ["java", "-cp", str(jar), DESCRIBE_MAIN_CLASS],
+        cwd=evolver_home,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return Err(result.stdout + result.stderr)
+    try:
+        manifest = yaml.safe_load(result.stdout)
+    except yaml.YAMLError as error:
+        return Err(f"DescribeMain produced invalid YAML: {error}")
+    if not isinstance(manifest, dict):
+        return Err(f"DescribeMain produced unexpected output: {result.stdout!r}")
+    return Ok(manifest)
 
 
 def read_status(status_yaml: Path) -> RunStatus | None:
