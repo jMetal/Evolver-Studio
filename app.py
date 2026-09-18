@@ -33,7 +33,15 @@ from evolver_studio.evolver_client import (
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
-from evolver_studio.request import BaseLevelConfig, FlatMetaSearchConfig, to_request_yaml
+from evolver_studio.request import (
+    FLAT_META_SEARCH_SCALAR_KEYS,
+    BaseLevelConfig,
+    FlatMetaSearchConfig,
+    base_level_to_yaml,
+    flat_meta_search_to_yaml,
+    parse_operator_flags_yaml,
+    request_to_yaml,
+)
 from evolver_studio.result import Err
 from evolver_studio.results import (
     deduplicate_consecutive_checkpoints,
@@ -50,11 +58,16 @@ DEFAULT_EVOLVER_HOME = "/Users/ajnebro/Softw/Evolver"
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
 PARAMETER_SPACES_RELATIVE_DIR = Path("src/main/resources/parameterSpaces")
+META_OPTIMIZER_CONFIGURATIONS_RELATIVE_DIR = Path("src/main/resources/metaOptimizerConfigurations")
+# The single meta-optimizer exposed in this app's launch form for now. MetaAlgorithmRegistry
+# also registers SPEA2/SMPSO/AsyncNSGA-II for the flat encoding (see catalogue.py), but each
+# needs its own operator-flags editing UI to be genuinely useful — deferred, see ROADMAP.md.
+LAUNCHABLE_META_ALGORITHM_NAME = "ParallelNSGA-II"
+LAUNCHABLE_META_ALGORITHM_EXAMPLE_CONFIG_FILE = "MetaParallelNSGAIIFlatConfiguration.yaml"
 
 
 def _base_level_config(
     algorithm_name: str,
-    output_directory: str,
     yaml_parameter_space_file: str,
     extra_config: dict[str, str] | None,
 ) -> BaseLevelConfig:
@@ -67,7 +80,6 @@ def _base_level_config(
     Args:
         algorithm_name: The exact string BaseAlgorithmRegistry.resolve() expects
             (catalogue.BaseAlgorithm.registry_name, e.g. "MOEAD", not "MOEA/D").
-        output_directory: Where Evolver writes this run's results.
         yaml_parameter_space_file: Path to the base-level algorithm's parameter
             space YAML (possibly a run-specific, user-edited copy).
         extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
@@ -86,30 +98,29 @@ def _base_level_config(
         training_reference_front_file_names=["resources/referenceFronts/ZDT4.csv"],
         training_evaluations=[12000],
         indicator_names=["Epsilon", "NormalizedHypervolume"],
-        output_directory=output_directory,
     )
 
 
 def _meta_search_config(
-    meta_max_evaluations: int, number_of_cores: int, meta_yaml_parameter_space_file: str
+    meta_max_evaluations: int, number_of_cores: int, operator_flags: dict[str, object]
 ) -> FlatMetaSearchConfig:
-    """Build the flat meta-search config for the (currently sole) NSGA-II meta-optimizer.
+    """Build the flat meta-search config for the launchable meta-optimizer.
 
     Args:
         meta_max_evaluations: Meta-level evaluation budget.
         number_of_cores: Cores used to parallelize base-level runs.
-        meta_yaml_parameter_space_file: Path to the meta-optimizer's own
-            parameter space YAML (possibly a run-specific, user-edited copy).
+        operator_flags: The meta-optimizer's own operator configuration
+            (possibly user-edited), as plain key/value pairs.
 
     Returns:
-        The flat meta-search config for the meta-level NSGA-II.
+        The flat meta-search config for LAUNCHABLE_META_ALGORITHM_NAME.
     """
     return FlatMetaSearchConfig(
+        algorithm=LAUNCHABLE_META_ALGORITHM_NAME,
         meta_max_evaluations=meta_max_evaluations,
         meta_population_size=100,
         number_of_cores=number_of_cores,
-        mutation_probability_factor=1.5,
-        meta_yaml_parameter_space_file=meta_yaml_parameter_space_file,
+        operator_flags=operator_flags,
     )
 
 
@@ -120,12 +131,16 @@ def _launch_run(
     output_directory_base: str,
     parameter_space_text: str,
     extra_config: dict[str, str] | None,
-    meta_parameter_space_text: str,
+    operator_flags: dict[str, object],
     meta_max_evaluations: int,
     number_of_cores: int,
     update_every_evaluations: int,
 ) -> None:
-    """Write both parameter spaces and the request, launch training, persist its PID.
+    """Write the base-level/meta-search/request files, launch training, persist its PID.
+
+    A full request is three files (see evolver_studio/request.py): the
+    base-level parameter space, the base-level and metaSearch configuration
+    files, and request.yaml itself referencing the latter two by path.
 
     Args:
         evolver_home: Path to the Evolver checkout (JVM working directory).
@@ -140,31 +155,37 @@ def _launch_run(
             absolute path here regardless of its working directory.
         extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
             weightVectorFilesDirectory), or None.
-        meta_parameter_space_text: The (possibly user-edited) meta-optimizer's
-            own parameter space YAML, written to this run's own file too.
+        operator_flags: The (possibly user-edited) meta-optimizer operator
+            configuration, as plain key/value pairs.
         meta_max_evaluations: Meta-level evaluation budget.
         number_of_cores: Cores used to parallelize base-level runs.
-        update_every_evaluations: Chosen live-preview redraw threshold.
+        update_every_evaluations: Chosen live-preview redraw threshold, also
+            used as writeFrequency/statusFrequency for this run.
     """
     run_dir = evolver_home / "cli-runner-runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     parameter_space_file = run_dir / "base_parameter_space.yaml"
     parameter_space_file.write_text(parameter_space_text)
-    meta_parameter_space_file = run_dir / "meta_parameter_space.yaml"
-    meta_parameter_space_file.write_text(meta_parameter_space_text)
 
-    base_level = _base_level_config(
-        algorithm_name,
-        f"{output_directory_base}/{run_id}",
-        str(parameter_space_file),
-        extra_config,
-    )
-    meta_search = _meta_search_config(
-        meta_max_evaluations, number_of_cores, str(meta_parameter_space_file)
-    )
+    base_level = _base_level_config(algorithm_name, str(parameter_space_file), extra_config)
+    base_level_file = run_dir / "base_level.yaml"
+    base_level_file.write_text(base_level_to_yaml(base_level))
+
+    meta_search = _meta_search_config(meta_max_evaluations, number_of_cores, operator_flags)
+    meta_search_file = run_dir / "meta_search.yaml"
+    meta_search_file.write_text(flat_meta_search_to_yaml(meta_search))
+
     request_yaml = run_dir / "request.yaml"
-    request_yaml.write_text(to_request_yaml(base_level, meta_search))
+    request_yaml.write_text(
+        request_to_yaml(
+            str(base_level_file),
+            str(meta_search_file),
+            f"{output_directory_base}/{run_id}",
+            write_frequency=update_every_evaluations,
+            status_frequency=update_every_evaluations,
+        )
+    )
     process = start_training(
         evolver_home, jar_path(evolver_home), request_yaml, run_dir / "status.yaml"
     )
@@ -389,6 +410,53 @@ def _render_guided_editor(default_text: str, key_prefix: str) -> str:
     return serialize_parameter_space(edited)
 
 
+def _default_operator_flags_text(evolver_home: Path) -> str:
+    """Read the launchable meta-algorithm's example config, stripped to its operator flags.
+
+    The example file under metaOptimizerConfigurations/ also carries algorithm/encoding/
+    metaMaxEvaluations/metaPopulationSize/numberOfCores — those are set from other widgets in
+    this app's launch form, not from this editor, so they're excluded here.
+
+    Args:
+        evolver_home: Path to the Evolver checkout.
+
+    Returns:
+        A flat YAML mapping of just the operator flags, as starting text for the editor.
+    """
+    example_file = (
+        evolver_home
+        / META_OPTIMIZER_CONFIGURATIONS_RELATIVE_DIR
+        / LAUNCHABLE_META_ALGORITHM_EXAMPLE_CONFIG_FILE
+    )
+    example = yaml.safe_load(example_file.read_text())
+    operator_flags = {
+        key: value for key, value in example.items() if key not in FLAT_META_SEARCH_SCALAR_KEYS
+    }
+    return yaml.safe_dump(operator_flags, sort_keys=False)
+
+
+def _render_operator_flags_editor(default_text: str, key: str) -> dict[str, object] | None:
+    """A raw YAML text area for the meta-optimizer's operator flags, validated on every change.
+
+    Args:
+        default_text: Text to pre-fill the text area with, the first time
+            it's shown.
+        key: Stable session-state key for this text area.
+
+    Returns:
+        The parsed operator flags if the text is valid, else None (a
+        validation error is already shown).
+    """
+    if key not in st.session_state:
+        st.session_state[key] = default_text
+    text = st.text_area("Operator flags (YAML)", key=key, height=200)
+    try:
+        return parse_operator_flags_yaml(text)
+    except (ValueError, yaml.YAMLError) as error:
+        st.error(f"YAML inválido: {error}")
+        return None
+
+
 def _render_parameter_space_editor(title: str, default_text: str, key_prefix: str) -> str | None:
     """Let the user pick or edit a parameter space, guided or expert.
 
@@ -415,7 +483,7 @@ def _render_runnable_badge(runnable_today: bool) -> None:
     """Show whether an algorithm can actually be launched today, or only browsed.
 
     Args:
-        runnable_today: Whether cli.runner's BaseAlgorithmRegistry supports it.
+        runnable_today: Whether cli.training's BaseAlgorithmRegistry supports it.
     """
     if runnable_today:
         st.success("✅ Ejecutable hoy desde esta app.")
@@ -435,9 +503,9 @@ def _render_meta_algorithm_summary(meta: MetaAlgorithm) -> None:
         if supported
     )
     wired = (
-        "✅ conectado a cli.runner"
+        "✅ conectado a cli.training"
         if meta.wired_into_cli_runner
-        else "🔍 no conectado a cli.runner"
+        else "🔍 no conectado a cli.training"
     )
     with st.expander(f"{meta.name} — {encodings} — {wired}"):
         st.write("**Parámetros (flat):**", ", ".join(meta.flat_parameters))
@@ -541,10 +609,9 @@ with tab_train:
             )
             extra_config = {"weightVectorFilesDirectory": weight_vectors_directory}
 
-        wired_meta_algorithms = [m for m in META_ALGORITHMS if m.wired_into_cli_runner]
-        selected_meta_algorithm_name = st.selectbox(
+        st.selectbox(
             "Meta-optimizador",
-            [m.name for m in wired_meta_algorithms],
+            [LAUNCHABLE_META_ALGORITHM_NAME],
             key="train_meta_algorithm",
         )
 
@@ -567,25 +634,21 @@ with tab_train:
             f"base_{algorithm.name}",
         )
 
-        default_meta_text = _parameter_space_text(evolver_home, "NSGAIIDoubleReduced.yaml")
-        meta_parameter_space_text = _render_parameter_space_editor(
-            f"Espacio de parámetros del meta-optimizador ({selected_meta_algorithm_name})",
-            default_meta_text,
-            f"meta_{selected_meta_algorithm_name}",
-        )
+        with st.expander(f"Operator flags del meta-optimizador ({LAUNCHABLE_META_ALGORITHM_NAME})"):
+            operator_flags = _render_operator_flags_editor(
+                _default_operator_flags_text(evolver_home), "meta_operator_flags"
+            )
 
         base_level = _base_level_config(
-            algorithm.registry_name,
-            output_directory_base,
-            "<written to disk at launch>",
-            extra_config,
+            algorithm.registry_name, "<written to disk at launch>", extra_config
         )
         meta_search = _meta_search_config(
-            int(meta_max_evaluations), int(number_of_cores), "<written to disk at launch>"
+            int(meta_max_evaluations), int(number_of_cores), operator_flags or {}
         )
-        st.code(to_request_yaml(base_level, meta_search), language="yaml")
+        st.code(base_level_to_yaml(base_level), language="yaml")
+        st.code(flat_meta_search_to_yaml(meta_search), language="yaml")
 
-        can_launch = parameter_space_text is not None and meta_parameter_space_text is not None
+        can_launch = parameter_space_text is not None and operator_flags is not None
         if st.button("Ejecutar entrenamiento", disabled=not can_launch):
             run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
             _launch_run(
@@ -595,7 +658,7 @@ with tab_train:
                 output_directory_base,
                 parameter_space_text,
                 extra_config,
-                meta_parameter_space_text,
+                operator_flags,
                 int(meta_max_evaluations),
                 int(number_of_cores),
                 int(update_every_evaluations),
