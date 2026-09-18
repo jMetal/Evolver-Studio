@@ -76,3 +76,46 @@ def _render_categorical(parameter: CategoricalParameter, key: str) -> Categorica
         _render_parameter(sub, f"{key}_{sub.name}") for sub in parameter.global_sub_parameters
     )
     return replace(narrowed, choices=choices, global_sub_parameters=global_sub_parameters)
+
+
+def render_parameter_space_readonly(parameters: list[ParameterSpec]) -> None:
+    """Render a parameter space as a compact, read-only nested list.
+
+    No widgets: a single markdown tree, for browsing a parameter space
+    without implying it can be edited here — see parameter_form.py's module
+    docstring, editing lives in the Entrenamiento page's form instead.
+
+    Args:
+        parameters: The top-level parameters to render.
+    """
+    st.markdown("\n".join(_readonly_lines(parameters, 0)))
+
+
+def _readonly_lines(parameters: list[ParameterSpec], level: int) -> list[str]:
+    lines = []
+    for parameter in parameters:
+        if isinstance(parameter, RangeParameter):
+            lines.append(_readonly_range_line(parameter, level))
+        else:
+            lines.extend(_readonly_categorical_lines(parameter, level))
+    return lines
+
+
+def _readonly_range_line(parameter: RangeParameter, level: int) -> str:
+    indent = "    " * level
+    bounds = f"[{parameter.lower_bound}, {parameter.upper_bound}]"
+    return f"{indent}- **{parameter.name}**: {bounds} ({parameter.kind})"
+
+
+def _readonly_categorical_lines(parameter: CategoricalParameter, level: int) -> list[str]:
+    indent = "    " * level
+    values = ", ".join(choice.value for choice in parameter.choices)
+    lines = [f"{indent}- **{parameter.name}**: {values}"]
+    for choice in parameter.choices:
+        if choice.conditional_parameters:
+            lines.append(f"{indent}    - *si {choice.value}:*")
+            lines.extend(_readonly_lines(list(choice.conditional_parameters), level + 2))
+    if parameter.global_sub_parameters:
+        lines.append(f"{indent}    - *siempre:*")
+        lines.extend(_readonly_lines(list(parameter.global_sub_parameters), level + 2))
+    return lines

@@ -10,7 +10,7 @@ import streamlit as st
 
 from evolver_studio.app_state import render_sidebar
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
-from evolver_studio.parameter_form import render_parameter_form
+from evolver_studio.parameter_form import render_parameter_space_readonly
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.resource_files import parameter_space_text
 
@@ -62,7 +62,7 @@ _render_runnable_badge(algorithm.runnable_today)
 
 encoding = st.selectbox("Codificación", list(algorithm.encodings), key="explorer_encoding")
 text = parameter_space_text(evolver_home, algorithm.encodings[encoding])
-render_parameter_form(parse_parameter_space(text), f"explorer_{selected_name}_{encoding}")
+render_parameter_space_readonly(parse_parameter_space(text))
 
 st.subheader("Algoritmos de meta-optimización")
 for meta in META_ALGORITHMS:
