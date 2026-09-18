@@ -65,6 +65,10 @@ class MetaAlgorithm:
             if `supports_tree` is False.
         wired_into_cli_runner: Whether org.uma.evolver.cli.training.MetaAlgorithmRegistry
             can currently use this as the meta-optimizer.
+        example_config_file: Filename of a ready-to-use metaSearch configuration
+            under src/main/resources/metaOptimizerConfigurations/, whose
+            operator flags seed this algorithm's launch-form editor. None when
+            not `wired_into_cli_runner` (nothing to launch).
     """
 
     name: str
@@ -73,6 +77,7 @@ class MetaAlgorithm:
     flat_parameters: tuple[str, ...]
     tree_parameters: tuple[str, ...]
     wired_into_cli_runner: bool
+    example_config_file: str | None = None
 
 
 BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
@@ -183,6 +188,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         flat_parameters=_FLAT_NSGAII_PARAMETERS,
         tree_parameters=_TREE_NSGAII_PARAMETERS,
         wired_into_cli_runner=True,
+        example_config_file="MetaParallelNSGAIIFlatConfiguration.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SPEA2") — built via MetaSPEA2Builder,
     # which hardcodes its own operators (SBX, polynomial mutation, KNN density estimator,
@@ -201,6 +207,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         ),
         tree_parameters=(),
         wired_into_cli_runner=True,
+        example_config_file="MetaSPEA2FlatConfiguration.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SMPSO") — built via MetaSMPSOBuilder,
     # which exposes no operator catalogue at all (swarm size/evaluations/cores only); structurally
@@ -213,6 +220,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         flat_parameters=("swarmSize", "maxEvaluations", "numberOfCores"),
         tree_parameters=(),
         wired_into_cli_runner=True,
+        example_config_file="MetaSMPSOFlatConfiguration.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("AsyncNSGA-II") — built via
     # MetaAsyncNSGAIIBuilder, which hardcodes its own selection/replacement; only its
@@ -230,6 +238,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         ),
         tree_parameters=(),
         wired_into_cli_runner=True,
+        example_config_file="MetaAsyncNSGAIIFlatConfiguration.yaml",
     ),
     # org.uma.evolver.meta.builder.MetaAsyncGeneticAlgorithmBuilder
     MetaAlgorithm(

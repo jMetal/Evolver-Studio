@@ -19,7 +19,7 @@ import yaml
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
 from evolver_studio.app_state import render_sidebar
-from evolver_studio.catalogue import BASE_ALGORITHMS
+from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS
 from evolver_studio.evolver_client import (
     RunState,
     RunStatus,
@@ -56,11 +56,6 @@ from evolver_studio.slider_state import next_slider_value
 
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
-# The single meta-optimizer exposed in this app's launch form for now. MetaAlgorithmRegistry
-# also registers SPEA2/SMPSO/AsyncNSGA-II for the flat encoding (see catalogue.py), but each
-# needs its own operator-flags editing UI to be genuinely useful — deferred, see ROADMAP.md.
-LAUNCHABLE_META_ALGORITHM_NAME = "NSGA-II"
-LAUNCHABLE_META_ALGORITHM_EXAMPLE_CONFIG_FILE = "MetaParallelNSGAIIFlatConfiguration.yaml"
 
 
 def _base_level_config(
@@ -99,21 +94,25 @@ def _base_level_config(
 
 
 def _meta_search_config(
-    meta_max_evaluations: int, number_of_cores: int, operator_flags: dict[str, object]
+    algorithm: str,
+    meta_max_evaluations: int,
+    number_of_cores: int,
+    operator_flags: dict[str, object],
 ) -> FlatMetaSearchConfig:
-    """Build the flat meta-search config for the launchable meta-optimizer.
+    """Build the flat meta-search config for the selected meta-optimizer.
 
     Args:
+        algorithm: The selected meta-optimizer's name (catalogue.MetaAlgorithm.name).
         meta_max_evaluations: Meta-level evaluation budget.
         number_of_cores: Cores used to parallelize base-level runs.
         operator_flags: The meta-optimizer's own operator configuration
             (possibly user-edited), as plain key/value pairs.
 
     Returns:
-        The flat meta-search config for LAUNCHABLE_META_ALGORITHM_NAME.
+        The flat meta-search config for the selected algorithm.
     """
     return FlatMetaSearchConfig(
-        algorithm=LAUNCHABLE_META_ALGORITHM_NAME,
+        algorithm=algorithm,
         meta_max_evaluations=meta_max_evaluations,
         meta_population_size=100,
         number_of_cores=number_of_cores,
@@ -125,6 +124,7 @@ def _launch_run(
     evolver_home: Path,
     run_id: str,
     algorithm_name: str,
+    meta_algorithm_name: str,
     output_directory_base: str,
     parameter_space_text_: str,
     extra_config: dict[str, str] | None,
@@ -144,6 +144,8 @@ def _launch_run(
         run_id: This run's timestamp-based identifier.
         algorithm_name: The base algorithm's registry name (catalogue.py's
             BaseAlgorithm.registry_name), e.g. "MOEAD".
+        meta_algorithm_name: The selected meta-optimizer's name
+            (catalogue.MetaAlgorithm.name), e.g. "SPEA2".
         output_directory_base: Output directory, nested under run_id so
             INDICATORS.csv (append-only in Evolver) never mixes checkpoints
             across runs that share the same base output directory.
@@ -169,7 +171,9 @@ def _launch_run(
     base_level_file = run_dir / "base_level.yaml"
     base_level_file.write_text(base_level_to_yaml(base_level))
 
-    meta_search = _meta_search_config(meta_max_evaluations, number_of_cores, operator_flags)
+    meta_search = _meta_search_config(
+        meta_algorithm_name, meta_max_evaluations, number_of_cores, operator_flags
+    )
     meta_search_file = run_dir / "meta_search.yaml"
     meta_search_file.write_text(flat_meta_search_to_yaml(meta_search))
 
@@ -393,8 +397,8 @@ def _render_guided_editor(default_text: str, key_prefix: str) -> str:
     return serialize_parameter_space(edited)
 
 
-def _default_operator_flags_text(evolver_home: Path) -> str:
-    """Read the launchable meta-algorithm's example config, stripped to its operator flags.
+def _default_operator_flags_text(evolver_home: Path, example_config_file: str) -> str:
+    """Read a meta-algorithm's example config, stripped to its operator flags.
 
     The example file under metaOptimizerConfigurations/ also carries algorithm/encoding/
     metaMaxEvaluations/metaPopulationSize/numberOfCores — those are set from other widgets in
@@ -402,15 +406,13 @@ def _default_operator_flags_text(evolver_home: Path) -> str:
 
     Args:
         evolver_home: Path to the Evolver checkout.
+        example_config_file: Filename under metaOptimizerConfigurations/ for the
+            selected meta-algorithm (catalogue.MetaAlgorithm.example_config_file).
 
     Returns:
         A flat YAML mapping of just the operator flags, as starting text for the editor.
     """
-    example = yaml.safe_load(
-        meta_optimizer_configuration_text(
-            evolver_home, LAUNCHABLE_META_ALGORITHM_EXAMPLE_CONFIG_FILE
-        )
-    )
+    example = yaml.safe_load(meta_optimizer_configuration_text(evolver_home, example_config_file))
     operator_flags = {
         key: value for key, value in example.items() if key not in FLAT_META_SEARCH_SCALAR_KEYS
     }
@@ -522,7 +524,13 @@ else:
         )
         extra_config = {"weightVectorFilesDirectory": weight_vectors_directory}
 
-    st.selectbox("Meta-optimizer", [LAUNCHABLE_META_ALGORITHM_NAME], key="train_meta_algorithm")
+    wired_meta_algorithms = [m for m in META_ALGORITHMS if m.wired_into_cli_runner]
+    selected_meta_algorithm_name = st.selectbox(
+        "Meta-optimizer", [m.name for m in wired_meta_algorithms], key="train_meta_algorithm"
+    )
+    meta_algorithm = next(
+        m for m in wired_meta_algorithms if m.name == selected_meta_algorithm_name
+    )
 
     output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
     meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
@@ -543,16 +551,17 @@ else:
         f"base_{algorithm.name}",
     )
 
-    with st.expander(f"Meta-optimizer operator flags ({LAUNCHABLE_META_ALGORITHM_NAME})"):
+    with st.expander(f"Meta-optimizer operator flags ({meta_algorithm.name})"):
         operator_flags = _render_operator_flags_editor(
-            _default_operator_flags_text(evolver_home), "meta_operator_flags"
+            _default_operator_flags_text(evolver_home, meta_algorithm.example_config_file),
+            f"meta_operator_flags_{meta_algorithm.name}",
         )
 
     base_level = _base_level_config(
         algorithm.registry_name, "<written to disk at launch>", extra_config
     )
     meta_search = _meta_search_config(
-        int(meta_max_evaluations), int(number_of_cores), operator_flags or {}
+        meta_algorithm.name, int(meta_max_evaluations), int(number_of_cores), operator_flags or {}
     )
     st.code(base_level_to_yaml(base_level), language="yaml")
     st.code(flat_meta_search_to_yaml(meta_search), language="yaml")
@@ -564,6 +573,7 @@ else:
             evolver_home,
             run_id,
             algorithm.registry_name,
+            meta_algorithm.name,
             output_directory_base,
             parameter_space_text_value,
             extra_config,
