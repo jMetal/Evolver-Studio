@@ -201,7 +201,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         flat_parameters=_FLAT_NSGAII_PARAMETERS,
         tree_parameters=_TREE_NSGAII_PARAMETERS,
         wired_into_cli_runner=True,
-        example_config_file="MetaParallelNSGAIIFlatConfiguration.yaml",
+        example_config_file="MetaNSGAIIFlatConfiguration.yaml",
         operator_parameter_space_file="NSGAIIMetaDouble.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SPEA2") — built via MetaSPEA2Builder,
