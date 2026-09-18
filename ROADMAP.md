@@ -6,40 +6,58 @@ below; revisit and reorder as real usage surfaces new ones.
 
 ## Done so far
 
-- Request/status/results contract against Evolver's `org.uma.evolver.cli.runner.TrainingRunnerMain`
-  (`evolver_studio/request.py`, `evolver_client.py`, `results.py`).
+- Request/status/results contract against Evolver's `org.uma.evolver.cli.training.TrainingRunnerMain`
+  (`evolver_studio/request.py`, `evolver_client.py`, `results.py`) — a full request is three files
+  (`request.yaml` referencing a reusable `baseLevel` file and a reusable `metaSearch` file by path,
+  `outputDirectory`/`writeFrequency`/`statusFrequency` inline on `request.yaml` itself), matching
+  Evolver's `cli-training-prototype.md`.
 - Non-blocking run control: detached subprocess, PID tracking, cancellation, reconnect to an
   in-progress run across page reloads (`evolver_studio/runs.py`, `adaptive_poll.py`).
 - Live indicator-front preview: accumulates checkpoints from `INDICATORS.csv`, deduplicates unchanged
   fronts, lets the viewer narrow the plot to the last N checkpoints
   (`evolver_studio/live_front.py`, `slider_state.py`).
-- Validated parameter editing (formerly "Phase 1"): parses Evolver's YAML parameter space files into a
-  structured model and renders a dynamic Streamlit form from it — Guided mode (validated by
-  construction) and Expert mode (raw YAML, validated on every change)
-  (`evolver_studio/parameter_space.py`, `parameter_form.py`). Base-level algorithm only so far; the
-  meta-optimizer's own parameter space (`NSGAIIDoubleReduced.yaml`) still uses the fixed default.
+- Validated parameter editing: parses Evolver's YAML parameter space files into a structured model and
+  renders a dynamic Streamlit form from it — Guided mode (validated by construction) and Expert mode
+  (raw YAML, validated on every change) (`evolver_studio/parameter_space.py`, `parameter_form.py`).
+  Base-level algorithm only; the meta-optimizer's own operators use a flat, single-level YAML editor
+  instead (`evolver_studio/request.py`'s `parse_operator_flags_yaml`) — Evolver's `metaSearch` files
+  are a fixed recipe, not a `ParameterSpace` to evolve, so the same guided/expert form does not apply.
+- **Discovery and a read-only parameter space explorer** (formerly "Phase 2"): a four-section
+  multipage app (`st.navigation`, `pages/{explore,training,analysis,validation}.py`) — the
+  **Explore** page browses any base algorithm's parameter space as a compact, read-only tree
+  (`parameter_form.render_parameter_space_readonly`, no widgets — editing lives only in Training's
+  form) and summarizes every registered meta-optimizer's encoding support and operator parameters.
+  Backed by `evolver_studio/catalogue.py`, still a hand-maintained Python mirror of Evolver's
+  registries (see "Provisional catalogue" below), cross-checked against Evolver's own introspection
+  manifest when the checkout is available (`tests/test_catalogue.py::TestCatalogueMatchesDescribeManifest`).
+- **Provisional catalogue → Evolver's own introspection manifest**: Evolver's
+  `org.uma.evolver.cli.training.DescribeMain` (`docs/proposals/cli-describe-manifest.md` in Evolver)
+  now prints a YAML manifest of everything `cli.training` can resolve (registered base/meta
+  algorithms, problems, indicators, available resource-directory file names, and the
+  `request.yaml`/`baseLevel`/`metaSearch` schema via reflection over Evolver's own records) —
+  `evolver_client.describe()` calls it. `catalogue.py` is not yet fully populated *from* the
+  manifest (see "Next up" below); today the manifest is only used to catch `catalogue.py` drifting
+  from Evolver's registered algorithms, not as `catalogue.py`'s data source.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`) for the single hardcoded NSGA-II/ZDT4 case.
 
-## Phase 2 — Discovery and a read-only parameter space explorer
+## Next up — expose the newly-wired meta-optimizers
 
-Prioritized after reviewing the use cases below: users want to understand what's available and what a
-given algorithm's parameters look like *before* committing to launching a run.
-
-- Replace the hardcoded values (`"NSGA-II"`, `["ZDT4"]`, `["Epsilon", "NormalizedHypervolume"]`) with
-  real listings: `list_algorithms()`, `list_indicators()`, `list_training_sets()`.
-- Evolver's registries (`BaseAlgorithmRegistry`, `IndicatorRegistry`) only exist in Java today. Short
-  term: mirror them in a Python constant, explicitly marked provisional (consistent with `CLAUDE.md`'s
-  thin-adapter-layer approach). Medium term: ask Evolver to expose a small registry dump.
-- Multi-problem training sets (today only single-problem ZDT4).
-- A **read-only parameter space explorer**: browse any algorithm's tunable parameters (ranges,
-  categorical choices, conditional/global sub-parameters) without launching a training run. Reuses
-  `evolver_studio/parameter_space.py`'s parser directly (already built for Phase 1's form) — no new
-  parsing logic needed, only a browsing view (e.g. reusing `parameter_form.py`'s recursive rendering in
-  a disabled/inspection mode, or a simpler read-only tree view). Self-contained, no Evolver changes.
+Evolver's `MetaAlgorithmRegistry` now registers four flat-encoding meta-optimizer engines
+(`NSGA-II`, `SPEA2`, `SMPSO`, `AsyncNSGA-II`; only `NSGA-II` for tree), all marked
+`wired_into_cli_runner=True` in `catalogue.py` — but the Training page's launch form still only
+offers `NSGA-II` (`pages/training.py`'s `LAUNCHABLE_META_ALGORITHM_NAME`), since each engine accepts
+a different operator-flag catalogue (`SPEA2`: two optional flags; `SMPSO`: none at all; `AsyncNSGA-II`:
+just `crossover`/`mutation`) and the current single flat-YAML operator-flags editor was only seeded
+from `NSGA-II`'s example config. Needs: seeding the editor's default text from the selected
+algorithm's own example file under `metaOptimizerConfigurations/` (already listed in
+`resourceDirectories.metaOptimizerConfigurations` by the manifest), and a meta-optimizer selectbox
+driven by `catalogue.py`'s wired algorithms instead of the hardcoded single-entry list.
 
 ## Phase 3 — Analysis layer
+
+Landing page now exists (`pages/analysis.py`), currently a placeholder pointing back here.
 
 - Structured parsing of `CONFIGURATIONS.csv`/`VAR_CONF.txt` (today only listed as files).
 - Run history: browsing past runs, not just the latest one (each run is currently ephemeral from the
@@ -49,14 +67,27 @@ given algorithm's parameters look like *before* committing to launching a run.
 
 ## Phase 4 — Validation runs
 
+Landing page now exists (`pages/validation.py`), currently a placeholder pointing back here.
+
 - `start_validation(request)`: run the winning configuration against a validation set and compare
   indicator distributions against a baseline (default, untuned configuration).
 
 ## Phase 5 — Hardening
 
-- Tests for the parameter-space explorer once Phase 2 lands.
-- Track the state of the `study/uniform-training-runner` branch on Evolver (the `cli.runner` prototype
-  this tool depends on is still not merged to `main`).
+- Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; still no
+  dedicated Streamlit `AppTest` coverage beyond the manual smoke-test discipline described in
+  `CLAUDE.md`.)*
+- Track the state of the `study/uniform-training-runner` branch on Evolver (the `cli.training`
+  prototype this tool depends on is still not merged to `main`). The rename from `cli.runner` to
+  `cli.training` and the `request.yaml` schema change already broke this integration once; the
+  two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
+  `BaseAlgorithmRegistryCompletenessTest`/`TrainingRunnerMetaBuilderCompletenessTest` in Evolver) and
+  Evolver's `DescribeMain` manifest (see "Done so far") both exist to catch the next one faster.
+- Fully populate `catalogue.py` from `DescribeMain`'s manifest instead of hand-maintained literals,
+  for the subset it actually covers (registered/runnable algorithms) — the broader
+  browsable-but-unregistered set (SMS-EMOA, RDE-MOEA, Async Genetic Algorithm, Random Search, ...)
+  has no Evolver registry to introspect and stays hand-maintained regardless (see `catalogue.py`'s
+  module docstring).
 
 ## Use cases considered
 
@@ -78,7 +109,7 @@ phase currently plans for it.
    `numberOfIndependentRuns > 1` and a multi-run analysis view — Phase 3.
 
 **C. Exploring the parameter space without launching anything**
-8. Browse an algorithm's parameters before deciding whether to tune it — **Phase 2 (prioritized)**.
+8. Browse an algorithm's parameters before deciding whether to tune it — *shipped* (Explore page).
 9. Understand which parameters most influenced the configuration found (sensitivity/importance
    analysis) — not yet scheduled.
 
@@ -92,8 +123,8 @@ phase currently plans for it.
 
 **F. Onboarding / new users**
 14. "Try Evolver" on a bundled example with sensible defaults, minimal setup — *shipped* (the ZDT4
-    quick-start), informs how Phase 2's guided experience should feel.
-15. Discover which algorithms/problems/indicators exist — **Phase 2 (prioritized)**.
+    quick-start).
+15. Discover which algorithms/problems/indicators exist — *shipped* (Explore page).
 
 **G. Reproducibility**
 16. Recover a run's exact `request.yaml` to reproduce or cite it — *shipped* (already persisted per run
