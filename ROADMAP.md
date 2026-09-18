@@ -38,22 +38,14 @@ below; revisit and reorder as real usage surfaces new ones.
   `evolver_client.describe()` calls it. `catalogue.py` is not yet fully populated *from* the
   manifest (see "Next up" below); today the manifest is only used to catch `catalogue.py` drifting
   from Evolver's registered algorithms, not as `catalogue.py`'s data source.
+- **All four wired meta-optimizers launchable, not just NSGA-II**: the Training page's meta-optimizer
+  selector now lists every algorithm `catalogue.py` marks `wired_into_cli_runner` (`NSGA-II`,
+  `SPEA2`, `SMPSO`, `AsyncNSGA-II`), each seeding its own operator-flags editor from its real example
+  file under `metaOptimizerConfigurations/` (`MetaAlgorithm.example_config_file`). Verified against
+  the real jar: all four reach `FINISHED`.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`) for the single hardcoded NSGA-II/ZDT4 case.
-
-## Next up — expose the newly-wired meta-optimizers
-
-Evolver's `MetaAlgorithmRegistry` now registers four flat-encoding meta-optimizer engines
-(`NSGA-II`, `SPEA2`, `SMPSO`, `AsyncNSGA-II`; only `NSGA-II` for tree), all marked
-`wired_into_cli_runner=True` in `catalogue.py` — but the Training page's launch form still only
-offers `NSGA-II` (`pages/training.py`'s `LAUNCHABLE_META_ALGORITHM_NAME`), since each engine accepts
-a different operator-flag catalogue (`SPEA2`: two optional flags; `SMPSO`: none at all; `AsyncNSGA-II`:
-just `crossover`/`mutation`) and the current single flat-YAML operator-flags editor was only seeded
-from `NSGA-II`'s example config. Needs: seeding the editor's default text from the selected
-algorithm's own example file under `metaOptimizerConfigurations/` (already listed in
-`resourceDirectories.metaOptimizerConfigurations` by the manifest), and a meta-optimizer selectbox
-driven by `catalogue.py`'s wired algorithms instead of the hardcoded single-entry list.
 
 ## Phase 3 — Analysis layer
 
