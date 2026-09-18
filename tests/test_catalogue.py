@@ -126,6 +126,24 @@ class TestCatalogueMatchesEvolverCheckout:
         # Assert
         assert missing == []
 
+    def test_should_reference_meta_operator_parameter_space_files_that_actually_exist(self):
+        """A stale operator_parameter_space_file would break the explorer at browse time."""
+        if not EVOLVER_PARAMETER_SPACES_DIR.is_dir():
+            pytest.skip(f"Evolver checkout not found at {EVOLVER_PARAMETER_SPACES_DIR}")
+
+        # Arrange
+        missing = [
+            f"{algorithm.name}: {algorithm.operator_parameter_space_file}"
+            for algorithm in META_ALGORITHMS
+            if algorithm.operator_parameter_space_file is not None
+            and not (
+                EVOLVER_PARAMETER_SPACES_DIR / algorithm.operator_parameter_space_file
+            ).is_file()
+        ]
+
+        # Assert
+        assert missing == []
+
     def test_should_flag_any_untriaged_parameter_space_file(self):
         """A new YAML file (new algorithm, new encoding) must not go unnoticed.
 

@@ -6,6 +6,8 @@ runnable today from this app (see evolver_studio/catalogue.py and the
 Training page).
 """
 
+from pathlib import Path
+
 import streamlit as st
 
 from evolver_studio.app_state import render_sidebar
@@ -27,10 +29,18 @@ def _render_runnable_badge(runnable_today: bool) -> None:
         st.info("🔍 Browsable only for now — Evolver does not expose it for launching a run yet.")
 
 
-def _render_meta_algorithm_summary(meta: MetaAlgorithm) -> None:
+def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> None:
     """Show one meta-optimizer's encoding support, wiring status, and parameters.
 
+    Prefers the real ParameterSpace YAML backing the algorithm's flat-encoding
+    operators (`meta.operator_parameter_space_file`, same format/parser as a
+    base algorithm's own parameter space) over the hand-maintained flat name
+    list, when one exists — SPEA2/SMPSO hardcode their operators in Java
+    instead, so `flat_parameters` is their only option.
+
     Args:
+        evolver_home: Path to the Evolver checkout, to read the parameter
+            space file when the algorithm has one.
         meta: The meta-optimizer to summarize.
     """
     encodings = ", ".join(
@@ -44,7 +54,12 @@ def _render_meta_algorithm_summary(meta: MetaAlgorithm) -> None:
         else "🔍 not wired into cli.training"
     )
     with st.expander(f"{meta.name} — {encodings} — {wired}"):
-        st.write("**Parameters (flat):**", ", ".join(meta.flat_parameters))
+        if meta.operator_parameter_space_file is not None:
+            st.caption(f"Flat operator catalogue ({meta.operator_parameter_space_file}):")
+            text = parameter_space_text(evolver_home, meta.operator_parameter_space_file)
+            render_parameter_space_readonly(parse_parameter_space(text))
+        else:
+            st.write("**Parameters (flat):**", ", ".join(meta.flat_parameters))
         if meta.tree_parameters:
             st.write("**Parameters (tree):**", ", ".join(meta.tree_parameters))
 
@@ -66,4 +81,4 @@ render_parameter_space_readonly(parse_parameter_space(text))
 
 st.subheader("Meta-optimization algorithms")
 for meta in META_ALGORITHMS:
-    _render_meta_algorithm_summary(meta)
+    _render_meta_algorithm_summary(evolver_home, meta)

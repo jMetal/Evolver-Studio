@@ -60,15 +60,27 @@ class MetaAlgorithm:
         supports_tree: Whether it can be used with the tree (grammar derivation)
             encoding. False for algorithms tied to a continuous solution
             representation (e.g. SMPSO's particle velocity).
-        flat_parameters: Its configurable parameters under flat encoding.
+        flat_parameters: Its configurable parameters under flat encoding, as a
+            flat name list — fallback display for algorithms with no real
+            ParameterSpace file (`operator_parameter_space_file` is None), since
+            their operators are hardcoded Java, not data to read structure from.
         tree_parameters: Its configurable parameters under tree encoding, empty
-            if `supports_tree` is False.
+            if `supports_tree` is False. Always a flat list: the tree encoding
+            has no meta-level YAML at all (its two operators are fixed, only
+            their scalar hyperparameters are configurable).
         wired_into_cli_runner: Whether org.uma.evolver.cli.training.MetaAlgorithmRegistry
             can currently use this as the meta-optimizer.
         example_config_file: Filename of a ready-to-use metaSearch configuration
             under src/main/resources/metaOptimizerConfigurations/, whose
             operator flags seed this algorithm's launch-form editor. None when
             not `wired_into_cli_runner` (nothing to launch).
+        operator_parameter_space_file: Filename of the real ParameterSpace YAML
+            backing this algorithm's flat-encoding operator catalogue, under
+            src/main/resources/parameterSpaces/ (same format/parser as a base
+            algorithm's own `yamlParameterSpaceFile`) — mirrors Evolver's
+            MetaAlgorithmRegistry.MetaAlgorithmDescriptor.operatorParameterSpaceFile.
+            None when the algorithm hardcodes its operators in Java instead
+            (SPEA2, SMPSO); `flat_parameters` is the fallback for those.
     """
 
     name: str
@@ -78,6 +90,7 @@ class MetaAlgorithm:
     tree_parameters: tuple[str, ...]
     wired_into_cli_runner: bool
     example_config_file: str | None = None
+    operator_parameter_space_file: str | None = None
 
 
 BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
@@ -189,6 +202,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=_TREE_NSGAII_PARAMETERS,
         wired_into_cli_runner=True,
         example_config_file="MetaParallelNSGAIIFlatConfiguration.yaml",
+        operator_parameter_space_file="NSGAIIMetaDouble.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SPEA2") — built via MetaSPEA2Builder,
     # which hardcodes its own operators (SBX, polynomial mutation, KNN density estimator,
@@ -239,6 +253,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=(),
         wired_into_cli_runner=True,
         example_config_file="MetaAsyncNSGAIIFlatConfiguration.yaml",
+        operator_parameter_space_file="AsyncNSGAIIMetaDouble.yaml",
     ),
     # org.uma.evolver.meta.builder.MetaAsyncGeneticAlgorithmBuilder
     MetaAlgorithm(
