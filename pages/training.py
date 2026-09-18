@@ -24,6 +24,7 @@ from evolver_studio.evolver_client import (
     RunState,
     RunStatus,
     cancel_training,
+    describe,
     jar_path,
     read_pid,
     read_status,
@@ -43,6 +44,7 @@ from evolver_studio.request import (
     request_to_yaml,
 )
 from evolver_studio.resource_files import meta_optimizer_configuration_text, parameter_space_text
+from evolver_studio.result import Ok
 from evolver_studio.results import (
     deduplicate_consecutive_checkpoints,
     last_n_checkpoints,
@@ -53,6 +55,11 @@ from evolver_studio.results import (
 )
 from evolver_studio.runs import ActiveRun, find_active_run, mark_cancelled
 from evolver_studio.slider_state import next_slider_value
+from evolver_studio.training_set import (
+    TrainingSet,
+    default_training_set_table,
+    parse_training_set,
+)
 
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
@@ -62,12 +69,12 @@ def _base_level_config(
     algorithm_name: str,
     yaml_parameter_space_file: str,
     extra_config: dict[str, str] | None,
+    training_set: TrainingSet,
 ) -> BaseLevelConfig:
-    """Build the base-level config for the selected algorithm, tuned on ZDT4.
+    """Build the base-level config for the selected algorithm and training set.
 
-    The training problem (ZDT4) and indicators (Epsilon, NormalizedHypervolume)
-    stay fixed for now — only the algorithm and its parameter space are chosen
-    by the user; see ROADMAP.md for problem/indicator selection as a later step.
+    Indicators (Epsilon, NormalizedHypervolume) stay fixed for now; see
+    ROADMAP.md for indicator selection as a later step.
 
     Args:
         algorithm_name: The exact string BaseAlgorithmRegistry.resolve() expects
@@ -76,9 +83,11 @@ def _base_level_config(
             space YAML (possibly a run-specific, user-edited copy).
         extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
             weightVectorFilesDirectory), or None when the algorithm needs none.
+        training_set: The problems to train on, with their reference fronts
+            and evaluation budgets (BaseLevelConfig's three parallel lists).
 
     Returns:
-        The base-level config for the selected algorithm tuned on ZDT4.
+        The base-level config for the selected algorithm and training set.
     """
     return BaseLevelConfig(
         algorithm_name=algorithm_name,
@@ -86,9 +95,9 @@ def _base_level_config(
         number_of_independent_runs=1,
         yaml_parameter_space_file=yaml_parameter_space_file,
         extra_config=extra_config,
-        training_problem_names=["ZDT4"],
-        training_reference_front_file_names=["resources/referenceFronts/ZDT4.csv"],
-        training_evaluations=[12000],
+        training_problem_names=training_set.problem_names,
+        training_reference_front_file_names=training_set.reference_front_file_names,
+        training_evaluations=training_set.evaluations,
         indicator_names=["Epsilon", "NormalizedHypervolume"],
     )
 
@@ -128,6 +137,7 @@ def _launch_run(
     output_directory_base: str,
     parameter_space_text_: str,
     extra_config: dict[str, str] | None,
+    training_set: TrainingSet,
     operator_flags: dict[str, object],
     meta_max_evaluations: int,
     number_of_cores: int,
@@ -154,6 +164,8 @@ def _launch_run(
             absolute path here regardless of its working directory.
         extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
             weightVectorFilesDirectory), or None.
+        training_set: The problems to train on, with their reference fronts
+            and evaluation budgets.
         operator_flags: The (possibly user-edited) meta-optimizer operator
             configuration, as plain key/value pairs.
         meta_max_evaluations: Meta-level evaluation budget.
@@ -167,7 +179,9 @@ def _launch_run(
     parameter_space_file = run_dir / "base_parameter_space.yaml"
     parameter_space_file.write_text(parameter_space_text_)
 
-    base_level = _base_level_config(algorithm_name, str(parameter_space_file), extra_config)
+    base_level = _base_level_config(
+        algorithm_name, str(parameter_space_file), extra_config, training_set
+    )
     base_level_file = run_dir / "base_level.yaml"
     base_level_file.write_text(base_level_to_yaml(base_level))
 
@@ -463,6 +477,70 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
         return _render_guided_editor(default_text, f"{key_prefix}_form")
 
 
+@st.cache_data(show_spinner=False)
+def _cached_problem_names(evolver_home_str: str) -> list[str] | None:
+    """Look up registered training problem names from Evolver's DescribeMain manifest.
+
+    Cached per Evolver checkout path for the session, since it launches a JVM
+    subprocess — cheap enough for one call, too slow to repeat on every rerun.
+
+    Args:
+        evolver_home_str: Path to the Evolver checkout, as a string (cache
+            keys must be hashable; st.cache_data hashes Path objects by
+            identity, not by value, so a plain string is used instead).
+
+    Returns:
+        The registered problem names, or None if DescribeMain could not be
+        run (e.g. the jar hasn't been built yet).
+    """
+    evolver_home = Path(evolver_home_str)
+    result = describe(evolver_home, jar_path(evolver_home))
+    return sorted(result.value["problems"]) if isinstance(result, Ok) else None
+
+
+def _render_training_set_editor(evolver_home: Path) -> pd.DataFrame:
+    """Let the user define the training set as an editable table of rows.
+
+    Each row is one training problem, its reference front file, and its
+    evaluation budget — BaseLevelConfig's three parallel lists, spelled out
+    explicitly since the CLI does not resolve training sets by name.
+
+    Args:
+        evolver_home: Path to the Evolver checkout, to look up valid problem
+            names from DescribeMain's manifest.
+
+    Returns:
+        The current (possibly user-edited) training set table.
+    """
+    problem_names = _cached_problem_names(str(evolver_home))
+    if problem_names is None:
+        st.warning(
+            "Could not list registered problems (build Evolver first) — "
+            "problem names below are free text and not validated."
+        )
+    st.caption(
+        "Reference front files live under resources/referenceFronts/ in the Evolver "
+        "checkout; some problems use a dimension suffix (e.g. DTLZ1.3D.csv)."
+    )
+    return st.data_editor(
+        st.session_state.get("training_set_table", default_training_set_table()),
+        column_config={
+            "problem": (
+                st.column_config.SelectboxColumn("Problem", options=problem_names, required=True)
+                if problem_names is not None
+                else st.column_config.TextColumn("Problem", required=True)
+            ),
+            "reference_front": st.column_config.TextColumn("Reference front file", required=True),
+            "evaluations": st.column_config.NumberColumn(
+                "Evaluations", min_value=1, step=100, required=True
+            ),
+        },
+        num_rows="dynamic",
+        width="stretch",
+        key="training_set_table",
+    )
+
+
 def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
     """Show progress and a live front preview for an in-progress run.
 
@@ -557,16 +635,30 @@ else:
             f"meta_operator_flags_{meta_algorithm.name}",
         )
 
-    base_level = _base_level_config(
-        algorithm.registry_name, "<written to disk at launch>", extra_config
-    )
-    meta_search = _meta_search_config(
-        meta_algorithm.name, int(meta_max_evaluations), int(number_of_cores), operator_flags or {}
-    )
-    st.code(base_level_to_yaml(base_level), language="yaml")
-    st.code(flat_meta_search_to_yaml(meta_search), language="yaml")
+    with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
+        training_set_table = _render_training_set_editor(evolver_home)
+    training_set = parse_training_set(training_set_table)
+    if training_set is None:
+        st.error("Every row needs a problem, a reference front file, and evaluations > 0.")
 
-    can_launch = parameter_space_text_value is not None and operator_flags is not None
+    can_launch = (
+        parameter_space_text_value is not None
+        and operator_flags is not None
+        and training_set is not None
+    )
+    if can_launch:
+        base_level = _base_level_config(
+            algorithm.registry_name, "<written to disk at launch>", extra_config, training_set
+        )
+        meta_search = _meta_search_config(
+            meta_algorithm.name,
+            int(meta_max_evaluations),
+            int(number_of_cores),
+            operator_flags or {},
+        )
+        st.code(base_level_to_yaml(base_level), language="yaml")
+        st.code(flat_meta_search_to_yaml(meta_search), language="yaml")
+
     if st.button("Launch training", disabled=not can_launch):
         run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         _launch_run(
@@ -577,6 +669,7 @@ else:
             output_directory_base,
             parameter_space_text_value,
             extra_config,
+            training_set,
             operator_flags,
             int(meta_max_evaluations),
             int(number_of_cores),
