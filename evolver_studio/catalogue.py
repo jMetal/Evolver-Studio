@@ -5,9 +5,9 @@ what BaseAlgorithmRegistry/MetaAlgorithmRegistry actually register (see
 evolver_client.describe() and Evolver's docs/proposals/cli-describe-manifest.md) — the
 `runnable_today`/`wired_into_cli_runner` flags below should match it. What DescribeMain does
 *not* cover is the broader, browsable-but-unregistered set this module also documents (e.g.
-SMS-EMOA, RDE-MOEA as base algorithms; Async Genetic Algorithm, Random Search as meta-optimizers):
-those exist as org.uma.evolver.algorithm.*/org.uma.evolver.meta.builder.* Java classes, usable
-from org.uma.evolver.example.*, but never registered for cli.training — there is no registry to
+SMS-EMOA, RDE-MOEA as base algorithms; Async Genetic Algorithm as a meta-optimizer): those exist
+as org.uma.evolver.algorithm.*/org.uma.evolver.meta.builder.* Java classes, usable from
+org.uma.evolver.example.*, but never registered for cli.training — there is no registry to
 introspect for them, so this module still mirrors them by hand and must be kept in sync manually
 if Evolver's algorithm set changes there — see tests/test_catalogue.py for a check against the
 real checkout.
@@ -15,7 +15,7 @@ real checkout.
 `runnable_today`/`wired_into_cli_runner` distinguish "Evolver-Studio can browse this algorithm's
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can
 actually launch a training run with it" (true only where org.uma.evolver.cli.training already
-supports it: NSGA-II/MOEA-D as base algorithms; NSGA-II/SPEA2/SMPSO/AsyncNSGA-II as
+supports it: NSGA-II/MOEA-D as base algorithms; NSGA-II/SPEA2/SMPSO/AsyncNSGA-II/RandomSearch as
 flat-encoding meta-optimizers, only NSGA-II for tree).
 """
 
@@ -269,14 +269,19 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=(),
         wired_into_cli_runner=False,
     ),
-    # org.uma.evolver.meta.builder.MetaRandomSearchBuilder<S> — generic over the solution type, so
-    # the only one (besides NSGA-II) genuinely usable with either encoding.
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("RandomSearch") — built via
+    # MetaRandomSearchBuilder, which has no population concept and exposes no operator catalogue
+    # at all (it just samples uniformly at random); generic over the solution type, so it could
+    # support tree too, but cli.training's tree pipeline (TrainingRunner.runTree(), via
+    # validateTreeAlgorithm) only accepts NSGA-II today, same convention as SPEA2/SMPSO/
+    # AsyncNSGA-II above (wired for flat only despite the underlying builder's own capability).
     MetaAlgorithm(
-        name="Random Search",
+        name="RandomSearch",
         supports_flat=True,
-        supports_tree=True,
+        supports_tree=False,
         flat_parameters=("maxEvaluations", "numberOfCores"),
-        tree_parameters=("maxEvaluations", "numberOfCores"),
-        wired_into_cli_runner=False,
+        tree_parameters=(),
+        wired_into_cli_runner=True,
+        example_config_file="MetaRandomSearchFlatConfiguration.yaml",
     ),
 )

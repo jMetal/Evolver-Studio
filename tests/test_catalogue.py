@@ -90,13 +90,13 @@ class TestMetaAlgorithms:
         # Act / Assert
         assert smpso.supports_tree is False
 
-    def test_should_mark_the_four_registered_meta_algorithms_as_wired(self):
-        """MetaAlgorithmRegistry registers exactly these four for the flat encoding."""
+    def test_should_mark_the_five_registered_meta_algorithms_as_wired(self):
+        """MetaAlgorithmRegistry registers exactly these five for the flat encoding."""
         # Act
         wired = {a.name for a in META_ALGORITHMS if a.wired_into_cli_runner}
 
         # Assert
-        assert wired == {"NSGA-II", "SPEA2", "SMPSO", "AsyncNSGA-II"}
+        assert wired == {"NSGA-II", "SPEA2", "SMPSO", "AsyncNSGA-II", "RandomSearch"}
 
     def test_should_mark_only_parallel_nsgaii_as_supporting_tree_among_wired_algorithms(self):
         """MetaAlgorithmRegistry.validateTreeAlgorithm only accepts NSGA-II."""
