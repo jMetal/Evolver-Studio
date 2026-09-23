@@ -53,6 +53,7 @@ class TestBaseLevelToYaml:
         # Assert
         assert parsed == {
             "algorithmName": "NSGA-II",
+            "encoding": "Double",
             "populationSize": 100,
             "numberOfIndependentRuns": 1,
             "yamlParameterSpaceFile": "NSGAIIDouble.yaml",
@@ -62,6 +63,25 @@ class TestBaseLevelToYaml:
             "trainingEvaluations": [12000],
             "indicatorNames": ["Epsilon", "NormalizedHypervolume"],
         }
+
+    def test_should_default_encoding_to_double(self):
+        """Matches BaseLevelConfigurationReader's own default when the field is absent."""
+        # Arrange
+        base_level = _base_level()
+
+        # Act / Assert
+        assert base_level.encoding == "Double"
+
+    def test_should_serialize_a_non_default_encoding(self):
+        """A Permutation-encoded base algorithm (e.g. PermutationNSGAII for TSP) round-trips too."""
+        # Arrange
+        base_level = _base_level(encoding="Permutation")
+
+        # Act
+        parsed = yaml.safe_load(base_level_to_yaml(base_level))
+
+        # Assert
+        assert parsed["encoding"] == "Permutation"
 
     def test_should_serialize_null_extra_config_as_yaml_null(self):
         """extra_config=None must serialize as YAML null, not be omitted."""

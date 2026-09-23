@@ -35,19 +35,19 @@ class BaseAlgorithm:
         registry_name: The exact string BaseAlgorithmRegistry.resolve() expects
             as its algorithmName argument, when it differs from `name` (e.g.
             "MOEAD", not "MOEA/D"). None when `runnable_today` is False.
-        runnable_encoding: Which encoding key in `encodings` is the one
-            BaseAlgorithmRegistry actually builds today — it hardcodes the
-            Double-encoded Java class regardless of which parameter space
-            file is passed in, so Binary/Permutation YAML files are only
-            browsable, not launchable, even though the algorithm itself is
-            `runnable_today`. None when `runnable_today` is False.
+        runnable_encodings: Which encoding keys in `encodings` BaseAlgorithmRegistry
+            actually builds today (e.g. NSGA-II: both "Double" and "Permutation",
+            each routing to a different Java class via BaseLevelConfig.encoding) —
+            any other key in `encodings` is browsable only, not launchable, even
+            though the algorithm itself is `runnable_today`. Empty when
+            `runnable_today` is False.
     """
 
     name: str
     encodings: dict[str, str]
     runnable_today: bool
     registry_name: str | None = None
-    runnable_encoding: str | None = None
+    runnable_encodings: tuple[str, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
@@ -104,7 +104,7 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         },
         runnable_today=True,
         registry_name="NSGA-II",
-        runnable_encoding="Double",
+        runnable_encodings=("Double", "Permutation"),
     ),
     # org.uma.evolver.algorithm.moead.{Double,Binary,Permutation}MOEAD
     BaseAlgorithm(
@@ -116,7 +116,7 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         },
         runnable_today=True,
         registry_name="MOEAD",
-        runnable_encoding="Double",
+        runnable_encodings=("Double",),
     ),
     # org.uma.evolver.algorithm.smsemoa.{Double,Binary,Permutation}SMSEMOA
     BaseAlgorithm(

@@ -38,6 +38,11 @@ class BaseLevelConfig:
         training_reference_front_file_names: Reference front file per problem.
         training_evaluations: Base-level evaluation budget per problem.
         indicator_names: Quality indicator names.
+        encoding: The jMetal solution encoding the base-level algorithm is
+            built for (e.g. "Double", "Permutation"), resolved together with
+            `algorithm_name` by BaseAlgorithmRegistry. Defaults to "Double",
+            matching BaseLevelConfigurationReader's own default when the
+            field is absent from a hand-written YAML file.
     """
 
     algorithm_name: str
@@ -49,6 +54,7 @@ class BaseLevelConfig:
     training_reference_front_file_names: list[str]
     training_evaluations: list[int]
     indicator_names: list[str]
+    encoding: str = "Double"
 
     def to_dict(self) -> dict:
         """Build the mapping BaseLevelConfigurationReader expects.
@@ -58,6 +64,7 @@ class BaseLevelConfig:
         """
         return {
             "algorithmName": self.algorithm_name,
+            "encoding": self.encoding,
             "populationSize": self.population_size,
             "numberOfIndependentRuns": self.number_of_independent_runs,
             "yamlParameterSpaceFile": self.yaml_parameter_space_file,

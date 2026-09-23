@@ -38,12 +38,12 @@ class TestBaseAlgorithms:
         # Assert
         assert runnable == {"NSGA-II", "MOEA/D"}
 
-    def test_should_set_registry_name_and_runnable_encoding_iff_runnable_today(self):
+    def test_should_set_registry_name_and_runnable_encodings_iff_runnable_today(self):
         """A runnable algorithm needs both to build a request; a non-runnable one needs neither."""
         # Act / Assert
         for algorithm in BASE_ALGORITHMS:
-            has_registry_fields = (
-                algorithm.registry_name is not None and algorithm.runnable_encoding is not None
+            has_registry_fields = algorithm.registry_name is not None and bool(
+                algorithm.runnable_encodings
             )
             assert has_registry_fields is algorithm.runnable_today
 
@@ -55,12 +55,20 @@ class TestBaseAlgorithms:
         # Act / Assert
         assert moead.registry_name == "MOEAD"
 
-    def test_should_make_runnable_encoding_a_real_encoding_of_the_algorithm(self):
-        """A typo'd runnable_encoding would point at a parameter space file that doesn't exist."""
+    def test_should_make_runnable_encodings_real_encodings_of_the_algorithm(self):
+        """A typo'd runnable_encodings entry would point at a nonexistent parameter space file."""
         # Act / Assert
         for algorithm in BASE_ALGORITHMS:
-            if algorithm.runnable_encoding is not None:
-                assert algorithm.runnable_encoding in algorithm.encodings
+            for encoding in algorithm.runnable_encodings:
+                assert encoding in algorithm.encodings
+
+    def test_should_mark_nsgaii_as_runnable_for_both_double_and_permutation(self):
+        """BaseAlgorithmRegistry now registers ("NSGA-II", "Permutation") too."""
+        # Arrange
+        nsgaii = next(a for a in BASE_ALGORITHMS if a.name == "NSGA-II")
+
+        # Act / Assert
+        assert set(nsgaii.runnable_encodings) == {"Double", "Permutation"}
 
 
 class TestMetaAlgorithms:

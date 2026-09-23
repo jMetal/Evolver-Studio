@@ -67,6 +67,7 @@ LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
 
 def _base_level_config(
     algorithm_name: str,
+    encoding: str,
     yaml_parameter_space_file: str,
     extra_config: dict[str, str] | None,
     training_set: TrainingSet,
@@ -79,6 +80,8 @@ def _base_level_config(
     Args:
         algorithm_name: The exact string BaseAlgorithmRegistry.resolve() expects
             (catalogue.BaseAlgorithm.registry_name, e.g. "MOEAD", not "MOEA/D").
+        encoding: The selected runnable encoding (catalogue.BaseAlgorithm.
+            runnable_encodings), e.g. "Double" or "Permutation".
         yaml_parameter_space_file: Path to the base-level algorithm's parameter
             space YAML (possibly a run-specific, user-edited copy).
         extra_config: Algorithm-specific extra settings (e.g. MOEA/D's
@@ -91,6 +94,7 @@ def _base_level_config(
     """
     return BaseLevelConfig(
         algorithm_name=algorithm_name,
+        encoding=encoding,
         population_size=100,
         number_of_independent_runs=1,
         yaml_parameter_space_file=yaml_parameter_space_file,
@@ -133,6 +137,7 @@ def _launch_run(
     evolver_home: Path,
     run_id: str,
     algorithm_name: str,
+    encoding: str,
     meta_algorithm_name: str,
     output_directory_base: str,
     parameter_space_text_: str,
@@ -154,6 +159,8 @@ def _launch_run(
         run_id: This run's timestamp-based identifier.
         algorithm_name: The base algorithm's registry name (catalogue.py's
             BaseAlgorithm.registry_name), e.g. "MOEAD".
+        encoding: The selected runnable encoding (catalogue.BaseAlgorithm.
+            runnable_encodings), e.g. "Double" or "Permutation".
         meta_algorithm_name: The selected meta-optimizer's name
             (catalogue.MetaAlgorithm.name), e.g. "SPEA2".
         output_directory_base: Output directory, nested under run_id so
@@ -180,7 +187,7 @@ def _launch_run(
     parameter_space_file.write_text(parameter_space_text_)
 
     base_level = _base_level_config(
-        algorithm_name, str(parameter_space_file), extra_config, training_set
+        algorithm_name, encoding, str(parameter_space_file), extra_config, training_set
     )
     base_level_file = run_dir / "base_level.yaml"
     base_level_file.write_text(base_level_to_yaml(base_level))
@@ -513,23 +520,25 @@ def _render_training_set_editor(evolver_home: Path) -> pd.DataFrame:
         The current (possibly user-edited) training set table.
     """
     problem_names = _cached_problem_names(str(evolver_home))
-    if problem_names is None:
-        st.warning(
-            "Could not list registered problems (build Evolver first) — "
-            "problem names below are free text and not validated."
-        )
+    problem_help = (
+        "A curated name (e.g. ZDT4, DTLZ3) or a fully-qualified jMetal class name for any "
+        "other Problem<S> on the classpath (e.g. "
+        "org.uma.jmetal.problem.multiobjective.multiobjectivetsp.instance.KroAB100TSP), "
+        "resolved by reflection."
+    )
+    if problem_names is not None:
+        problem_help += " Curated names: " + ", ".join(sorted(problem_names))
+    else:
+        st.warning("Could not list registered problems (build Evolver first).")
     st.caption(
-        "Reference front files live under resources/referenceFronts/ in the Evolver "
-        "checkout; some problems use a dimension suffix (e.g. DTLZ1.3D.csv)."
+        "Reference front files live under resources/referenceFronts/ (or "
+        "resources/referenceFrontsTSP/ for TSP problems) in the Evolver checkout; some "
+        "problems use a dimension suffix (e.g. DTLZ1.3D.csv)."
     )
     return st.data_editor(
         st.session_state.get("training_set_table", default_training_set_table()),
         column_config={
-            "problem": (
-                st.column_config.SelectboxColumn("Problem", options=problem_names, required=True)
-                if problem_names is not None
-                else st.column_config.TextColumn("Problem", required=True)
-            ),
+            "problem": st.column_config.TextColumn("Problem", required=True, help=problem_help),
             "reference_front": st.column_config.TextColumn("Reference front file", required=True),
             "evaluations": st.column_config.NumberColumn(
                 "Evaluations", min_value=1, step=100, required=True
@@ -590,9 +599,8 @@ else:
         "Base algorithm", [a.name for a in runnable_algorithms], key="train_base_algorithm"
     )
     algorithm = next(a for a in runnable_algorithms if a.name == selected_algorithm_name)
-    st.caption(
-        f"Encoding: {algorithm.runnable_encoding} — the only one "
-        "BaseAlgorithmRegistry builds today, whichever YAML is chosen."
+    encoding = st.selectbox(
+        "Encoding", algorithm.runnable_encodings, key=f"train_encoding_{algorithm.name}"
     )
 
     extra_config = None
@@ -620,13 +628,11 @@ else:
         step=100,
     )
 
-    default_base_text = parameter_space_text(
-        evolver_home, algorithm.encodings[algorithm.runnable_encoding]
-    )
+    default_base_text = parameter_space_text(evolver_home, algorithm.encodings[encoding])
     parameter_space_text_value = _render_parameter_space_editor(
-        f"Base algorithm parameter space ({algorithm.name})",
+        f"Base algorithm parameter space ({algorithm.name}, {encoding})",
         default_base_text,
-        f"base_{algorithm.name}",
+        f"base_{algorithm.name}_{encoding}",
     )
 
     with st.expander(f"Meta-optimizer operator flags ({meta_algorithm.name})"):
@@ -648,7 +654,11 @@ else:
     )
     if can_launch:
         base_level = _base_level_config(
-            algorithm.registry_name, "<written to disk at launch>", extra_config, training_set
+            algorithm.registry_name,
+            encoding,
+            "<written to disk at launch>",
+            extra_config,
+            training_set,
         )
         meta_search = _meta_search_config(
             meta_algorithm.name,
@@ -665,6 +675,7 @@ else:
             evolver_home,
             run_id,
             algorithm.registry_name,
+            encoding,
             meta_algorithm.name,
             output_directory_base,
             parameter_space_text_value,
