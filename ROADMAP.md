@@ -46,8 +46,15 @@ below; revisit and reorder as real usage surfaces new ones.
 - **Arbitrary multi-problem training sets**: the single hardcoded ZDT4 problem is gone — Training's
   launch form has an editable table (`evolver_studio/training_set.py`, `st.data_editor`), one row per
   problem with its reference front file and evaluation budget (`BaseLevelConfig`'s three parallel
-  fields), problem names validated against Evolver's `DescribeMain` manifest when available. Verified
+  fields); problem names are free text (a curated `DescribeMain` name, or any fully-qualified jMetal
+  class resolved reflectively — e.g. TSP problems, which aren't `Problem<DoubleSolution>` so are
+  never in the curated catalogue), with curated names shown as a hint when available. Verified
   against the real jar with a two-problem set (RE31+RE32). Indicators still stay fixed.
+- **Permutation-encoded base algorithms**: Training's Base algorithm selector gained an Encoding
+  selectbox (`catalogue.BaseAlgorithm.runnable_encodings`, plural — NSGA-II now supports both
+  "Double" and "Permutation"), threaded through to `BaseLevelConfig.encoding` (default "Double").
+  Verified end-to-end against the real jar: `PermutationNSGAII` tuned on two multi-objective TSP
+  instances (`KroAB100TSP`/`KroAC100TSP`) reaches `FINISHED`.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`).
