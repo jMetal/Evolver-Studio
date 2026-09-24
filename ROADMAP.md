@@ -101,8 +101,7 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; still no
   dedicated Streamlit `AppTest` coverage beyond the manual smoke-test discipline described in
   `CLAUDE.md`.)*
-- Track Evolver's `develop` branch, where `cli.training` lives (not yet merged to `main`; the older
-  `study/uniform-training-runner` branch appears superseded). The rename from `cli.runner` to
+- Track Evolver's `develop` branch, where `cli.training` lives (not yet merged to `main`). The rename from `cli.runner` to
   `cli.training` and the `request.yaml` schema change already broke this integration once; the
   two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
   `BaseAlgorithmRegistryCompletenessTest`/`TrainingRunnerMetaBuilderCompletenessTest` in Evolver) and

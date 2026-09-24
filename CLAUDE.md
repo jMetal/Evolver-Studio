@@ -49,8 +49,7 @@ updated without touching the UI or analysis code.
 
 **Evolver is not only a read-only external dependency.** When Evolver-Studio's needs require it, work
 may extend into the Evolver checkout itself (`/Users/ajnebro/Softw/Evolver`, branch `develop`, where
-`cli.training` lives; the older `study/uniform-training-runner` branch appears superseded) to
-propose or implement the missing pieces — e.g. expanding `BaseAlgorithmRegistry` beyond its current
+`cli.training` lives) to propose or implement the missing pieces — e.g. expanding `BaseAlgorithmRegistry` beyond its current
 NSGA-II/MOEA-D scope, or wiring additional `Meta*Builder` classes (`MetaSPEA2Builder`,
 `MetaSMPSOBuilder`, `MetaAsyncNSGAIIBuilder`, ...) into `TrainingRunner` so more of them are
 selectable as meta-optimizers, not just usable from `example.training`. Prefer proposing such changes
