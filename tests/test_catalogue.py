@@ -98,23 +98,30 @@ class TestMetaAlgorithms:
         # Act / Assert
         assert smpso.supports_tree is False
 
-    def test_should_mark_the_five_registered_meta_algorithms_as_wired(self):
-        """MetaAlgorithmRegistry registers exactly these five for the flat encoding."""
+    def test_should_mark_the_six_registered_meta_algorithms_as_wired(self):
+        """MetaAlgorithmRegistry registers exactly these six for the flat encoding."""
         # Act
         wired = {a.name for a in META_ALGORITHMS if a.wired_into_cli_runner}
 
         # Assert
-        assert wired == {"NSGA-II", "SPEA2", "SMPSO", "AsyncNSGA-II", "RandomSearch"}
+        assert wired == {"NSGA-II", "AGE-MOEA", "SPEA2", "SMPSO", "AsyncNSGA-II", "RandomSearch"}
 
-    def test_should_mark_only_parallel_nsgaii_as_supporting_tree_among_wired_algorithms(self):
-        """MetaAlgorithmRegistry.validateTreeAlgorithm only accepts NSGA-II."""
+    def test_should_mark_nsgaii_agemoea_and_random_search_as_supporting_tree_among_wired(self):
+        """MetaAlgorithmRegistry.validateTreeAlgorithm accepts exactly these three."""
         # Act
         tree_wired = {
             a.name for a in META_ALGORITHMS if a.wired_into_cli_runner and a.supports_tree
         }
 
         # Assert
-        assert tree_wired == {"NSGA-II"}
+        assert tree_wired == {"NSGA-II", "AGE-MOEA", "RandomSearch"}
+
+    def test_should_have_a_tree_operator_catalogue_only_when_tree_is_supported(self):
+        """A tree operator catalogue on a flat-only algorithm would never be used."""
+        # Act / Assert
+        assert all(
+            a.supports_tree or a.tree_operator_parameter_space_file is None for a in META_ALGORITHMS
+        )
 
 
 class TestCatalogueMatchesEvolverCheckout:
@@ -141,12 +148,13 @@ class TestCatalogueMatchesEvolverCheckout:
 
         # Arrange
         missing = [
-            f"{algorithm.name}: {algorithm.operator_parameter_space_file}"
+            f"{algorithm.name}: {filename}"
             for algorithm in META_ALGORITHMS
-            if algorithm.operator_parameter_space_file is not None
-            and not (
-                EVOLVER_PARAMETER_SPACES_DIR / algorithm.operator_parameter_space_file
-            ).is_file()
+            for filename in (
+                algorithm.operator_parameter_space_file,
+                algorithm.tree_operator_parameter_space_file,
+            )
+            if filename is not None and not (EVOLVER_PARAMETER_SPACES_DIR / filename).is_file()
         ]
 
         # Assert
@@ -212,6 +220,21 @@ class TestCatalogueMatchesDescribeManifest:
 
         # Assert
         assert manifest_names == wired_names
+
+    def test_should_match_the_manifest_tree_support_of_every_wired_meta_algorithm(self):
+        """supports_tree must agree with each manifest entry's supportsTree."""
+        manifest = self._manifest()
+        if manifest is None:
+            pytest.skip(f"Evolver jar not found under {EVOLVER_HOME}")
+
+        # Arrange
+        manifest_tree = {a["name"]: a["supportsTree"] for a in manifest["metaAlgorithms"]}
+        catalogue_tree = {
+            a.name: a.supports_tree for a in META_ALGORITHMS if a.wired_into_cli_runner
+        }
+
+        # Assert
+        assert catalogue_tree == manifest_tree
 
     def test_should_have_a_runnable_base_algorithm_entry_for_every_manifest_entry(self):
         """Every algorithm DescribeMain lists as registered must be runnable_today=True here too."""
