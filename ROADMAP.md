@@ -65,8 +65,15 @@ below; revisit and reorder as real usage surfaces new ones.
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
-  `pages/tutorials.py`). Run algorithm and Tutorials are placeholders for the solving track and the
-  tutorials (see Next up), like Analysis and Validation.
+  `pages/tutorials.py`). Run algorithm is a placeholder for the solving track (see Next up), like
+  Analysis and Validation.
+- **Tutorials page with the first interactive tutorial**: the page lists Evolver-Studio's tutorials
+  by level (`evolver_studio/tutorials.py`, mirroring Evolver's `docs/proposals/tutorials.md`) and
+  guides the selected one step by step. **S2, "Exploring a parameter space"**
+  (`evolver_studio/tutorial_parameter_spaces.py`), the companion of Evolver's tutorial E1, is the
+  first available: reading the tree view, global and conditional sub-parameters, an interactive
+  view of the parameters a configuration activates, and two encodings side by side.
+  `tests/test_tutorials.py` walks through it with Streamlit's `AppTest`.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`).
@@ -81,8 +88,9 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   in the guided form), run it, inspect the front and indicators, export `VAR`/`FUN`. Needs an
   Evolver-side entry point for single algorithm runs, analogous to `cli.training` (to be proposed in
   Evolver's `docs/proposals/`), and a new page reusing the guided parameter form and the live front.
-- **Tutorials**: interactive tutorials for both tracks, catalogued (with their Evolver documentation
-  counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time.
+- **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
+  documentation counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time
+  (S2 is done).
 
 ## Phase 3 — Analysis layer
 
@@ -103,9 +111,8 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 
 ## Phase 5 — Hardening
 
-- Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; still no
-  dedicated Streamlit `AppTest` coverage beyond the manual smoke-test discipline described in
-  `CLAUDE.md`.)*
+- Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
+  `AppTest` coverage exists only for the Tutorials page so far, see `tests/test_tutorials.py`.)*
 - Track Evolver's `develop` branch, where `cli.training` lives (not yet merged to `main`). The rename from `cli.runner` to
   `cli.training` and the `request.yaml` schema change already broke this integration once; the
   two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
