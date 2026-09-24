@@ -7,8 +7,12 @@ import yaml
 
 from evolver_studio.catalogue import BASE_ALGORITHMS
 from evolver_studio.parameter_space import (
+    CategoricalChoice,
     CategoricalParameter,
     RangeParameter,
+    active_parameter_names,
+    active_sub_parameters,
+    count_parameters,
     parse_parameter_space,
     serialize_parameter_space,
     with_range,
@@ -218,3 +222,72 @@ class TestRealParameterSpaceFiles:
 
         # Assert
         assert reparsed == parameters
+
+
+def _crossover_space() -> list:
+    """A small space: a crossover with a global probability and an SBX-only index."""
+    crossover = CategoricalParameter(
+        "crossover",
+        (
+            CategoricalChoice("SBX", (RangeParameter("sbxDistributionIndex", "double", 5, 400),)),
+            CategoricalChoice("blxAlpha"),
+        ),
+        global_sub_parameters=(RangeParameter("crossoverProbability", "double", 0, 1),),
+    )
+    return [crossover, RangeParameter("populationSize", "integer", 10, 100)]
+
+
+class TestCountParameters:
+    def test_should_count_sub_parameters_of_every_value(self):
+        # Act
+        total = count_parameters(_crossover_space())
+
+        # Assert
+        assert total == 4
+
+    def test_should_match_evolvers_count_for_nsgaii_double(self):
+        """Evolver's ParameterManagement.parameterFlattening gives 34 for NSGAIIDouble.yaml."""
+        path = PARAMETER_SPACES_DIR / "NSGAIIDouble.yaml"
+        if not path.exists():
+            pytest.skip(f"Evolver checkout not found at {path}")
+
+        # Act
+        total = count_parameters(parse_parameter_space(path.read_text()))
+
+        # Assert
+        assert total == 34
+
+
+class TestActiveParameters:
+    def test_should_activate_the_conditional_parameters_of_the_chosen_value(self):
+        # Act
+        names = active_parameter_names(_crossover_space(), {"crossover": "SBX"})
+
+        # Assert
+        assert names == [
+            "crossover",
+            "crossoverProbability",
+            "sbxDistributionIndex",
+            "populationSize",
+        ]
+
+    def test_should_keep_only_global_sub_parameters_for_a_value_without_conditionals(self):
+        # Act
+        names = active_parameter_names(_crossover_space(), {"crossover": "blxAlpha"})
+
+        # Assert
+        assert names == ["crossover", "crossoverProbability", "populationSize"]
+
+    def test_should_take_the_first_value_when_no_choice_is_given(self):
+        # Act
+        active = active_sub_parameters(_crossover_space()[0], {})
+
+        # Assert
+        assert [p.name for p in active] == ["crossoverProbability", "sbxDistributionIndex"]
+
+    def test_should_have_no_sub_parameters_for_a_range_parameter(self):
+        # Act
+        active = active_sub_parameters(_crossover_space()[1], {})
+
+        # Assert
+        assert active == []
