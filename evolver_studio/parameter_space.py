@@ -209,3 +209,70 @@ def with_range(parameter: RangeParameter, lower_bound: float, upper_bound: float
         A copy with the updated bounds.
     """
     return replace(parameter, lower_bound=lower_bound, upper_bound=upper_bound)
+
+
+def count_parameters(parameters: list[ParameterSpec]) -> int:
+    """Count every parameter of a parameter space, sub-parameters included.
+
+    The result matches Evolver's ParameterManagement.parameterFlattening: it is
+    the number of variables of the flat encoding meta-optimizers search.
+
+    Args:
+        parameters: The top-level parameters.
+
+    Returns:
+        The total number of parameters, at any depth.
+    """
+    return sum(1 + count_parameters(_sub_parameters(parameter)) for parameter in parameters)
+
+
+def _sub_parameters(parameter: ParameterSpec) -> list[ParameterSpec]:
+    if isinstance(parameter, RangeParameter):
+        return []
+    conditional = [p for choice in parameter.choices for p in choice.conditional_parameters]
+    return [*parameter.global_sub_parameters, *conditional]
+
+
+def active_parameter_names(parameters: list[ParameterSpec], choices: dict[str, str]) -> list[str]:
+    """List the parameters a configuration activates, in depth-first order.
+
+    A parameter is active when its parent is active; a conditional parameter
+    also needs its parent to take the value it hangs from. A categorical
+    parameter missing from `choices` takes its first value.
+
+    Args:
+        parameters: The top-level parameters (always active).
+        choices: The value chosen for each categorical parameter, by name.
+
+    Returns:
+        The names of the active parameters.
+    """
+    names = []
+    for parameter in parameters:
+        names.append(parameter.name)
+        names.extend(active_parameter_names(active_sub_parameters(parameter, choices), choices))
+    return names
+
+
+def active_sub_parameters(parameter: ParameterSpec, choices: dict[str, str]) -> list[ParameterSpec]:
+    """Return the sub-parameters of `parameter` that are active under `choices`.
+
+    Args:
+        parameter: An active parameter.
+        choices: The value chosen for each categorical parameter, by name; a
+            categorical parameter missing from it takes its first value.
+
+    Returns:
+        Its global sub-parameters followed by the conditional parameters of
+        its chosen value; empty for a range parameter.
+    """
+    if isinstance(parameter, RangeParameter):
+        return []
+    chosen = choices.get(parameter.name, parameter.choices[0].value)
+    conditional = [
+        p
+        for choice in parameter.choices
+        if choice.value == chosen
+        for p in choice.conditional_parameters
+    ]
+    return [*parameter.global_sub_parameters, *conditional]
