@@ -6,16 +6,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Evolver-Studio is a **Python/Streamlit GUI and analysis tool for [Evolver](https://github.com/jMetal/Evolver)**,
 a Java framework for automated meta-optimization of multi-objective metaheuristics. Evolver itself has no
-GUI and no uniform CLI/API: base-level algorithms are configured via YAML parameter spaces, runs are
-launched through ad hoc Java `main()` classes, and results are written as CSV/text files. Evolver-Studio's
-job is to make Evolver usable without writing Java or hand-editing YAML, and to add a statistical-analysis
-layer (Wilcoxon tests, plots, comparison tables) on top of the raw results — leveraging the Python
-scientific stack (`pandas`, `scipy.stats`, `seaborn`/`plotly`) and, where useful, `jMetalPy`.
+GUI: base-level algorithms are configured via YAML parameter spaces, training runs are launched through its
+`cli.training` command-line entry point (or Java `main()` examples), and results are written as CSV/text
+files. Evolver-Studio's job is to make Evolver usable without writing Java or hand-editing YAML, and to add
+a statistical-analysis layer (Wilcoxon tests, plots, comparison tables) on top of the raw results —
+leveraging the Python scientific stack (`pandas`, `scipy.stats`, `seaborn`/`plotly`) and, where useful, `jMetalPy`.
+
+Evolver-Studio serves two purposes, not only meta-optimization:
+
+- **Solving problems**: configure and run Evolver's configurable algorithms on concrete problems, in the
+  style of jMetal's runners (pick a problem, an algorithm and a configuration, run it, inspect the front).
+  Evolver's configurable core is usable on its own, as an alternative to jMetal.
+- **Meta-optimization**: training runs, analysis and validation of the configurations found.
+
+Tutorials for both (interactive, in the app) are catalogued in Evolver's `docs/proposals/tutorials.md`.
 
 This file documents the intended architecture agreed on before implementation started. A first,
 deliberately minimal prototype now lives in the repo (`app.py`, `evolver_studio/`): it drives Evolver's
-`org.uma.evolver.cli.runner.TrainingRunnerMain` (see `/Users/ajnebro/Softw/Evolver/docs/proposals/
-cli-runner-prototype.md`) to run the single ZDT4 training case, as a smoke test of the
+`org.uma.evolver.cli.training.TrainingRunnerMain` (see `/Users/ajnebro/Softw/Evolver/docs/proposals/
+cli-training-prototype.md`) to run the single ZDT4 training case, as a smoke test of the
 request/status/results contract before building the full MVP surface below. Expect this file's
 architecture sections to be corrected/expanded as more of the real code lands.
 
@@ -24,29 +33,30 @@ locally — do not assume a fixed absolute path in code, make it configurable).
 
 ## Relationship to Evolver — status
 
-Evolver does **not** yet expose a stable integration surface. Before (or alongside) building
-Evolver-Studio's integration layer, Evolver needs:
+Evolver's integration surface is still partial:
 
-- A uniform way to launch a training/validation run with structured parameters (today every example
-  `main()` parses `args` differently, or ignores them and hardcodes everything).
-- A single canonical output format for meta-optimization results (today `OutputResults` and
-  `ConsolidatedOutputResults` coexist with different file layouts — `ConsolidatedOutputResults`
-  `METADATA.txt`/`INDICATORS.csv`/`CONFIGURATIONS.csv` is the better candidate to standardize on).
+- Training runs have a uniform, structured entry point: `cli.training`'s `TrainingRunnerMain`
+  (request/status/result files) and `DescribeMain` (a manifest of what it can resolve). There is no
+  equivalent yet for **single algorithm runs** (the solving purpose above) or for **validation runs**;
+  both still need an Evolver-side entry point.
+- Meta-optimization results have a single canonical output format: `ConsolidatedOutputResults`
+  (`METADATA.txt`/`INDICATORS.csv`/`CONFIGURATIONS.csv`/`VAR_CONF.txt`); the older `OutputResults` was
+  removed.
 
 Until that uniformization happens on the Evolver side, Evolver-Studio's integration code should be
 treated as provisional and isolated behind a thin adapter layer (see Architecture below) so it can be
 updated without touching the UI or analysis code.
 
 **Evolver is not only a read-only external dependency.** When Evolver-Studio's needs require it, work
-may extend into the Evolver checkout itself (`/Users/ajnebro/Softw/Evolver`, branch
-`study/uniform-training-runner` — the branch `cli.runner` and this tool's integration code live on) to
+may extend into the Evolver checkout itself (`/Users/ajnebro/Softw/Evolver`, branch `develop`, where
+`cli.training` lives; the older `study/uniform-training-runner` branch appears superseded) to
 propose or implement the missing pieces — e.g. expanding `BaseAlgorithmRegistry` beyond its current
 NSGA-II/MOEA-D scope, or wiring additional `Meta*Builder` classes (`MetaSPEA2Builder`,
 `MetaSMPSOBuilder`, `MetaAsyncNSGAIIBuilder`, ...) into `TrainingRunner` so more of them are
 selectable as meta-optimizers, not just usable from `example.training`. Prefer proposing such changes
 as a `docs/proposals/*.md` document in Evolver's repo first (matching the existing
-`cli-runner-prototype.md`) before implementing them, consistent with how that branch's design was
-itself introduced.
+`cli-training-prototype.md`) before implementing them, consistent with how that design was itself
+introduced.
 
 ### Keeping Evolver-Studio's catalogue in sync with Evolver — the drift-detection mechanism
 
@@ -60,8 +70,8 @@ instead of silently going stale.
   Evolver's `src/main/resources/parameterSpaces/` directory and fails if any `.yaml`/`.irace` file is
   neither referenced by `BASE_ALGORITHMS` nor listed in
   `KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES` (both in `evolver_studio/catalogue.py`).
-- **Evolver side** (on `study/uniform-training-runner`,
-  `src/test/java/org/uma/evolver/cli/runner/`): two JUnit tests with the same shape —
+- **Evolver side** (`src/test/java/org/uma/evolver/cli/training/`): two JUnit tests with the same
+  shape —
   `BaseAlgorithmRegistryCompletenessTest` scans `src/main/java/org/uma/evolver/algorithm/**` for
   concrete algorithm classes not accounted for in its `KNOWN_ALGORITHM_CLASSES` map;
   `TrainingRunnerMetaBuilderCompletenessTest` does the same for `Meta*Builder` classes under
@@ -81,7 +91,7 @@ Streamlit UI (this repo)
   │     (reads Evolver's YAML parameter spaces directly, or via a small Java helper — TBD)
   ├─> Run control: launch training / validation runs
   │     -> writes a request.yaml, invokes the Evolver fat jar as a subprocess
-  │        (java -cp ... org.uma.evolver.cli.runner.TrainingRunnerMain request.yaml status.yaml)
+  │        (java -cp ... org.uma.evolver.cli.training.TrainingRunnerMain request.yaml status.yaml)
   │     -> polls a status.yaml for progress (RUNNING/FINISHED/FAILED, evaluations done/total)
   │     -> reads a results.yaml (pointing at METADATA.txt/INDICATORS.csv/CONFIGURATIONS.csv) once finished
   └─> Analysis: statistical comparison of runs/configurations

@@ -56,8 +56,28 @@ below; revisit and reorder as real usage surfaces new ones.
   Verified end-to-end against the real jar: `PermutationNSGAII` tuned on two multi-objective TSP
   instances (`KroAB100TSP`/`KroAC100TSP`) reaches `FINISHED`.
 
+- **Catalogue synced with Evolver's September 2026 changes**: AGE-MOEA as a meta-optimizer (flat and
+  tree); tree support for NSGA-II, AGE-MOEA and RandomSearch, whose tree operator catalogues
+  (`*MetaTree.yaml`) the Explore page now renders; NSGA-III, PAES and SSMOEA browsable as base
+  algorithms; offspring size no longer listed as configurable (Evolver fixes it to the population
+  size). The Training page leaves the meta population size to Evolver's own default (50). A new
+  manifest test checks `supports_tree` against `DescribeMain`'s `supportsTree`.
+
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`).
+
+## Next up
+
+- **Tree-encoding training in the Training page**: Evolver's `cli.training` now accepts tree
+  `metaSearch` files for NSGA-II, AGE-MOEA and RandomSearch (operator flags, like the flat ones, plus
+  the selection); the Training page only builds flat requests today.
+- **Solving track** (see `CLAUDE.md`): configure and run a configurable algorithm on a concrete problem,
+  jMetal-runner style — choose problem, algorithm, encoding and configuration (default, tuned or edited
+  in the guided form), run it, inspect the front and indicators, export `VAR`/`FUN`. Needs an
+  Evolver-side entry point for single algorithm runs, analogous to `cli.training` (to be proposed in
+  Evolver's `docs/proposals/`), and a new page reusing the guided parameter form and the live front.
+- **Tutorials**: interactive tutorials for both tracks, catalogued (with their Evolver documentation
+  counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time.
 
 ## Phase 3 — Analysis layer
 
@@ -81,15 +101,16 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; still no
   dedicated Streamlit `AppTest` coverage beyond the manual smoke-test discipline described in
   `CLAUDE.md`.)*
-- Track the state of the `study/uniform-training-runner` branch on Evolver (the `cli.training`
-  prototype this tool depends on is still not merged to `main`). The rename from `cli.runner` to
+- Track Evolver's `develop` branch, where `cli.training` lives (not yet merged to `main`; the older
+  `study/uniform-training-runner` branch appears superseded). The rename from `cli.runner` to
   `cli.training` and the `request.yaml` schema change already broke this integration once; the
   two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
   `BaseAlgorithmRegistryCompletenessTest`/`TrainingRunnerMetaBuilderCompletenessTest` in Evolver) and
   Evolver's `DescribeMain` manifest (see "Done so far") both exist to catch the next one faster.
 - Fully populate `catalogue.py` from `DescribeMain`'s manifest instead of hand-maintained literals,
   for the subset it actually covers (registered/runnable algorithms) — the broader
-  browsable-but-unregistered set (SMS-EMOA, RDE-MOEA, Async Genetic Algorithm, Random Search, ...)
+  browsable-but-unregistered set (SMS-EMOA, RDE-MOEA, NSGA-III, PAES, SSMOEA, Async Genetic
+  Algorithm, ...)
   has no Evolver registry to introspect and stays hand-maintained regardless (see `catalogue.py`'s
   module docstring).
 
@@ -133,3 +154,10 @@ phase currently plans for it.
 **G. Reproducibility**
 16. Recover a run's exact `request.yaml` to reproduce or cite it — *shipped* (already persisted per run
     under `cli-runner-runs/<run_id>/`; no dedicated UI for it yet).
+
+**H. Solving problems (no meta-optimization)**
+17. Configure and run an algorithm on a concrete problem, jMetal-runner style — Next up (solving track).
+18. Run a configuration found in a training run on a new problem — Next up (solving track).
+19. Compare several configurations (default, tuned, custom) on a problem over independent runs — not
+    yet scheduled.
+20. Run an algorithm on a user-defined jMetal problem class — not yet scheduled.
