@@ -1,21 +1,81 @@
-"""Tutorials: interactive, step-by-step tutorials. Not implemented yet."""
+"""Tutorials: interactive, step-by-step tutorials, grouped by level."""
+
+from pathlib import Path
 
 import streamlit as st
 
+from evolver_studio import tutorial_parameter_spaces
 from evolver_studio.app_state import render_sidebar
-
-TUTORIALS_CATALOGUE_URL = (
-    "https://github.com/jMetal/Evolver/blob/develop/docs/proposals/tutorials.md"
+from evolver_studio.tutorials import (
+    TUTORIALS,
+    TUTORIALS_CATALOGUE_URL,
+    Tutorial,
+    TutorialLevel,
+    tutorials_by_level,
 )
+
+# Steps of every tutorial with content in this app, by id (see Tutorial.available).
+TUTORIAL_STEPS = {"S2": tutorial_parameter_spaces.STEPS}
+SELECTED_KEY = "tutorial_selected"
+STEP_KEY = "tutorial_step"
+
+
+def _open(tutorial_id: str | None) -> None:
+    st.session_state[SELECTED_KEY] = tutorial_id
+    st.session_state[STEP_KEY] = 0
+
+
+def _render_catalogue() -> None:
+    st.markdown(
+        "Step-by-step tutorials on both uses of Evolver-Studio: solving problems with Evolver's "
+        "configurable algorithms, and meta-optimization. Each one pairs with a tutorial of "
+        f"Evolver's documentation. See the [tutorials catalogue]({TUTORIALS_CATALOGUE_URL}) for "
+        "the full plan."
+    )
+    for level in TutorialLevel:
+        st.subheader(level.value)
+        for tutorial in tutorials_by_level(level):
+            _render_catalogue_entry(tutorial)
+
+
+def _render_catalogue_entry(tutorial: Tutorial) -> None:
+    pairs = f" · pairs with {', '.join(tutorial.pairs_with)}" if tutorial.pairs_with else ""
+    with st.container(border=True):
+        st.markdown(f"**{tutorial.tutorial_id}. {tutorial.title}** — {tutorial.track}{pairs}")
+        st.caption(tutorial.summary)
+        st.button(
+            "Start" if tutorial.available else "Coming soon",
+            key=f"tutorial_open_{tutorial.tutorial_id}",
+            disabled=not tutorial.available,
+            on_click=_open,
+            args=(tutorial.tutorial_id,),
+        )
+
+
+def _render_tutorial(tutorial: Tutorial, evolver_home: Path) -> None:
+    steps = TUTORIAL_STEPS[tutorial.tutorial_id]
+    step = st.session_state.get(STEP_KEY, 0)
+    st.button("← All tutorials", on_click=_open, args=(None,))
+    st.header(f"{tutorial.tutorial_id}. {tutorial.title}")
+    st.progress((step + 1) / len(steps), text=f"Step {step + 1} of {len(steps)}")
+    st.subheader(steps[step].title)
+    steps[step].render(evolver_home)
+    previous_column, next_column = st.columns(2)
+    previous_column.button("← Previous", disabled=step == 0, on_click=_go_to, args=(step - 1,))
+    next_column.button("Next →", disabled=step == len(steps) - 1, on_click=_go_to, args=(step + 1,))
+
+
+def _go_to(step: int) -> None:
+    st.session_state[STEP_KEY] = step
+
 
 st.title("Tutorials")
 
-render_sidebar()
+evolver_home = render_sidebar()
 
-st.info(
-    "🔍 Not implemented yet — see ROADMAP.md, Next up.\n\n"
-    "Planned: interactive tutorials for both tracks — solving problems with Evolver's "
-    "configurable algorithms, and meta-optimization (training, analysis, validation) — each "
-    "paired with its counterpart in Evolver's documentation. The planned tutorials are listed in "
-    f"the [tutorials catalogue]({TUTORIALS_CATALOGUE_URL})."
-)
+selected_id = st.session_state.get(SELECTED_KEY)
+selected = next((t for t in TUTORIALS if t.tutorial_id == selected_id), None)
+if selected is None:
+    _render_catalogue()
+else:
+    _render_tutorial(selected, evolver_home)
