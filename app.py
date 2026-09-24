@@ -7,9 +7,22 @@ does). Pages are grouped by purpose: Explore (what is available), Solve
 algorithm, analyze the result, validate it) and Learn (tutorials).
 """
 
+from pathlib import Path
+
 import streamlit as st
 
-st.set_page_config(page_title="Evolver-Studio", layout="wide")
+LOGO_DIRECTORY = Path(__file__).parent / "assets" / "logo"
+
+st.set_page_config(
+    page_title="Evolver-Studio",
+    page_icon=str(LOGO_DIRECTORY / "studio-icon.svg"),
+    layout="wide",
+)
+st.logo(
+    str(LOGO_DIRECTORY / "studio-logo.svg"),
+    icon_image=str(LOGO_DIRECTORY / "studio-icon.svg"),
+    size="large",
+)
 
 pg = st.navigation(
     {

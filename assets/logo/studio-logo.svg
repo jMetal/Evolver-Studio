@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 140" width="1020" height="210">
+  <title>Evolver-Studio logo</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B3C6E"/><stop offset="1" stop-color="#0E6BA8"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(8,10)">
+    <rect x="4" y="4" width="112" height="112" rx="26" fill="url(#tile)"/>
+    <g fill="none" stroke-linecap="round" stroke-width="7">
+      <path d="M56 22 C56 46 66 58 96 58" stroke="#7CD69B"/>
+      <path d="M42 22 C42 56 56 70 96 70" stroke="#5CC8D6"/>
+      <path d="M28 22 C28 64 44 82 96 82" stroke="#FFFFFF"/>
+    </g>
+    <line x1="28" y1="99" x2="96" y2="99" stroke="#9FD8E3" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="66" cy="99" r="8" fill="#FFFFFF" stroke="#14A3B8" stroke-width="4"/>
+  </g>
+  <text x="150" y="94" font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="72" fill="#0B3C6E" letter-spacing="-1">Evolver<tspan fill="#14A3B8" font-weight="400"> Studio</tspan></text>
+  <text x="153" y="124" font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif" font-size="17" fill="#3E5A73">The visual workbench for Evolver</text>
+</svg>
