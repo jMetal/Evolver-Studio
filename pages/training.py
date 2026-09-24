@@ -114,6 +114,9 @@ def _meta_search_config(
 ) -> FlatMetaSearchConfig:
     """Build the flat meta-search config for the selected meta-optimizer.
 
+    The meta population size is left to Evolver's own default (50, see
+    MetaAlgorithmRegistry.DEFAULT_POPULATION_SIZE), rather than duplicated here.
+
     Args:
         algorithm: The selected meta-optimizer's name (catalogue.MetaAlgorithm.name).
         meta_max_evaluations: Meta-level evaluation budget.
@@ -127,7 +130,8 @@ def _meta_search_config(
     return FlatMetaSearchConfig(
         algorithm=algorithm,
         meta_max_evaluations=meta_max_evaluations,
-        meta_population_size=100,
+        # None omits metaPopulationSize, so Evolver applies its own default (50).
+        meta_population_size=None,
         number_of_cores=number_of_cores,
         operator_flags=operator_flags,
     )
