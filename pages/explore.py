@@ -36,7 +36,8 @@ def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> N
     operators (`meta.operator_parameter_space_file`, same format/parser as a
     base algorithm's own parameter space) over the hand-maintained flat name
     list, when one exists — SPEA2/SMPSO hardcode their operators in Java
-    instead, so `flat_parameters` is their only option.
+    instead, so `flat_parameters` is their only option. Same for the tree
+    encoding, with `meta.tree_operator_parameter_space_file`/`tree_parameters`.
 
     Args:
         evolver_home: Path to the Evolver checkout, to read the parameter
@@ -60,7 +61,11 @@ def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> N
             render_parameter_space_readonly(parse_parameter_space(text))
         else:
             st.write("**Parameters (flat):**", ", ".join(meta.flat_parameters))
-        if meta.tree_parameters:
+        if meta.tree_operator_parameter_space_file is not None:
+            st.caption(f"Tree operator catalogue ({meta.tree_operator_parameter_space_file}):")
+            text = parameter_space_text(evolver_home, meta.tree_operator_parameter_space_file)
+            render_parameter_space_readonly(parse_parameter_space(text))
+        elif meta.tree_parameters:
             st.write("**Parameters (tree):**", ", ".join(meta.tree_parameters))
 
 
