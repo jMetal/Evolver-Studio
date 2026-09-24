@@ -22,8 +22,8 @@ below; revisit and reorder as real usage surfaces new ones.
   Base-level algorithm only; the meta-optimizer's own operators use a flat, single-level YAML editor
   instead (`evolver_studio/request.py`'s `parse_operator_flags_yaml`) — Evolver's `metaSearch` files
   are a fixed recipe, not a `ParameterSpace` to evolve, so the same guided/expert form does not apply.
-- **Discovery and a read-only parameter space explorer** (formerly "Phase 2"): a four-section
-  multipage app (`st.navigation`, `pages/{explore,training,analysis,validation}.py`) — the
+- **Discovery and a read-only parameter space explorer** (formerly "Phase 2"): a multipage app
+  (`st.navigation`, one script per page under `pages/`) — the
   **Explore** page browses any base algorithm's parameter space as a compact, read-only tree
   (`parameter_form.render_parameter_space_readonly`, no widgets — editing lives only in Training's
   form) and summarizes every registered meta-optimizer's encoding support and operator parameters.
@@ -62,6 +62,11 @@ below; revisit and reorder as real usage surfaces new ones.
   algorithms; offspring size no longer listed as configurable (Evolver fixes it to the population
   size). The Training page leaves the meta population size to Evolver's own default (50). A new
   manifest test checks `supports_tree` against `DescribeMain`'s `supportsTree`.
+
+- **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
+  `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
+  `pages/tutorials.py`). Run algorithm and Tutorials are placeholders for the solving track and the
+  tutorials (see Next up), like Analysis and Validation.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`).
