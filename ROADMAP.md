@@ -113,7 +113,9 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists only for the Tutorials page so far, see `tests/test_tutorials.py`.)*
-- Track Evolver's `develop` branch, where `cli.training` lives (not yet merged to `main`). The rename from `cli.runner` to
+- Track Evolver's releases: the app is built against Evolver 2.1 (`evolver_client.EVOLVER_VERSION`,
+  the first release that ships `cli.training`); moving to a newer release means bumping that
+  constant and re-running the drift-detection tests against it. The rename from `cli.runner` to
   `cli.training` and the `request.yaml` schema change already broke this integration once; the
   two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
   `BaseAlgorithmRegistryCompletenessTest`/`TrainingRunnerMetaBuilderCompletenessTest` in Evolver) and

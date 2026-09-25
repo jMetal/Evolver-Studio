@@ -16,7 +16,9 @@ CANCEL_GRACE_PERIOD_SECONDS = 2.0
 
 TRAINING_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.training.TrainingRunnerMain"
 DESCRIBE_MAIN_CLASS = "org.uma.evolver.cli.training.DescribeMain"
-JAR_RELATIVE_PATH = Path("target/Evolver-2.1-SNAPSHOT-jar-with-dependencies.jar")
+# Evolver release this app is built against (the `v2.1` tag of jMetal/Evolver).
+EVOLVER_VERSION = "2.1"
+JAR_RELATIVE_PATH = Path(f"target/Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar")
 
 
 class RunState(Enum):
