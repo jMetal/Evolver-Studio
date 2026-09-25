@@ -1,78 +1,66 @@
-"""Tests that the resource files copied from Evolver (resources/) stay in sync with it."""
+"""Tests that the resource files copied from Evolver (resources/) match their manifest."""
 
 from pathlib import Path
 
-import pytest
-
-EVOLVER_HOME = Path("/Users/ajnebro/Softw/Evolver")
-STUDIO_HOME = Path(__file__).parent.parent
-
-# Directories under resources/ copied from Evolver (see resources/README.md).
-COPIED_DIRECTORIES = ("referenceFronts", "referenceFrontsTSP", "tspInstances", "weightVectors")
-# Reference fronts deliberately left out: MaF's many-objective fronts are ~73 MB of the ~99 MB.
-EXCLUDED_FILE_PREFIXES = ("referenceFronts/MaF",)
-
-
-def _relative_files(resources_dir: Path) -> set[str]:
-    """Return the copied files under a resources/ directory, relative to it.
-
-    Args:
-        resources_dir: A resources/ directory, either Evolver's or this repo's.
-
-    Returns:
-        Paths like "referenceFronts/ZDT4.csv", excluding EXCLUDED_FILE_PREFIXES.
-    """
-    return {
-        path.relative_to(resources_dir).as_posix()
-        for directory in COPIED_DIRECTORIES
-        for path in (resources_dir / directory).rglob("*")
-        if path.is_file()
-        and not path.relative_to(resources_dir).as_posix().startswith(EXCLUDED_FILE_PREFIXES)
-    }
+from evolver_studio.bundled_resources import (
+    RESOURCES_DIRECTORY,
+    copied_files,
+    is_copied,
+    read_manifest,
+    sha256,
+    write_manifest,
+)
 
 
-class TestResourcesMatchEvolverCheckout:
-    @pytest.fixture(autouse=True)
-    def _require_checkout(self):
-        if not (EVOLVER_HOME / "resources").is_dir():
-            pytest.skip(f"Evolver checkout not found at {EVOLVER_HOME}")
+class TestIsCopied:
+    def test_should_copy_reference_fronts_and_weight_vectors(self):
+        # Act / Assert
+        assert is_copied("referenceFronts/ZDT4.csv")
+        assert is_copied("weightVectors/W3D_100.dat")
 
-    def test_should_copy_every_resource_file_of_evolver(self):
-        """A reference front or weight vector file added to Evolver must not go unnoticed."""
-        # Act
-        missing = sorted(
-            _relative_files(EVOLVER_HOME / "resources") - _relative_files(STUDIO_HOME / "resources")
-        )
+    def test_should_leave_out_maf_fronts_and_other_directories(self):
+        # Act / Assert
+        assert not is_copied("referenceFronts/MaF07.15D.csv")
+        assert not is_copied("extremePointsFronts/ZDT1.csv")
 
-        # Assert
-        assert missing == [], (
-            f"File(s) in Evolver's resources/ not copied here: {missing}. Copy them, or add them "
-            "to EXCLUDED_FILE_PREFIXES (with a reason)."
-        )
 
-    def test_should_not_keep_files_evolver_no_longer_has(self):
-        """A file removed from Evolver should be removed from the copy too."""
-        # Act
-        extra = sorted(
-            _relative_files(STUDIO_HOME / "resources") - _relative_files(EVOLVER_HOME / "resources")
-        )
-
-        # Assert
-        assert extra == []
-
-    def test_should_keep_copies_identical_to_evolver(self):
-        """A reference front corrected in Evolver would otherwise stay stale here."""
+class TestManifest:
+    def test_should_round_trip_the_checksums_of_the_copied_files(self, tmp_path: Path):
         # Arrange
-        studio_resources = STUDIO_HOME / "resources"
-        evolver_resources = EVOLVER_HOME / "resources"
-        common = _relative_files(studio_resources) & _relative_files(evolver_resources)
+        (tmp_path / "referenceFronts").mkdir()
+        (tmp_path / "referenceFronts" / "ZDT4.csv").write_text("0.0 1.0\n")
+        manifest_file = tmp_path / "SHA256SUMS"
 
         # Act
-        different = sorted(
-            name
-            for name in common
-            if (studio_resources / name).read_bytes() != (evolver_resources / name).read_bytes()
-        )
+        count = write_manifest(tmp_path, manifest_file)
 
         # Assert
-        assert different == []
+        assert count == 1
+        assert read_manifest(manifest_file) == {
+            "referenceFronts/ZDT4.csv": sha256(tmp_path / "referenceFronts" / "ZDT4.csv")
+        }
+
+
+class TestCopiedResources:
+    """The copy in this repository, against the manifest scripts/sync_resources.py wrote."""
+
+    def test_should_hold_exactly_the_files_of_the_manifest(self):
+        """A file lost or added by hand would go unnoticed otherwise."""
+        # Act / Assert
+        assert copied_files() == sorted(read_manifest())
+
+    def test_should_keep_every_file_unchanged(self):
+        """Edited copies would no longer be Evolver's; refresh them with `make sync-resources`."""
+        # Act
+        changed = [
+            name
+            for name, digest in read_manifest().items()
+            if sha256(RESOURCES_DIRECTORY / name) != digest
+        ]
+
+        # Assert
+        assert changed == []
+
+    def test_should_copy_only_files_that_belong_in_the_copy(self):
+        # Act / Assert
+        assert all(is_copied(name) for name in copied_files())
