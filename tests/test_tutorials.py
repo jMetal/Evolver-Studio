@@ -6,6 +6,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import tutorial_parameter_spaces
+from evolver_studio.evolver_client import jar_path
 from evolver_studio.tutorials import TUTORIALS, TutorialLevel, tutorials_by_level
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
@@ -50,6 +51,8 @@ class TestTutorialS2WalkThrough:
 
     @pytest.fixture
     def app(self) -> AppTest:
+        if not jar_path().is_file():
+            pytest.skip(f"Evolver jar not found at {jar_path()}")
         app = AppTest.from_file(str(APP_SCRIPT), default_timeout=60).run()
         app.switch_page("pages/tutorials.py").run()
         next(button for button in app.button if button.label == "Start").click().run()

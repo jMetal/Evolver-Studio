@@ -1,9 +1,12 @@
-"""Subprocess integration with Evolver's cli.runner (build + launch + poll)."""
+"""Subprocess integration with Evolver's cli.training (download + launch + poll)."""
 
+import hashlib
 import os
 import signal
 import subprocess
 import time
+import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -16,9 +19,23 @@ CANCEL_GRACE_PERIOD_SECONDS = 2.0
 
 TRAINING_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.training.TrainingRunnerMain"
 DESCRIBE_MAIN_CLASS = "org.uma.evolver.cli.training.DescribeMain"
+
+STUDIO_HOME = Path(__file__).resolve().parent.parent
+# The JVM's working directory. Evolver resolves the relative paths of a training request
+# (resources/referenceFronts/..., resources/weightVectors, the output directory) against it,
+# so it must hold the resources/ directory copied from Evolver.
+WORKING_DIRECTORY = STUDIO_HOME
+
 # Evolver release this app is built against (the `v2.1` tag of jMetal/Evolver).
 EVOLVER_VERSION = "2.1"
-JAR_RELATIVE_PATH = Path(f"target/Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar")
+JAR_FILE_NAME = f"Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar"
+JAR_DIRECTORY = STUDIO_HOME / "lib"
+MAVEN_CENTRAL_JAR_URL = (
+    f"https://repo1.maven.org/maven2/org/uma/jmetal/Evolver/{EVOLVER_VERSION}/{JAR_FILE_NAME}"
+)
+# Points at another Evolver jar (e.g. one built from a local checkout) instead of the release's.
+JAR_OVERRIDE_VARIABLE = "EVOLVER_JAR"
+DOWNLOAD_CHUNK_BYTES = 1 << 20
 
 
 class RunState(Enum):
@@ -48,43 +65,81 @@ class RunStatus:
     error_message: str | None = None
 
 
-def jar_path(evolver_home: Path) -> Path:
-    """Return the expected path of Evolver's fat jar.
-
-    Args:
-        evolver_home: Path to the Evolver checkout.
-
-    Returns:
-        The absolute path where `mvn package` writes the fat jar.
-    """
-    return evolver_home / JAR_RELATIVE_PATH
+def is_jar_overridden() -> bool:
+    """Tell whether the EVOLVER_JAR environment variable selects the jar to use."""
+    return bool(os.environ.get(JAR_OVERRIDE_VARIABLE))
 
 
-def build_jar(evolver_home: Path) -> Ok[None] | Err:
-    """Build Evolver's fat jar with Maven, skipping tests.
-
-    Args:
-        evolver_home: Path to the Evolver checkout.
+def jar_path() -> Path:
+    """Return the path of the Evolver fat jar to run.
 
     Returns:
-        Ok(None) on success, Err(message) with captured Maven output on failure.
+        The jar named by the EVOLVER_JAR environment variable if set, else where
+        `download_jar` stores the release's jar (which may not exist yet).
     """
-    pom = evolver_home / "pom.xml"
-    result = subprocess.run(
-        ["mvn", "-q", "-f", str(pom), "package", "-DskipTests"],
-        capture_output=True,
-        text=True,
-    )
-    return Err(result.stdout + result.stderr) if result.returncode != 0 else Ok(None)
+    if is_jar_overridden():
+        return Path(os.environ[JAR_OVERRIDE_VARIABLE])
+    return JAR_DIRECTORY / JAR_FILE_NAME
+
+
+def download_jar(
+    destination: Path,
+    on_progress: Callable[[float], None] | None = None,
+    url: str = MAVEN_CENTRAL_JAR_URL,
+) -> Ok[None] | Err:
+    """Download Evolver's fat jar from Maven Central, checking its SHA-1 checksum.
+
+    The jar is written to a temporary file next to `destination` and renamed
+    only once complete and verified, so an interrupted download never leaves
+    a truncated jar behind.
+
+    Args:
+        destination: Where to store the jar.
+        on_progress: Called with the fraction downloaded so far, if given.
+        url: The jar's URL; Maven Central publishes its checksum at `url + ".sha1"`.
+
+    Returns:
+        Ok(None) once the jar is in place, Err(message) if the download failed
+        or the checksum does not match.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_name(destination.name + ".part")
+    try:
+        with urllib.request.urlopen(url + ".sha1") as response:
+            expected_sha1 = response.read().decode().split()[0]
+        actual_sha1 = _download_to(url, partial, on_progress)
+    except OSError as error:
+        partial.unlink(missing_ok=True)
+        return Err(f"Could not download {url}: {error}")
+    if actual_sha1 != expected_sha1:
+        partial.unlink()
+        return Err(f"Checksum mismatch for {url}: expected {expected_sha1}, got {actual_sha1}")
+    partial.replace(destination)
+    return Ok(None)
+
+
+def _download_to(url: str, target: Path, on_progress: Callable[[float], None] | None) -> str:
+    """Stream `url` into `target`, returning the SHA-1 hex digest of what was written."""
+    sha1 = hashlib.sha1()
+    with urllib.request.urlopen(url) as response, target.open("wb") as file:
+        total = int(response.headers.get("Content-Length", 0))
+        done = 0
+        while chunk := response.read(DOWNLOAD_CHUNK_BYTES):
+            file.write(chunk)
+            sha1.update(chunk)
+            done += len(chunk)
+            if on_progress is not None and total:
+                on_progress(min(done / total, 1.0))
+    return sha1.hexdigest()
 
 
 def start_training(
-    evolver_home: Path, jar: Path, request_yaml: Path, status_yaml: Path
+    working_directory: Path, jar: Path, request_yaml: Path, status_yaml: Path
 ) -> subprocess.Popen:
     """Launch TrainingRunnerMain as a background subprocess.
 
     Args:
-        evolver_home: Working directory the JVM resolves relative paths against.
+        working_directory: Working directory the JVM resolves relative paths against.
         jar: Path to Evolver's fat jar.
         request_yaml: Path to the training request YAML.
         status_yaml: Path where the run's status is written.
@@ -94,7 +149,7 @@ def start_training(
     """
     return subprocess.Popen(
         ["java", "-cp", str(jar), TRAINING_RUNNER_MAIN_CLASS, str(request_yaml), str(status_yaml)],
-        cwd=evolver_home,
+        cwd=working_directory,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -168,11 +223,11 @@ def cancel_training(pid: int) -> Ok[None] | Err:
     return Ok(None)
 
 
-def describe(evolver_home: Path, jar: Path) -> Ok[dict] | Err:
+def describe(working_directory: Path, jar: Path) -> Ok[dict] | Err:
     """Run DescribeMain and parse its manifest of what cli.training can resolve today.
 
     Args:
-        evolver_home: Working directory the JVM resolves relative paths against.
+        working_directory: Working directory the JVM resolves relative paths against.
         jar: Path to Evolver's fat jar.
 
     Returns:
@@ -181,12 +236,15 @@ def describe(evolver_home: Path, jar: Path) -> Ok[dict] | Err:
         schemas), or Err(message) if the subprocess failed or its output
         wasn't valid YAML.
     """
-    result = subprocess.run(
-        ["java", "-cp", str(jar), DESCRIBE_MAIN_CLASS],
-        cwd=evolver_home,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["java", "-cp", str(jar), DESCRIBE_MAIN_CLASS],
+            cwd=working_directory,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return Err("Java was not found on the PATH.")
     if result.returncode != 0:
         return Err(result.stdout + result.stderr)
     try:

@@ -17,11 +17,11 @@ from evolver_studio.results import (
 
 
 class TestReadResultsPointer:
-    def test_should_resolve_paths_against_evolver_home(self, tmp_path: Path):
-        """outputDirectory/*.File paths are relative to evolver_home, not results.yaml's folder."""
+    def test_should_resolve_paths_against_the_working_directory(self, tmp_path: Path):
+        """outputDirectory/*.File paths are relative to the JVM's working directory."""
         # Arrange
-        evolver_home = tmp_path / "Evolver"
-        run_dir = evolver_home / "cli-runner-runs" / "20260915-000000"
+        working_directory = tmp_path / "Evolver-Studio"
+        run_dir = working_directory / "cli-runner-runs" / "20260915-000000"
         run_dir.mkdir(parents=True)
         results_yaml = run_dir / "results.yaml"
         results_yaml.write_text(
@@ -32,11 +32,11 @@ class TestReadResultsPointer:
         )
 
         # Act
-        pointer = read_results_pointer(results_yaml, evolver_home)
+        pointer = read_results_pointer(results_yaml, working_directory)
 
         # Assert
-        assert pointer.output_directory == evolver_home / "results/nsgaii/ZDT4"
-        assert pointer.var_conf_file == evolver_home / "results/nsgaii/ZDT4" / "VAR_CONF.txt"
+        assert pointer.output_directory == working_directory / "results/nsgaii/ZDT4"
+        assert pointer.var_conf_file == working_directory / "results/nsgaii/ZDT4" / "VAR_CONF.txt"
 
 
 class TestLoadIndicators:

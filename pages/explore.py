@@ -10,7 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.app_state import render_sidebar
+from evolver_studio.app_state import require_evolver_jar
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
 from evolver_studio.parameter_form import render_parameter_space_readonly
 from evolver_studio.parameter_space import parse_parameter_space
@@ -29,7 +29,7 @@ def _render_runnable_badge(runnable_today: bool) -> None:
         st.info("🔍 Browsable only for now — Evolver does not expose it for launching a run yet.")
 
 
-def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> None:
+def _render_meta_algorithm_summary(jar: Path, meta: MetaAlgorithm) -> None:
     """Show one meta-optimizer's encoding support, wiring status, and parameters.
 
     Prefers the real ParameterSpace YAML backing the algorithm's flat-encoding
@@ -40,8 +40,8 @@ def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> N
     encoding, with `meta.tree_operator_parameter_space_file`/`tree_parameters`.
 
     Args:
-        evolver_home: Path to the Evolver checkout, to read the parameter
-            space file when the algorithm has one.
+        jar: Path to Evolver's jar, to read the parameter space file when the
+            algorithm has one.
         meta: The meta-optimizer to summarize.
     """
     encodings = ", ".join(
@@ -57,13 +57,13 @@ def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> N
     with st.expander(f"{meta.name} — {encodings} — {wired}"):
         if meta.operator_parameter_space_file is not None:
             st.caption(f"Flat operator catalogue ({meta.operator_parameter_space_file}):")
-            text = parameter_space_text(evolver_home, meta.operator_parameter_space_file)
+            text = parameter_space_text(jar, meta.operator_parameter_space_file)
             render_parameter_space_readonly(parse_parameter_space(text))
         else:
             st.write("**Parameters (flat):**", ", ".join(meta.flat_parameters))
         if meta.tree_operator_parameter_space_file is not None:
             st.caption(f"Tree operator catalogue ({meta.tree_operator_parameter_space_file}):")
-            text = parameter_space_text(evolver_home, meta.tree_operator_parameter_space_file)
+            text = parameter_space_text(jar, meta.tree_operator_parameter_space_file)
             render_parameter_space_readonly(parse_parameter_space(text))
         elif meta.tree_parameters:
             st.write("**Parameters (tree):**", ", ".join(meta.tree_parameters))
@@ -71,7 +71,7 @@ def _render_meta_algorithm_summary(evolver_home: Path, meta: MetaAlgorithm) -> N
 
 st.title("Explore")
 
-evolver_home = render_sidebar()
+jar = require_evolver_jar()
 
 st.subheader("Base algorithms")
 selected_name = st.selectbox(
@@ -81,9 +81,9 @@ algorithm = next(a for a in BASE_ALGORITHMS if a.name == selected_name)
 _render_runnable_badge(algorithm.runnable_today)
 
 encoding = st.selectbox("Encoding", list(algorithm.encodings), key="explorer_encoding")
-text = parameter_space_text(evolver_home, algorithm.encodings[encoding])
+text = parameter_space_text(jar, algorithm.encodings[encoding])
 render_parameter_space_readonly(parse_parameter_space(text))
 
 st.subheader("Meta-optimization algorithms")
 for meta in META_ALGORITHMS:
-    _render_meta_algorithm_summary(evolver_home, meta)
+    _render_meta_algorithm_summary(jar, meta)

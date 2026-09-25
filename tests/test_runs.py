@@ -15,8 +15,10 @@ STATUS_FINISHED = (
 )
 
 
-def _write_run(evolver_home: Path, run_id: str, status_text: str, output_directory: str) -> Path:
-    run_dir = evolver_home / "cli-runner-runs" / run_id
+def _write_run(
+    working_directory: Path, run_id: str, status_text: str, output_directory: str
+) -> Path:
+    run_dir = working_directory / "cli-runner-runs" / run_id
     run_dir.mkdir(parents=True)
     (run_dir / "status.yaml").write_text(status_text)
     (run_dir / "request.yaml").write_text(
@@ -28,7 +30,7 @@ def _write_run(evolver_home: Path, run_id: str, status_text: str, output_directo
 
 class TestFindActiveRun:
     def test_should_return_none_when_runs_directory_does_not_exist(self, tmp_path: Path):
-        """A fresh checkout with no prior runs must not raise."""
+        """A fresh installation with no prior runs must not raise."""
         # Act
         active_run = find_active_run(tmp_path)
 
@@ -47,7 +49,7 @@ class TestFindActiveRun:
         assert active_run is None
 
     def test_should_return_the_running_run(self, tmp_path: Path):
-        """A running run must be reported, with paths resolved against evolver_home."""
+        """A running run must be reported, with paths resolved against the working directory."""
         # Arrange
         run_dir = _write_run(
             tmp_path, "20260101-000000", STATUS_RUNNING, "results/x/20260101-000000"

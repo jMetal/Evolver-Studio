@@ -1,11 +1,10 @@
 """Tests for parsing/serializing Evolver's YAML parameter space files."""
 
-from pathlib import Path
-
 import pytest
 import yaml
 
 from evolver_studio.catalogue import BASE_ALGORITHMS
+from evolver_studio.evolver_client import jar_path
 from evolver_studio.parameter_space import (
     CategoricalChoice,
     CategoricalParameter,
@@ -18,15 +17,12 @@ from evolver_studio.parameter_space import (
     with_range,
     with_selected_choices,
 )
+from evolver_studio.resource_files import parameter_space_text
 
-PARAMETER_SPACES_DIR = Path("/Users/ajnebro/Softw/Evolver/src/main/resources/parameterSpaces")
+# Evolver's real parameter space files, read from its jar.
 REAL_PARAMETER_SPACE_FILES = [
-    PARAMETER_SPACES_DIR / "NSGAIIDoubleReduced.yaml",
-    *(
-        PARAMETER_SPACES_DIR / filename
-        for algorithm in BASE_ALGORITHMS
-        for filename in algorithm.encodings.values()
-    ),
+    "NSGAIIDoubleReduced.yaml",
+    *(filename for algorithm in BASE_ALGORITHMS for filename in algorithm.encodings.values()),
 ]
 
 
@@ -207,14 +203,15 @@ class TestWithRange:
 
 
 class TestRealParameterSpaceFiles:
-    @pytest.mark.parametrize("path", REAL_PARAMETER_SPACE_FILES, ids=lambda p: p.name)
-    def test_should_parse_and_round_trip_evolvers_own_files(self, path: Path):
+    @pytest.mark.parametrize("filename", REAL_PARAMETER_SPACE_FILES)
+    def test_should_parse_and_round_trip_evolvers_own_files(self, filename: str):
         """The parser/serializer must handle Evolver's real parameter space files."""
-        if not path.exists():
-            pytest.skip(f"Evolver checkout not found at {path}")
+        jar = jar_path()
+        if not jar.is_file():
+            pytest.skip(f"Evolver jar not found at {jar}")
 
         # Arrange
-        original_text = path.read_text()
+        original_text = parameter_space_text(jar, filename)
 
         # Act
         parameters = parse_parameter_space(original_text)
@@ -247,12 +244,14 @@ class TestCountParameters:
 
     def test_should_match_evolvers_count_for_nsgaii_double(self):
         """Evolver's ParameterManagement.parameterFlattening gives 34 for NSGAIIDouble.yaml."""
-        path = PARAMETER_SPACES_DIR / "NSGAIIDouble.yaml"
-        if not path.exists():
-            pytest.skip(f"Evolver checkout not found at {path}")
+        jar = jar_path()
+        if not jar.is_file():
+            pytest.skip(f"Evolver jar not found at {jar}")
 
         # Act
-        total = count_parameters(parse_parameter_space(path.read_text()))
+        total = count_parameters(
+            parse_parameter_space(parameter_space_text(jar, "NSGAIIDouble.yaml"))
+        )
 
         # Assert
         assert total == 34

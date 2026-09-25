@@ -1,16 +1,21 @@
-"""Tests for Evolver subprocess integration (status parsing, jar build)."""
+"""Tests for Evolver subprocess integration (status parsing, jar download)."""
 
+import hashlib
 import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
 from evolver_studio.evolver_client import (
+    EVOLVER_VERSION,
+    JAR_DIRECTORY,
+    JAR_OVERRIDE_VARIABLE,
     RunState,
-    build_jar,
     cancel_training,
+    download_jar,
+    is_jar_overridden,
+    jar_path,
     read_pid,
     read_status,
     write_pid_file,
@@ -76,39 +81,82 @@ class TestReadStatus:
         assert status is None
 
 
-class TestBuildJar:
-    def test_should_return_ok_when_maven_succeeds(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ):
-        """A zero exit code must produce Ok(None)."""
+class TestJarPath:
+    def test_should_default_to_the_downloaded_release_jar(self, monkeypatch: pytest.MonkeyPatch):
         # Arrange
-        completed = MagicMock(returncode=0, stdout="", stderr="")
-        monkeypatch.setattr(
-            "evolver_studio.evolver_client.subprocess.run", lambda *a, **k: completed
-        )
+        monkeypatch.delenv(JAR_OVERRIDE_VARIABLE, raising=False)
 
         # Act
-        result = build_jar(tmp_path)
+        jar = jar_path()
+
+        # Assert
+        assert jar == JAR_DIRECTORY / f"Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar"
+        assert not is_jar_overridden()
+
+    def test_should_use_the_jar_named_by_the_override_variable(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ):
+        """EVOLVER_JAR lets a developer run a jar built from a local Evolver checkout."""
+        # Arrange
+        local_jar = tmp_path / "Evolver-2.2-SNAPSHOT-jar-with-dependencies.jar"
+        monkeypatch.setenv(JAR_OVERRIDE_VARIABLE, str(local_jar))
+
+        # Act
+        jar = jar_path()
+
+        # Assert
+        assert jar == local_jar
+        assert is_jar_overridden()
+
+
+class TestDownloadJar:
+    """Downloads from file:// URLs, which urllib serves like Maven Central's https:// ones."""
+
+    def _publish(self, directory: Path, content: bytes, sha1: str | None = None) -> str:
+        jar = directory / "Evolver.jar"
+        jar.write_bytes(content)
+        checksum = sha1 if sha1 is not None else hashlib.sha1(content).hexdigest()
+        (directory / "Evolver.jar.sha1").write_text(checksum)
+        return jar.as_uri()
+
+    def test_should_store_the_jar_when_its_checksum_matches(self, tmp_path: Path):
+        # Arrange
+        url = self._publish(tmp_path, b"jar content")
+        destination = tmp_path / "lib" / "downloaded.jar"
+        fractions = []
+
+        # Act
+        result = download_jar(destination, fractions.append, url)
 
         # Assert
         assert isinstance(result, Ok)
+        assert destination.read_bytes() == b"jar content"
+        assert fractions[-1] == 1.0
 
-    def test_should_return_err_with_output_when_maven_fails(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ):
-        """A non-zero exit code must produce Err with the captured Maven output."""
+    def test_should_discard_the_jar_when_its_checksum_does_not_match(self, tmp_path: Path):
+        """A corrupted download must not be left where the app would run it."""
         # Arrange
-        completed = MagicMock(returncode=1, stdout="compile error\n", stderr="")
-        monkeypatch.setattr(
-            "evolver_studio.evolver_client.subprocess.run", lambda *a, **k: completed
-        )
+        url = self._publish(tmp_path, b"jar content", sha1="0" * 40)
+        destination = tmp_path / "lib" / "downloaded.jar"
 
         # Act
-        result = build_jar(tmp_path)
+        result = download_jar(destination, url=url)
 
         # Assert
         assert isinstance(result, Err)
-        assert "compile error" in result.message
+        assert "Checksum mismatch" in result.message
+        assert list(destination.parent.iterdir()) == []
+
+    def test_should_return_err_when_the_jar_cannot_be_fetched(self, tmp_path: Path):
+        # Arrange
+        destination = tmp_path / "lib" / "downloaded.jar"
+
+        # Act
+        result = download_jar(destination, url=(tmp_path / "missing.jar").as_uri())
+
+        # Assert
+        assert isinstance(result, Err)
+        assert not destination.exists()
 
 
 class TestPidFile:

@@ -44,17 +44,17 @@ def mark_cancelled(run_dir: Path) -> None:
     (run_dir / CANCELLED_MARKER_NAME).write_text("")
 
 
-def find_active_run(evolver_home: Path) -> ActiveRun | None:
+def find_active_run(working_directory: Path) -> ActiveRun | None:
     """Find the most recent still-running, non-cancelled training run, if any.
 
     Args:
-        evolver_home: Path to the Evolver checkout, whose cli-runner-runs
+        working_directory: The JVM's working directory, whose cli-runner-runs
             subdirectory holds each run's files.
 
     Returns:
         The most recent matching run, or None if none is currently running.
     """
-    runs_dir = evolver_home / RUNS_DIRECTORY_NAME
+    runs_dir = working_directory / RUNS_DIRECTORY_NAME
     if not runs_dir.is_dir():
         return None
     for run_dir in sorted(runs_dir.iterdir(), reverse=True):

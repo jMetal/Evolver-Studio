@@ -5,7 +5,7 @@ from pathlib import Path
 import streamlit as st
 
 from evolver_studio import tutorial_parameter_spaces
-from evolver_studio.app_state import render_sidebar
+from evolver_studio.app_state import render_sidebar, require_evolver_jar
 from evolver_studio.tutorials import (
     TUTORIALS,
     TUTORIALS_CATALOGUE_URL,
@@ -52,14 +52,14 @@ def _render_catalogue_entry(tutorial: Tutorial) -> None:
         )
 
 
-def _render_tutorial(tutorial: Tutorial, evolver_home: Path) -> None:
+def _render_tutorial(tutorial: Tutorial, jar: Path) -> None:
     steps = TUTORIAL_STEPS[tutorial.tutorial_id]
     step = st.session_state.get(STEP_KEY, 0)
     st.button("← All tutorials", on_click=_open, args=(None,))
     st.header(f"{tutorial.tutorial_id}. {tutorial.title}")
     st.progress((step + 1) / len(steps), text=f"Step {step + 1} of {len(steps)}")
     st.subheader(steps[step].title)
-    steps[step].render(evolver_home)
+    steps[step].render(jar)
     previous_column, next_column = st.columns(2)
     previous_column.button("← Previous", disabled=step == 0, on_click=_go_to, args=(step - 1,))
     next_column.button("Next →", disabled=step == len(steps) - 1, on_click=_go_to, args=(step + 1,))
@@ -71,11 +71,11 @@ def _go_to(step: int) -> None:
 
 st.title("Tutorials")
 
-evolver_home = render_sidebar()
-
 selected_id = st.session_state.get(SELECTED_KEY)
 selected = next((t for t in TUTORIALS if t.tutorial_id == selected_id), None)
 if selected is None:
+    # The catalogue itself does not need Evolver, only the tutorials' content does.
+    render_sidebar()
     _render_catalogue()
 else:
-    _render_tutorial(selected, evolver_home)
+    _render_tutorial(selected, require_evolver_jar())

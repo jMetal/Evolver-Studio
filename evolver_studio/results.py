@@ -27,28 +27,28 @@ class ResultsPointer:
     var_conf_file: Path
 
 
-def read_results_pointer(results_yaml: Path, evolver_home: Path) -> ResultsPointer:
-    """Read results.yaml and resolve its paths against Evolver's working directory.
+def read_results_pointer(results_yaml: Path, working_directory: Path) -> ResultsPointer:
+    """Read results.yaml and resolve its paths against the JVM's working directory.
 
     The paths inside results.yaml (outputDirectory, metadataFile, ...) are the
     same relative strings the request gave for `outputDirectory`, resolved by
-    the JVM against its own working directory (`evolver_home`) — not against
+    the JVM against its own working directory — not against
     where results.yaml itself lives.
 
     Args:
         results_yaml: Path to the results.yaml written by TrainingRunnerMain.
-        evolver_home: Path to the Evolver checkout used as the JVM's cwd.
+        working_directory: The JVM's working directory.
 
     Returns:
         The parsed pointer to the run's output directory and result files.
     """
     raw = yaml.safe_load(results_yaml.read_text())
-    output_directory = evolver_home / raw["outputDirectory"]
+    output_directory = working_directory / raw["outputDirectory"]
     return ResultsPointer(
         output_directory=output_directory,
-        metadata_file=evolver_home / raw["metadataFile"],
-        indicators_file=evolver_home / raw["indicatorsFile"],
-        configurations_file=evolver_home / raw["configurationsFile"],
+        metadata_file=working_directory / raw["metadataFile"],
+        indicators_file=working_directory / raw["indicatorsFile"],
+        configurations_file=working_directory / raw["configurationsFile"],
         var_conf_file=output_directory / "VAR_CONF.txt",
     )
 

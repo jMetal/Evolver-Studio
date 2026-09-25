@@ -10,7 +10,7 @@ as org.uma.evolver.algorithm.*/org.uma.evolver.meta.{algorithm,builder}.* Java c
 org.uma.evolver.example.*, but never registered for cli.training — there is no registry to
 introspect for them, so this module still mirrors them by hand and must be kept in sync manually
 if Evolver's algorithm set changes there — see tests/test_catalogue.py for a check against the
-real checkout.
+parameter spaces packaged in Evolver's jar.
 
 `runnable_today`/`wired_into_cli_runner` distinguish "Evolver-Studio can browse this algorithm's
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can

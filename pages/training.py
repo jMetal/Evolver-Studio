@@ -18,14 +18,14 @@ import streamlit as st
 import yaml
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
-from evolver_studio.app_state import render_sidebar
+from evolver_studio.app_state import require_evolver_jar
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS
 from evolver_studio.evolver_client import (
+    WORKING_DIRECTORY,
     RunState,
     RunStatus,
     cancel_training,
     describe,
-    jar_path,
     read_pid,
     read_status,
     start_training,
@@ -53,7 +53,7 @@ from evolver_studio.results import (
     read_metadata,
     read_results_pointer,
 )
-from evolver_studio.runs import ActiveRun, find_active_run, mark_cancelled
+from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
 from evolver_studio.slider_state import next_slider_value
 from evolver_studio.training_set import (
     TrainingSet,
@@ -138,7 +138,7 @@ def _meta_search_config(
 
 
 def _launch_run(
-    evolver_home: Path,
+    jar: Path,
     run_id: str,
     algorithm_name: str,
     encoding: str,
@@ -159,7 +159,7 @@ def _launch_run(
     files, and request.yaml itself referencing the latter two by path.
 
     Args:
-        evolver_home: Path to the Evolver checkout (JVM working directory).
+        jar: Path to Evolver's jar.
         run_id: This run's timestamp-based identifier.
         algorithm_name: The base algorithm's registry name (catalogue.py's
             BaseAlgorithm.registry_name), e.g. "MOEAD".
@@ -184,7 +184,7 @@ def _launch_run(
         update_every_evaluations: Chosen live-preview redraw threshold, also
             used as writeFrequency/statusFrequency for this run.
     """
-    run_dir = evolver_home / "cli-runner-runs" / run_id
+    run_dir = WORKING_DIRECTORY / RUNS_DIRECTORY_NAME / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     parameter_space_file = run_dir / "base_parameter_space.yaml"
@@ -212,9 +212,7 @@ def _launch_run(
             status_frequency=update_every_evaluations,
         )
     )
-    process = start_training(
-        evolver_home, jar_path(evolver_home), request_yaml, run_dir / "status.yaml"
-    )
+    process = start_training(WORKING_DIRECTORY, jar, request_yaml, run_dir / "status.yaml")
     write_pid_file(run_dir / "pid.txt", process.pid)
     st.session_state[f"update_every_evaluations_{run_id}"] = update_every_evaluations
     st.session_state.pop("last_finished_run", None)
@@ -364,12 +362,8 @@ def _render_output_directory(output_directory: Path, metadata_file: Path) -> Non
         st.text(read_metadata(metadata_file))
 
 
-def _render_last_finished_run_if_any(evolver_home: Path) -> None:
-    """Show the most recently completed run's results, if one is pending display.
-
-    Args:
-        evolver_home: Path to the Evolver checkout, to resolve results.yaml's paths.
-    """
+def _render_last_finished_run_if_any() -> None:
+    """Show the most recently completed run's results, if one is pending display."""
     pending = st.session_state.get("last_finished_run")
     if pending is None:
         return
@@ -377,7 +371,7 @@ def _render_last_finished_run_if_any(evolver_home: Path) -> None:
     if status.state == RunState.FAILED:
         st.error(status.error_message)
         return
-    pointer = read_results_pointer(run_dir / "results.yaml", evolver_home)
+    pointer = read_results_pointer(run_dir / "results.yaml", WORKING_DIRECTORY)
     st.success("Training finished.")
     if st.checkbox("Show indicator front", value=True):
         _render_indicator_front(pointer.indicators_file, run_dir.name)
@@ -422,7 +416,7 @@ def _render_guided_editor(default_text: str, key_prefix: str) -> str:
     return serialize_parameter_space(edited)
 
 
-def _default_operator_flags_text(evolver_home: Path, example_config_file: str) -> str:
+def _default_operator_flags_text(jar: Path, example_config_file: str) -> str:
     """Read a meta-algorithm's example config, stripped to its operator flags.
 
     The example file under metaOptimizerConfigurations/ also carries algorithm/encoding/
@@ -430,14 +424,14 @@ def _default_operator_flags_text(evolver_home: Path, example_config_file: str) -
     this app's launch form, not from this editor, so they're excluded here.
 
     Args:
-        evolver_home: Path to the Evolver checkout.
+        jar: Path to Evolver's jar.
         example_config_file: Filename under metaOptimizerConfigurations/ for the
             selected meta-algorithm (catalogue.MetaAlgorithm.example_config_file).
 
     Returns:
         A flat YAML mapping of just the operator flags, as starting text for the editor.
     """
-    example = yaml.safe_load(meta_optimizer_configuration_text(evolver_home, example_config_file))
+    example = yaml.safe_load(meta_optimizer_configuration_text(jar, example_config_file))
     operator_flags = {
         key: value for key, value in example.items() if key not in FLAT_META_SEARCH_SCALAR_KEYS
     }
@@ -489,27 +483,26 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
 
 
 @st.cache_data(show_spinner=False)
-def _cached_problem_names(evolver_home_str: str) -> list[str] | None:
+def _cached_problem_names(jar_str: str) -> list[str] | None:
     """Look up registered training problem names from Evolver's DescribeMain manifest.
 
-    Cached per Evolver checkout path for the session, since it launches a JVM
-    subprocess — cheap enough for one call, too slow to repeat on every rerun.
+    Cached per jar for the session, since it launches a JVM subprocess — cheap
+    enough for one call, too slow to repeat on every rerun.
 
     Args:
-        evolver_home_str: Path to the Evolver checkout, as a string (cache
-            keys must be hashable; st.cache_data hashes Path objects by
-            identity, not by value, so a plain string is used instead).
+        jar_str: Path to Evolver's jar, as a string (cache keys must be
+            hashable; st.cache_data hashes Path objects by identity, not by
+            value, so a plain string is used instead).
 
     Returns:
         The registered problem names, or None if DescribeMain could not be
-        run (e.g. the jar hasn't been built yet).
+        run (e.g. Java is not installed).
     """
-    evolver_home = Path(evolver_home_str)
-    result = describe(evolver_home, jar_path(evolver_home))
+    result = describe(WORKING_DIRECTORY, Path(jar_str))
     return sorted(result.value["problems"]) if isinstance(result, Ok) else None
 
 
-def _render_training_set_editor(evolver_home: Path) -> pd.DataFrame:
+def _render_training_set_editor(jar: Path) -> pd.DataFrame:
     """Let the user define the training set as an editable table of rows.
 
     Each row is one training problem, its reference front file, and its
@@ -517,13 +510,13 @@ def _render_training_set_editor(evolver_home: Path) -> pd.DataFrame:
     explicitly since the CLI does not resolve training sets by name.
 
     Args:
-        evolver_home: Path to the Evolver checkout, to look up valid problem
-            names from DescribeMain's manifest.
+        jar: Path to Evolver's jar, to look up valid problem names from
+            DescribeMain's manifest.
 
     Returns:
         The current (possibly user-edited) training set table.
     """
-    problem_names = _cached_problem_names(str(evolver_home))
+    problem_names = _cached_problem_names(str(jar))
     problem_help = (
         "A curated name (e.g. ZDT4, DTLZ3) or a fully-qualified jMetal class name for any "
         "other Problem<S> on the classpath (e.g. "
@@ -533,10 +526,10 @@ def _render_training_set_editor(evolver_home: Path) -> pd.DataFrame:
     if problem_names is not None:
         problem_help += " Curated names: " + ", ".join(sorted(problem_names))
     else:
-        st.warning("Could not list registered problems (build Evolver first).")
+        st.warning("Could not list registered problems (is Java installed?).")
     st.caption(
         "Reference front files live under resources/referenceFronts/ (or "
-        "resources/referenceFrontsTSP/ for TSP problems) in the Evolver checkout; some "
+        "resources/referenceFrontsTSP/ for TSP problems); some "
         "problems use a dimension suffix (e.g. DTLZ1.3D.csv)."
     )
     return st.data_editor(
@@ -554,11 +547,10 @@ def _render_training_set_editor(evolver_home: Path) -> pd.DataFrame:
     )
 
 
-def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
+def _render_active_run(active_run: ActiveRun) -> None:
     """Show progress and a live front preview for an in-progress run.
 
     Args:
-        evolver_home: Path to the Evolver checkout, to resolve results.yaml's paths.
         active_run: The run currently in progress.
     """
     st.info(f"Training in progress (run {active_run.run_id}).")
@@ -591,12 +583,12 @@ def _render_active_run(evolver_home: Path, active_run: ActiveRun) -> None:
 
 st.title("Training")
 
-evolver_home = render_sidebar()
+jar = require_evolver_jar()
 
-active_run = find_active_run(evolver_home)
+active_run = find_active_run(WORKING_DIRECTORY)
 
 if active_run is not None:
-    _render_active_run(evolver_home, active_run)
+    _render_active_run(active_run)
 else:
     runnable_algorithms = [a for a in BASE_ALGORITHMS if a.runnable_today]
     selected_algorithm_name = st.selectbox(
@@ -632,7 +624,7 @@ else:
         step=100,
     )
 
-    default_base_text = parameter_space_text(evolver_home, algorithm.encodings[encoding])
+    default_base_text = parameter_space_text(jar, algorithm.encodings[encoding])
     parameter_space_text_value = _render_parameter_space_editor(
         f"Base algorithm parameter space ({algorithm.name}, {encoding})",
         default_base_text,
@@ -641,12 +633,12 @@ else:
 
     with st.expander(f"Meta-optimizer operator flags ({meta_algorithm.name})"):
         operator_flags = _render_operator_flags_editor(
-            _default_operator_flags_text(evolver_home, meta_algorithm.example_config_file),
+            _default_operator_flags_text(jar, meta_algorithm.example_config_file),
             f"meta_operator_flags_{meta_algorithm.name}",
         )
 
     with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
-        training_set_table = _render_training_set_editor(evolver_home)
+        training_set_table = _render_training_set_editor(jar)
     training_set = parse_training_set(training_set_table)
     if training_set is None:
         st.error("Every row needs a problem, a reference front file, and evaluations > 0.")
@@ -676,7 +668,7 @@ else:
     if st.button("Launch training", disabled=not can_launch):
         run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         _launch_run(
-            evolver_home,
+            jar,
             run_id,
             algorithm.registry_name,
             encoding,
@@ -692,4 +684,4 @@ else:
         )
         st.rerun()
 
-    _render_last_finished_run_if_any(evolver_home)
+    _render_last_finished_run_if_any()

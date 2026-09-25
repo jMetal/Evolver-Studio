@@ -34,18 +34,18 @@ class TutorialStep:
 
     Attributes:
         title: The step's title.
-        render: Renders the step's content, given the Evolver checkout path.
+        render: Renders the step's content, given Evolver's jar.
     """
 
     title: str
     render: Callable[[Path], None]
 
 
-def _load(evolver_home: Path, filename: str) -> list[ParameterSpec]:
-    return parse_parameter_space(parameter_space_text(evolver_home, filename))
+def _load(jar: Path, filename: str) -> list[ParameterSpec]:
+    return parse_parameter_space(parameter_space_text(jar, filename))
 
 
-def _render_introduction(evolver_home: Path) -> None:
+def _render_introduction(jar: Path) -> None:
     st.markdown(
         "Every configurable algorithm in Evolver is described by a **parameter space**: the set "
         "of all the ways it can be configured — which crossover and mutation it uses, how it "
@@ -63,8 +63,8 @@ def _render_introduction(evolver_home: Path) -> None:
     )
 
 
-def _render_reading_the_tree(evolver_home: Path) -> None:
-    parameters = _load(evolver_home, "NSGAIIDouble.yaml")
+def _render_reading_the_tree(jar: Path) -> None:
+    parameters = _load(jar, "NSGAIIDouble.yaml")
     st.markdown(
         "This is the parameter space of NSGA-II for continuous problems (`NSGAIIDouble.yaml`), as "
         "the Explore page shows it. Each bullet is a parameter, in **bold**:\n\n"
@@ -78,8 +78,8 @@ def _render_reading_the_tree(evolver_home: Path) -> None:
         render_parameter_space_readonly(parameters)
 
 
-def _render_relations(evolver_home: Path) -> None:
-    parameters = _load(evolver_home, "NSGAIIDouble.yaml")
+def _render_relations(jar: Path) -> None:
+    parameters = _load(jar, "NSGAIIDouble.yaml")
     crossover = _find(parameters, "crossover")
     st.markdown(
         "Parameters can have sub-parameters of two kinds, which the tree marks differently:\n\n"
@@ -111,8 +111,8 @@ def _render_relations_quiz() -> None:
         st.error("Not quite: that one is a global sub-parameter, active for every crossover.")
 
 
-def _render_activation(evolver_home: Path) -> None:
-    parameters = _load(evolver_home, "NSGAIIDouble.yaml")
+def _render_activation(jar: Path) -> None:
+    parameters = _load(jar, "NSGAIIDouble.yaml")
     st.markdown(
         "A parameter is **active** when it applies to the current configuration: top-level "
         "parameters always are, and a sub-parameter is when its parent is active (and, for a "
@@ -140,7 +140,7 @@ def _render_choice_widgets(
     return choices
 
 
-def _render_encodings(evolver_home: Path) -> None:
+def _render_encodings(jar: Path) -> None:
     st.markdown(
         "NSGA-II can also solve binary problems. Its parameter space for them, "
         "`NSGAIIBinary.yaml`, has **the same top-level parameters**, but different operators: "
@@ -154,7 +154,7 @@ def _render_encodings(evolver_home: Path) -> None:
         (("Continuous (Double)", "NSGAIIDouble.yaml"), ("Binary", "NSGAIIBinary.yaml")),
         strict=True,
     ):
-        parameters = _load(evolver_home, filename)
+        parameters = _load(jar, filename)
         with column:
             st.markdown(f"**{label}** — `{filename}`")
             st.metric("Parameters", count_parameters(parameters))
@@ -162,7 +162,7 @@ def _render_encodings(evolver_home: Path) -> None:
                 render_parameter_space_readonly(parameters)
 
 
-def _render_next_steps(evolver_home: Path) -> None:
+def _render_next_steps(jar: Path) -> None:
     st.markdown(
         "You now know how to read a parameter space. Keep exploring on your own in the Explore "
         "page:\n\n"

@@ -1,6 +1,6 @@
 """Tests for the provisional algorithm catalogue."""
 
-from pathlib import Path
+import zipfile
 
 import pytest
 
@@ -9,11 +9,23 @@ from evolver_studio.catalogue import (
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
 )
-from evolver_studio.evolver_client import describe, jar_path
+from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
+from evolver_studio.resource_files import PARAMETER_SPACES_DIRECTORY
 from evolver_studio.result import Ok
 
-EVOLVER_HOME = Path("/Users/ajnebro/Softw/Evolver")
-EVOLVER_PARAMETER_SPACES_DIR = EVOLVER_HOME / "src/main/resources/parameterSpaces"
+
+def _jar_parameter_space_files() -> set[str]:
+    """The parameter space file names packaged in the app's Evolver jar, skipping if absent."""
+    jar = jar_path()
+    if not jar.is_file():
+        pytest.skip(f"Evolver jar not found at {jar}")
+    with zipfile.ZipFile(jar) as archive:
+        prefix = f"{PARAMETER_SPACES_DIRECTORY}/"
+        return {
+            name.removeprefix(prefix)
+            for name in archive.namelist()
+            if name.startswith(prefix) and name != prefix
+        }
 
 
 class TestBaseAlgorithms:
@@ -124,18 +136,20 @@ class TestMetaAlgorithms:
         )
 
 
-class TestCatalogueMatchesEvolverCheckout:
+class TestCatalogueMatchesEvolverJar:
+    """The app reads parameter spaces from Evolver's jar (see resource_files.py)."""
+
     def test_should_reference_parameter_space_files_that_actually_exist(self):
         """A stale filename in the catalogue would break the explorer at browse time."""
-        if not EVOLVER_PARAMETER_SPACES_DIR.is_dir():
-            pytest.skip(f"Evolver checkout not found at {EVOLVER_PARAMETER_SPACES_DIR}")
-
         # Arrange
+        available = _jar_parameter_space_files()
+
+        # Act
         missing = [
             f"{algorithm.name}/{encoding}: {filename}"
             for algorithm in BASE_ALGORITHMS
             for encoding, filename in algorithm.encodings.items()
-            if not (EVOLVER_PARAMETER_SPACES_DIR / filename).is_file()
+            if filename not in available
         ]
 
         # Assert
@@ -143,10 +157,10 @@ class TestCatalogueMatchesEvolverCheckout:
 
     def test_should_reference_meta_operator_parameter_space_files_that_actually_exist(self):
         """A stale operator_parameter_space_file would break the explorer at browse time."""
-        if not EVOLVER_PARAMETER_SPACES_DIR.is_dir():
-            pytest.skip(f"Evolver checkout not found at {EVOLVER_PARAMETER_SPACES_DIR}")
-
         # Arrange
+        available = _jar_parameter_space_files()
+
+        # Act
         missing = [
             f"{algorithm.name}: {filename}"
             for algorithm in META_ALGORITHMS
@@ -154,7 +168,7 @@ class TestCatalogueMatchesEvolverCheckout:
                 algorithm.operator_parameter_space_file,
                 algorithm.tree_operator_parameter_space_file,
             )
-            if filename is not None and not (EVOLVER_PARAMETER_SPACES_DIR / filename).is_file()
+            if filename is not None and filename not in available
         ]
 
         # Assert
@@ -169,16 +183,14 @@ class TestCatalogueMatchesEvolverCheckout:
         or in KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES (deliberately not
         one, with a reason in that constant's comments). This is the
         Evolver-Studio half of the drift-tracking mechanism described in
-        CLAUDE.md; org.uma.evolver.cli.runner has a companion Java test.
+        CLAUDE.md; org.uma.evolver.cli.training has companion Java tests. Run it against a
+        jar built from Evolver's develop branch (EVOLVER_JAR) to catch changes before a release.
         """
-        if not EVOLVER_PARAMETER_SPACES_DIR.is_dir():
-            pytest.skip(f"Evolver checkout not found at {EVOLVER_PARAMETER_SPACES_DIR}")
-
         # Arrange
+        actual = _jar_parameter_space_files()
         known = {
             filename for algorithm in BASE_ALGORITHMS for filename in algorithm.encodings.values()
         } | KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES
-        actual = {path.name for path in EVOLVER_PARAMETER_SPACES_DIR.iterdir() if path.is_file()}
 
         # Act
         untriaged = sorted(actual - known)
@@ -198,21 +210,21 @@ class TestCatalogueMatchesDescribeManifest:
     See Evolver's docs/proposals/cli-describe-manifest.md: DescribeMain lists exactly what
     BaseAlgorithmRegistry/MetaAlgorithmRegistry register, generated from their own data, so it
     cannot itself drift — this test instead catches *this* module going stale relative to it.
-    Skipped if the checkout/jar isn't available, same as the other checkout-dependent tests here.
+    Skipped if the app's Evolver jar isn't available.
     """
 
     def _manifest(self) -> dict | None:
-        jar = jar_path(EVOLVER_HOME)
+        jar = jar_path()
         if not jar.is_file():
             return None
-        result = describe(EVOLVER_HOME, jar)
+        result = describe(WORKING_DIRECTORY, jar)
         return result.value if isinstance(result, Ok) else None
 
     def test_should_have_a_wired_meta_algorithm_entry_for_every_manifest_entry(self):
         """Every algorithm DescribeMain lists as registered must be wired=True here too."""
         manifest = self._manifest()
         if manifest is None:
-            pytest.skip(f"Evolver jar not found under {EVOLVER_HOME}")
+            pytest.skip(f"Evolver jar not found at {jar_path()}")
 
         # Arrange
         manifest_names = {a["name"] for a in manifest["metaAlgorithms"]}
@@ -225,7 +237,7 @@ class TestCatalogueMatchesDescribeManifest:
         """supports_tree must agree with each manifest entry's supportsTree."""
         manifest = self._manifest()
         if manifest is None:
-            pytest.skip(f"Evolver jar not found under {EVOLVER_HOME}")
+            pytest.skip(f"Evolver jar not found at {jar_path()}")
 
         # Arrange
         manifest_tree = {a["name"]: a["supportsTree"] for a in manifest["metaAlgorithms"]}
@@ -240,7 +252,7 @@ class TestCatalogueMatchesDescribeManifest:
         """Every algorithm DescribeMain lists as registered must be runnable_today=True here too."""
         manifest = self._manifest()
         if manifest is None:
-            pytest.skip(f"Evolver jar not found under {EVOLVER_HOME}")
+            pytest.skip(f"Evolver jar not found at {jar_path()}")
 
         # Arrange
         manifest_names = {a["name"] for a in manifest["baseAlgorithms"]}
