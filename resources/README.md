@@ -14,11 +14,8 @@ directory (for example `resources/referenceFronts/ZDT4.csv`), so they keep Evolv
 
 The reference fronts of the MaF problems (`MaF*.csv`, about 73 MB) are left out.
 
-`tests/test_resources.py` checks that these files match those of an Evolver checkout: it fails if
-Evolver adds, removes or changes a file. To refresh the copy from a new Evolver release:
-
-```bash
-git -C <evolver-checkout> archive <tag> resources/referenceFronts resources/referenceFrontsTSP \
-    resources/tspInstances resources/weightVectors | tar -x -C .
-rm resources/referenceFronts/MaF*
-```
+The copy is made by `make sync-resources` (`scripts/sync_resources.py`), which downloads the
+source archive of the Evolver release set by `EVOLVER_VERSION` in `evolver_studio/evolver_client.py`
+from GitHub, replaces these directories with its files and records their checksums in
+`SHA256SUMS`. `tests/test_resources.py` fails if a file is missing, added or changed with respect to
+`SHA256SUMS`. Run `make sync-resources` again whenever `EVOLVER_VERSION` changes.

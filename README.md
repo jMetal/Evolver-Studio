@@ -25,7 +25,8 @@ It serves two purposes:
 
 ## How it works
 
-Evolver-Studio drives Evolver as a subprocess through a file-based contract, rather than a server:
+Evolver-Studio runs Evolver's release jar, downloaded from Maven Central, as a subprocess, and
+talks to it through files rather than a server:
 
 ```text
 Evolver-Studio (Streamlit)
@@ -37,7 +38,10 @@ Evolver-Studio (Streamlit)
 ```
 
 Training runs are long batch jobs, so each one runs as a detached process: closing or reloading the
-browser does not stop it, and reopening the app reconnects to it. The catalogue of algorithms,
+browser does not stop it, and reopening the app reconnects to it. The parameter spaces the app
+shows and edits are read from the jar itself, and the reference fronts and weight vectors that
+training runs need are copied from Evolver into [`resources/`](resources/README.md). The catalogue
+of algorithms,
 problems and indicators is cross-checked against the manifest printed by Evolver's
 `org.uma.evolver.cli.training.DescribeMain`.
 
@@ -82,23 +86,14 @@ SSMOEA) are browsable only, until Evolver's command-line runner supports them. S
 ## Requirements
 
 - Python 3.11+ and [Conda](https://docs.conda.io/)
-- Java 21 (JDK 21 recommended) and Maven 3.6+, to build Evolver
-- **Evolver 2.1** (the `v2.1` tag), the first release that includes the `cli.training` command-line
-  runner. Other versions are not supported; the expected version is set by `EVOLVER_VERSION` in
-  `evolver_studio/evolver_client.py`.
+- Java 21 or newer, on the `PATH`
+
+Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.1** (the
+first release that includes the `cli.training` command-line runner) from Maven Central. Other
+versions are not supported; the expected version is set by `EVOLVER_VERSION` in
+`evolver_studio/evolver_client.py`.
 
 ## Installation
-
-Build Evolver 2.1:
-
-```bash
-git clone --branch v2.1 https://github.com/jMetal/Evolver.git
-cd Evolver
-mvn clean package -DskipTests   # builds target/Evolver-2.1-jar-with-dependencies.jar
-cd ..
-```
-
-Install Evolver-Studio in its own Conda environment:
 
 ```bash
 git clone https://github.com/jMetal/Evolver-Studio.git
@@ -112,12 +107,12 @@ make env   # creates (or updates) the 'evolver-studio' environment from environm
 make run   # streamlit run app.py
 ```
 
-1. In the sidebar, set **Evolver checkout path** to the directory where you cloned Evolver. The
-   **Build Evolver** button builds the jar from there if you have not built it yet.
+1. The first time, click **Download Evolver 2.1** in the sidebar. The jar (about 130 MB) is
+   downloaded from Maven Central into `lib/` and its checksum is verified.
 2. Open **Explore** to browse the algorithms and their parameter spaces.
 3. Open **Training**, keep the default settings (NSGA-II on ZDT4) or edit them, and click
    **Launch training**. The indicator front updates as the run progresses.
-4. Paths are relative to the Evolver checkout. Each run's request files (`request.yaml`,
+4. Paths are relative to the Evolver-Studio directory. Each run's request files (`request.yaml`,
    `status.yaml`, ...) are kept under `cli-runner-runs/<run_id>/`, and its results under
    `<output directory>/<run_id>/` (by default, `results/nsgaii/ZDT4/<run_id>/`).
 
@@ -131,13 +126,24 @@ make format   # ruff format .
 make test     # pytest tests/ -x
 ```
 
-Tests that call Evolver's jar run only when the jar is found in the Evolver checkout; they are
-skipped otherwise.
+To run the app against another Evolver build, such as one made from Evolver's `develop` branch
+while working on Evolver itself, point the `EVOLVER_JAR` environment variable at its jar:
 
-Evolver adds algorithms and parameter spaces over time, and Evolver-Studio's catalogue
-(`evolver_studio/catalogue.py`) is maintained by hand. To keep them in sync, `tests/test_catalogue.py`
-scans Evolver's parameter-space directory and fails on any file the catalogue does not account for;
-Evolver has matching tests for its algorithm and meta-optimizer registries.
+```bash
+EVOLVER_JAR=/path/to/Evolver-2.2-SNAPSHOT-jar-with-dependencies.jar make run
+```
+
+Tests that use Evolver's jar (downloaded, or set by `EVOLVER_JAR`) are skipped without it. Among
+them, `tests/test_catalogue.py` keeps Evolver-Studio's hand-maintained catalogue
+(`evolver_studio/catalogue.py`) in sync with Evolver: it fails on any parameter space in the jar
+that the catalogue does not account for, and cross-checks the catalogue against the manifest
+printed by Evolver's `DescribeMain`. Evolver has matching tests for its algorithm and
+meta-optimizer registries.
+
+Moving to a new Evolver release means changing `EVOLVER_VERSION` in
+`evolver_studio/evolver_client.py` and refreshing the copied resources with
+`make sync-resources`, which downloads them from the release's source archive on GitHub.
+`tests/test_resources.py` checks the copy against the checksums that command records.
 
 Code and commits follow [CODING_GUIDELINES.md](CODING_GUIDELINES.md) and
 [GIT_GUIDELINES.md](GIT_GUIDELINES.md).

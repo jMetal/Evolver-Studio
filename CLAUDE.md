@@ -23,13 +23,14 @@ Tutorials for both (interactive, in the app) are catalogued in Evolver's `docs/p
 
 This file documents the intended architecture agreed on before implementation started. A first,
 deliberately minimal prototype now lives in the repo (`app.py`, `evolver_studio/`): it drives Evolver's
-`org.uma.evolver.cli.training.TrainingRunnerMain` (see `/Users/ajnebro/Softw/Evolver/docs/proposals/
-cli-training-prototype.md`) to run the single ZDT4 training case, as a smoke test of the
+`org.uma.evolver.cli.training.TrainingRunnerMain` (see Evolver's
+`docs/proposals/cli-training-prototype.md`) to run the single ZDT4 training case, as a smoke test of the
 request/status/results contract before building the full MVP surface below. Expect this file's
 architecture sections to be corrected/expanded as more of the real code lands.
 
-Evolver lives in a sibling repository: `/Users/ajnebro/Softw/Evolver` (or wherever it's checked out
-locally — do not assume a fixed absolute path in code, make it configurable).
+Evolver lives in its own repository, <https://github.com/jMetal/Evolver>. The app only needs
+Evolver's release jar, never a checkout: no local paths (to an Evolver checkout or anything else) may
+appear in this repository's code, tests or docs.
 
 ## Relationship to Evolver — status
 
@@ -48,8 +49,7 @@ treated as provisional and isolated behind a thin adapter layer (see Architectur
 updated without touching the UI or analysis code.
 
 **Evolver is not only a read-only external dependency.** When Evolver-Studio's needs require it, work
-may extend into the Evolver checkout itself (`/Users/ajnebro/Softw/Evolver`, branch `develop`, where
-`cli.training` lives) to propose or implement the missing pieces — e.g. expanding `BaseAlgorithmRegistry` beyond its current
+may extend into Evolver itself (its `develop` branch) to propose or implement the missing pieces — e.g. expanding `BaseAlgorithmRegistry` beyond its current
 NSGA-II/MOEA-D scope, or wiring additional `Meta*Builder` classes (`MetaSPEA2Builder`,
 `MetaSMPSOBuilder`, `MetaAsyncNSGAIIBuilder`, ...) into `TrainingRunner` so more of them are
 selectable as meta-optimizers, not just usable from `example.training`. Prefer proposing such changes
@@ -65,8 +65,8 @@ meta-optimizer builders). Nothing forces Evolver-Studio's provisional catalogue
 **drift-detection test**: a directory/source scan that fails loudly on anything new and untriaged,
 instead of silently going stale.
 
-- **Evolver-Studio side** (`tests/test_catalogue.py::TestCatalogueMatchesEvolverCheckout`): scans
-  Evolver's `src/main/resources/parameterSpaces/` directory and fails if any `.yaml`/`.irace` file is
+- **Evolver-Studio side** (`tests/test_catalogue.py::TestCatalogueMatchesEvolverJar`): scans
+  the `parameterSpaces/` directory packaged in Evolver's jar and fails if any `.yaml`/`.irace` file is
   neither referenced by `BASE_ALGORITHMS` nor listed in
   `KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES` (both in `evolver_studio/catalogue.py`).
 - **Evolver side** (`src/test/java/org/uma/evolver/cli/training/`): two JUnit tests with the same
@@ -142,8 +142,15 @@ make test    # pytest tests/ -x
 make run     # streamlit run app.py
 ```
 
-The prototype also needs a working Evolver checkout to build/run against (JDK ≥ 21, Maven) — the
-checkout path is provided at runtime via the Streamlit sidebar, default `/Users/ajnebro/Softw/Evolver`.
+At runtime the app needs Java ≥ 21 and Evolver's release jar (`EVOLVER_VERSION` in
+`evolver_studio/evolver_client.py`, currently 2.1), which the sidebar downloads from Maven Central
+into `lib/`. No Evolver checkout is needed: parameter spaces and meta-optimizer configurations are
+read from the jar, and the reference fronts/weight vectors training runs need are copied into
+`resources/` (the JVM runs with this repo's root as working directory). Set `EVOLVER_JAR` to run
+against a locally built Evolver jar instead — e.g. one built from Evolver's `develop` branch, to
+run the drift-detection tests against changes not yet released. Tests that need the jar are skipped
+without it. `make sync-resources` refreshes `resources/` (and its `SHA256SUMS` manifest) from the
+GitHub source archive of the `EVOLVER_VERSION` release; run it whenever that version changes.
 
 ## Conventions
 
