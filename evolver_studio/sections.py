@@ -1,0 +1,112 @@
+"""The app's pages, grouped by purpose: the single source of the menu and the home page.
+
+`app.py` builds `st.navigation` from `SECTIONS`, and the home page (`pages/home.py`) shows a card
+for each page, so the two cannot drift apart.
+"""
+
+from dataclasses import dataclass
+
+HOME_PAGE = "pages/home.py"
+
+
+@dataclass(slots=True, frozen=True)
+class Page:
+    """A page of the app.
+
+    Attributes:
+        path: Its script, relative to the app's root (e.g. "pages/explore.py").
+        title: Its title in the menu and on its card.
+        icon: Its icon in the menu and on its card.
+        description: What it does, for its card on the home page.
+        available: Whether it is implemented, or only a placeholder.
+    """
+
+    path: str
+    title: str
+    icon: str
+    description: str
+    available: bool
+
+
+@dataclass(slots=True, frozen=True)
+class Section:
+    """A group of pages in the menu.
+
+    Attributes:
+        name: Its heading in the menu, and the label of its pages' cards on the home page.
+        pages: Its pages, in menu order.
+    """
+
+    name: str
+    pages: tuple[Page, ...]
+
+
+SECTIONS = (
+    Section(
+        "Explore",
+        (
+            Page(
+                "pages/explore.py",
+                "Explore",
+                "🔍",
+                "Browse the parameter space of every configurable algorithm, and the encodings "
+                "and operators of each meta-optimizer.",
+                available=True,
+            ),
+        ),
+    ),
+    Section(
+        "Solve",
+        (
+            Page(
+                "pages/solve.py",
+                "Run algorithm",
+                "▶️",
+                "Choose a problem, an algorithm and a configuration (default, tuned or your own), "
+                "run it, and inspect its front and quality indicators.",
+                available=False,
+            ),
+        ),
+    ),
+    Section(
+        "Meta-optimization",
+        (
+            Page(
+                "pages/training.py",
+                "Training",
+                "🏋️",
+                "Configure, launch and monitor a training run, with a live view of the front of "
+                "configurations found.",
+                available=True,
+            ),
+            Page(
+                "pages/analysis.py",
+                "Analysis",
+                "📊",
+                "Study a training run's results: the configurations found, how they converge, and "
+                "how to choose one.",
+                available=False,
+            ),
+            Page(
+                "pages/validation.py",
+                "Validation",
+                "✅",
+                "Compare a tuned configuration with the default one on a validation set, with "
+                "statistical tests.",
+                available=False,
+            ),
+        ),
+    ),
+    Section(
+        "Learn",
+        (
+            Page(
+                "pages/tutorials.py",
+                "Tutorials",
+                "🎓",
+                "Interactive, step-by-step tutorials that pair with Evolver's documentation.",
+                available=True,
+            ),
+        ),
+    ),
+)
