@@ -67,6 +67,10 @@ below; revisit and reorder as real usage surfaces new ones.
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
   `pages/tutorials.py`). Run algorithm is a placeholder for the solving track (see Next up), like
   Analysis and Validation.
+- **Home page**: the app opens on `pages/home.py`, which presents Evolver-Studio's two uses and
+  shows a card for each page (its section, what it does, whether it is available or coming soon,
+  and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
+  cards are built from the same list of pages (`evolver_studio/sections.py`).
 - **Tutorials page with the first interactive tutorial**: the page lists Evolver-Studio's tutorials
   by level (`evolver_studio/tutorials.py`, mirroring Evolver's `docs/proposals/tutorials.md`) and
   guides the selected one step by step. **S2, "Exploring a parameter space"**

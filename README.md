@@ -47,7 +47,8 @@ problems and indicators is cross-checked against the manifest printed by Evolver
 
 ## Features
 
-The app's menu groups its pages by purpose:
+The app opens on a home page with a card for each part of the tool. The menu groups the pages by
+purpose:
 
 | Section | Page | Status | What it does |
 |---|---|:---:|---|
@@ -109,7 +110,7 @@ make run   # streamlit run app.py
 
 1. The first time, click **Download Evolver 2.1** in the sidebar. The jar (about 130 MB) is
    downloaded from Maven Central into `lib/` and its checksum is verified.
-2. Open **Explore** to browse the algorithms and their parameter spaces.
+2. The home page shows the parts of the app. Open **Explore** to browse the algorithms and their parameter spaces.
 3. Open **Training**, keep the default settings (NSGA-II on ZDT4) or edit them, and click
    **Launch training**. The indicator front updates as the run progresses.
 4. Paths are relative to the Evolver-Studio directory. Each run's request files (`request.yaml`,
