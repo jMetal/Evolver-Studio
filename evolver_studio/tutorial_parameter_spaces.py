@@ -2,7 +2,7 @@
 
 The interactive counterpart of Evolver's tutorial E1 (docs/tutorials/parameter_spaces.rst): the
 same concepts, on the same parameter spaces (NSGA-II for continuous and binary problems), read
-through the Explore page's tree view instead of Java code.
+drawn as a tree instead of Java code.
 """
 
 from collections.abc import Callable
@@ -66,8 +66,8 @@ def _render_introduction(jar: Path) -> None:
 def _render_reading_the_tree(jar: Path) -> None:
     parameters = _load(jar, "NSGAIIDouble.yaml")
     st.markdown(
-        "This is the parameter space of NSGA-II for continuous problems (`NSGAIIDouble.yaml`), as "
-        "the Explore page shows it. Each bullet is a parameter, in **bold**:\n\n"
+        "This is the parameter space of NSGA-II for continuous problems (`NSGAIIDouble.yaml`), "
+        "drawn as a tree. Each bullet is a parameter, in **bold**:\n\n"
         "- A **categorical** parameter lists its values (e.g. `createInitialSolutions`).\n"
         "- A **double** or **integer** parameter shows its range `[min, max]` (e.g. "
         "`crossoverProbability`).\n"
@@ -165,12 +165,15 @@ def _render_encodings(jar: Path) -> None:
 def _render_next_steps(jar: Path) -> None:
     st.markdown(
         "You now know how to read a parameter space. Keep exploring on your own in the Explore "
-        "page:\n\n"
+        "page, which shows each space as a table: one row per parameter, indented under the "
+        "parameter it hangs from, with an *Active if* column for the condition that activates it "
+        "and a filter to find parameters by name or value:\n\n"
         "- Open **MOEA/D** with the Double encoding. Which top-level parameters does it add to "
         "those of NSGA-II?\n"
         "- Open **NSGA-II** with the Permutation encoding. Which operators does it offer?\n"
-        "- Scroll down to the **meta-optimization algorithms**: NSGA-II and AGE-MOEA have their "
-        "own parameter spaces too, one for each encoding they support.\n\n"
+        "- Scroll down to the **meta-optimization algorithms**: NSGA-II, AGE-MOEA and "
+        "AsyncNSGA-II have their own parameter spaces too, one for each encoding they support."
+        "\n\n"
         f"For the same concepts with Java code, see Evolver's tutorial [E1]({E1_TUTORIAL_URL})."
     )
     st.page_link("pages/explore.py", label="Go to the Explore page", icon="🔍")
