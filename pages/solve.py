@@ -36,7 +36,11 @@ from evolver_studio.evolver_client import (
 )
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
-from evolver_studio.problems import default_reference_front, reference_front_candidates
+from evolver_studio.problems import (
+    default_reference_front,
+    reference_front_candidates,
+    reference_front_dimension,
+)
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
 from evolver_studio.runs import (
     SOLVE_RUNS_DIRECTORY_NAME,
@@ -56,11 +60,13 @@ from evolver_studio.solve_results import (
     read_run_fronts,
     zip_fronts,
 )
+from evolver_studio.weight_vectors import available_population_sizes
 
 RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
 NO_REFERENCE_FRONT = "(none: no indicators)"
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
+DEFAULT_POPULATION_SIZE = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 1
 LOG_LINES_SHOWN = 15
 
@@ -194,11 +200,44 @@ def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
     return configuration
 
 
-def _render_budget(has_reference_front: bool) -> tuple[int, int, int, int | None, list[str]]:
+def _render_population_size(column, population_sizes: list[int] | None) -> int:
+    """Choose the population size: any, or one a weight vector file exists for.
+
+    Args:
+        column: The column to draw it in.
+        population_sizes: The sizes the weight vector files allow (MOEA/D and RVEA need a file
+            that matches), an empty list when there is none for the problem's objectives, or None
+            when the algorithm does not read weight vectors or the objectives are not known.
+
+    Returns:
+        The population size.
+    """
+    if population_sizes:
+        default = DEFAULT_POPULATION_SIZE
+        return column.selectbox(
+            "Population size",
+            population_sizes,
+            index=population_sizes.index(default) if default in population_sizes else 0,
+            help="These sizes have a weight vector file for the problem's number of objectives.",
+            key="solve_population_choice",
+        )
+    population_size = column.number_input(
+        "Population size", 2, value=DEFAULT_POPULATION_SIZE, key="solve_population"
+    )
+    if population_sizes is not None:
+        column.warning("No weight vector file for this number of objectives in that directory.")
+    return int(population_size)
+
+
+def _render_budget(
+    has_reference_front: bool, population_sizes: list[int] | None
+) -> tuple[int, int, int, int | None, list[str]]:
     """Section 4: the population, the budget, the runs, the seed and the indicators.
 
     Args:
         has_reference_front: Whether the problem has a reference front (indicators need one).
+        population_sizes: The population sizes the weight vector files allow, if the algorithm
+            reads them (see `_render_population_size`).
 
     Returns:
         The population size, the evaluations, the number of runs, the seed (None to draw one) and
@@ -206,9 +245,7 @@ def _render_budget(has_reference_front: bool) -> tuple[int, int, int, int | None
     """
     st.subheader("4. Budget")
     columns = st.columns(4)
-    population_size = columns[0].number_input(
-        "Population size", 2, value=100, key="solve_population"
-    )
+    population_size = _render_population_size(columns[0], population_sizes)
     max_evaluations = columns[1].number_input(
         "Evaluations per run", 100, value=25000, step=1000, key="solve_evaluations"
     )
@@ -252,6 +289,28 @@ def _launch(request_for: Callable[[str], SolveRequest]) -> None:
     st.session_state.pop("solve_history", None)
 
 
+def _weight_vector_population_sizes(
+    extra_config: dict[str, str] | None, reference_front: str | None
+) -> list[int] | None:
+    """The population sizes the algorithm's weight vector files allow, when it reads them.
+
+    Args:
+        extra_config: The algorithm's extra configuration (None if it reads no weight vectors).
+        reference_front: The chosen reference front, whose columns give the objectives.
+
+    Returns:
+        The sizes (an empty list if there is no file for those objectives), or None when the
+        algorithm reads no weight vectors or the number of objectives is not known.
+    """
+    if extra_config is None or reference_front is None:
+        return None
+    objectives = reference_front_dimension(WORKING_DIRECTORY / reference_front)
+    if objectives is None:
+        return None
+    directory = WORKING_DIRECTORY / extra_config["weightVectorFilesDirectory"]
+    return available_population_sizes(directory, objectives)
+
+
 def _render_form(can_run: bool) -> None:
     """The five sections that build and launch a run, each shown once the previous is chosen.
 
@@ -271,7 +330,7 @@ def _render_form(can_run: bool) -> None:
     algorithm, encoding, extra_config = algorithm_choice
     configuration = _render_configuration(algorithm, encoding)
     population_size, max_evaluations, runs, seed, indicators = _render_budget(
-        reference_front is not None
+        reference_front is not None, _weight_vector_population_sizes(extra_config, reference_front)
     )
 
     def request_for(output_directory: str) -> SolveRequest:
