@@ -5,8 +5,10 @@ the Evolver documentation tutorial each one pairs with). Only tutorials marked `
 content in this app; the rest are listed as coming soon.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 TUTORIALS_CATALOGUE_URL = (
     "https://github.com/jMetal/Evolver/blob/develop/docs/proposals/tutorials.md"
@@ -42,6 +44,19 @@ class Tutorial:
     summary: str
     pairs_with: tuple[str, ...] = ()
     available: bool = False
+
+
+@dataclass(slots=True, frozen=True)
+class TutorialStep:
+    """One step of a tutorial.
+
+    Attributes:
+        title: The step's title.
+        render: Renders the step's content, given Evolver's jar.
+    """
+
+    title: str
+    render: Callable[[Path], None]
 
 
 _INTRO = TutorialLevel.INTRODUCTORY

@@ -5,8 +5,6 @@ same concepts, on the same parameter spaces (NSGA-II for continuous and binary p
 drawn as a tree instead of Java code.
 """
 
-from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 import streamlit as st
@@ -21,24 +19,12 @@ from evolver_studio.parameter_space import (
     parse_parameter_space,
 )
 from evolver_studio.resource_files import parameter_space_text
+from evolver_studio.tutorials import TutorialStep
 
 E1_TUTORIAL_URL = (
     "https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/parameter_spaces.rst"
 )
 KEY_PREFIX = "tutorial_s2"
-
-
-@dataclass(slots=True, frozen=True)
-class TutorialStep:
-    """One step of a tutorial.
-
-    Attributes:
-        title: The step's title.
-        render: Renders the step's content, given Evolver's jar.
-    """
-
-    title: str
-    render: Callable[[Path], None]
 
 
 def _load(jar: Path, filename: str) -> list[ParameterSpec]:
