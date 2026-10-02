@@ -27,10 +27,12 @@ Works with Evolver 2.2.
   allows, with the parameters that changed marked); the fronts of the independent runs are plotted
   over the problem's reference front, with the quality indicators of each run and their summary, and
   the results can be downloaded. Every run is kept under `solve-runs/` and can be reopened. With
-  Evolver 2.3 or later the progress bar moves while a run is in progress, with the time elapsed and
-  an estimate of what is left, and a slider sets how often it is refreshed (the page warns that
-  updating after every evaluation slows the run down); a silent mode updates it only when each
-  independent run ends, as with Evolver 2.2.
+  Evolver 2.3 or later the run can be followed while it is in progress, in three modes: *Silent*
+  (the progress changes only when each independent run ends, as with Evolver 2.2), *Progress bar*
+  (evaluations, time elapsed and an estimate of what is left) and *Live front* (the bar and a chart of
+  the front as it evolves over the reference front, optionally with the dominated solutions in
+  grey). A slider sets how often it is refreshed, and the page warns of the cost: updating the
+  progress is cheap, but writing the front often can make the run several times slower.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,

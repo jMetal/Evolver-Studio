@@ -99,9 +99,12 @@ below; revisit and reorder as real usage surfaces new ones.
   with its phase told by `runs.run_phase`; the fronts are plotted over the reference front (2D, 3D
   or parallel coordinates), with the indicators, a summary over the runs and a zip to download.
   Previous runs are reopened from a list. See Evolver's `docs/proposals/cli-solving.md`.
-  The progress is updated while a run is in progress when Evolver can (2.3's `statusFrequency`,
-  chosen with a slider, with `progress.estimate_remaining_seconds` for the time left); the front
-  chart that follows the run is the next step, with Evolver writing the current front.
+  The run can be followed while it runs when Evolver can (2.3): three modes (silent, progress bar,
+  live front), a slider for how often, and a warning of the cost measured on NSGA-II. The progress
+  comes from `statusFrequency` (with `progress.estimate_remaining_seconds` for the time left), and
+  the live front from `frontFrequency`/`writePopulation`: Evolver overwrites `CURRENT_FRONT.csv` and
+  the page plots it (`solve_figures.build_live_front_figure`) in the fragment that refreshes the
+  bar.
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
