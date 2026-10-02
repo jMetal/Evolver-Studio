@@ -35,7 +35,9 @@ Works with Evolver 2.2.
   a run with their objectives and decision variables, filters them by a range for each objective,
   shows the variables of a selected one (as a permutation when it is one) and downloads the table.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
-  tutorial E1.
+  tutorial E1: it reads a space in the same table the Explore pages show, with its *Active if*
+  column and filter, writes the configuration a choice of values gives, and ends with the
+  meta-optimizers' operators and the quality indicators.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,
   Solve, Meta-optimization, Learn). *Analysis* and *Validation* are placeholders.
 - No Evolver checkout and no Maven needed: the app downloads Evolver's release jar from Maven Central
