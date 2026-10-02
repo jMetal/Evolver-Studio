@@ -197,3 +197,16 @@ class TestTutorialS3WalkThrough:
         # Assert
         assert not app.exception
         assert len([s for s in app.success if "are the ones you got" in s.value]) == 2
+
+    def test_should_go_back_to_the_list_of_tutorials_from_the_last_step(self, app: AppTest):
+        """A link to the Tutorials page does nothing from inside it, so it is a button."""
+        # Arrange
+        self._go_to_step(app, "Try it yourself")
+
+        # Act
+        app.button(key="tutorial_s3_all_tutorials").click().run()
+
+        # Assert
+        assert not app.exception
+        assert [header.value for header in app.subheader][:1] == ["Introductory"]
+        assert len([button for button in app.button if button.label == "Start"]) == 2

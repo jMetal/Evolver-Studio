@@ -134,3 +134,16 @@ class TestTutorialS2WalkThrough:
         assert any("Normalized hypervolume" in markdown.value for markdown in app.markdown)
         app.radio(key="tutorial_s2_tree_quiz").set_value("subtree").run()
         assert any("Right" in success.value for success in app.success)
+
+    def test_should_go_back_to_the_list_of_tutorials_from_the_last_step(self, app: AppTest):
+        """A link to the Tutorials page does nothing from inside it, so it is a button."""
+        # Arrange
+        self._go_to_step(app, "Explore on your own")
+
+        # Act
+        app.button(key="tutorial_s2_all_tutorials").click().run()
+
+        # Assert
+        assert not app.exception
+        assert [header.value for header in app.subheader][:1] == ["Introductory"]
+        assert [button.label for button in app.button if button.label == "Start"]
