@@ -15,9 +15,11 @@ render_sidebar()
 
 st.markdown(
     "A training run measures every configuration it evaluates with **two** of these indicators, "
-    "which are the objectives the meta-optimizer minimizes. Each front is normalized with the "
-    "reference front of its problem and compared against it, so every indicator needs one; "
-    "lower values are always better."
+    "which are the objectives the meta-optimizer minimizes; lower values are always better. Each "
+    "front is normalized with the reference front of its problem, so every training problem "
+    "needs a reference front file. For `HypervolumeMinus` an approximate one is enough, since "
+    "only its bounds are used (to normalize and to place the reference point); the others also "
+    "use its points."
 )
 # A markdown table, not st.dataframe: the descriptions are the point, and it wraps them instead of
 # truncating them.
