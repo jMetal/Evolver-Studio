@@ -37,9 +37,10 @@ appear in this repository's code, tests or docs.
 Evolver's integration surface is still partial:
 
 - Training runs have a uniform, structured entry point: `cli.training`'s `TrainingRunnerMain`
-  (request/status/result files) and `DescribeMain` (a manifest of what it can resolve). There is no
-  equivalent yet for **single algorithm runs** (the solving purpose above) or for **validation runs**;
-  both still need an Evolver-side entry point.
+  (request/status/result files) and `DescribeMain` (a manifest of what it can resolve), and **single
+  algorithm runs** (the solving purpose above) have `cli.solving`'s `SolveRunnerMain`, with the same
+  file contract. There is no equivalent yet for **validation runs**, which still needs an
+  Evolver-side entry point.
 - Meta-optimization results have a single canonical output format: `ConsolidatedOutputResults`
   (`METADATA.txt`/`INDICATORS.csv`/`CONFIGURATIONS.csv`/`VAR_CONF.txt`); the older `OutputResults` was
   removed.

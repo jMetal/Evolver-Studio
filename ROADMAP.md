@@ -87,10 +87,22 @@ below; revisit and reorder as real usage surfaces new ones.
   selector as base algorithms (they were a list of expanders). Quality indicators come from
   `catalogue.QUALITY_INDICATORS`, checked against the manifest's `indicators`.
 
+- **Run algorithm (solving track, first version)**: `pages/solve.py` builds a `cli.solving` request
+  in five sections that appear as the previous one is chosen: problem (and its reference front,
+  found by `problems.reference_front_candidates`), algorithm and encoding, configuration, budget
+  (population, evaluations, independent runs, seed, indicators) and Run. The configuration starts
+  from the default one of Evolver's jar (`BaseAlgorithm.default_configurations`; RVEA offers its
+  three variants) and is adjusted with `parameter_form.render_configuration_form`, a widget per
+  active parameter limited to what the parameter space allows (`evolver_studio/configuration.py`
+  reads, completes and checks the `--parameter value` strings). The run is a detached subprocess
+  (`evolver_client.start_solve`, whose output goes to a log file) kept under `solve-runs/<id>/`,
+  with its phase told by `runs.run_phase`; the fronts are plotted over the reference front (2D, 3D
+  or parallel coordinates), with the indicators, a summary over the runs and a zip to download.
+  Previous runs are reopened from a list. See Evolver's `docs/proposals/cli-solving.md`.
+
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
-  `pages/tutorials.py`). Run algorithm is a placeholder for the solving track (see Next up), like
-  Analysis and Validation.
+  `pages/tutorials.py`). Analysis and Validation are placeholders.
 - **Home page**: the app opens on `pages/home.py`, which presents Evolver-Studio's two uses and
   shows a card for each page (its section, what it does, whether it is available or coming soon,
   and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
@@ -119,11 +131,10 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 - **Tree-encoding training in the Training page**: Evolver's `cli.training` now accepts tree
   `metaSearch` files for NSGA-II, AGE-MOEA and RandomSearch (operator flags, like the flat ones, plus
   the selection); the Training page only builds flat requests today.
-- **Solving track** (see `CLAUDE.md`): configure and run a configurable algorithm on a concrete problem,
-  jMetal-runner style — choose problem, algorithm, encoding and configuration (default, tuned or edited
-  in the guided form), run it, inspect the front and indicators, export `VAR`/`FUN`. Needs an
-  Evolver-side entry point for single algorithm runs, analogous to `cli.training` (to be proposed in
-  Evolver's `docs/proposals/`), and a new page reusing the guided parameter form and the live front.
+- **Solving track, next steps** (the first version of Run algorithm is done): start from a
+  configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
+  configurations on a problem; problem arguments (number of objectives and variables of DTLZ, WFG,
+  ZCAT), which need the Problems page of Explore; the Spread indicators, with Evolver 2.3.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
   documentation counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time
   (S2 is done).
@@ -208,7 +219,8 @@ phase currently plans for it.
     under `cli-runner-runs/<run_id>/`; no dedicated UI for it yet).
 
 **H. Solving problems (no meta-optimization)**
-17. Configure and run an algorithm on a concrete problem, jMetal-runner style — Next up (solving track).
+17. Configure and run an algorithm on a concrete problem, jMetal-runner style — *shipped* (Run
+    algorithm page).
 18. Run a configuration found in a training run on a new problem — Next up (solving track).
 19. Compare several configurations (default, tuned, custom) on a problem over independent runs — not
     yet scheduled.

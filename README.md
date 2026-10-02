@@ -56,7 +56,7 @@ purpose:
 | Explore | Meta-optimizers | ✅ | See each meta-optimizer's encodings and the operators it can be configured with |
 | Explore | Quality indicators | ✅ | The indicators a training run can minimize, and what each one measures |
 | Explore | Problems | 🚧 | Browse the problems available for training and solving |
-| Solve | Run algorithm | 🚧 | Configure and run an algorithm on a problem, inspect its front, export `VAR`/`FUN` |
+| Solve | Run algorithm | ✅ | Run an algorithm on a problem from its default configuration, adjusted within its parameter space; inspect the fronts and indicators, download `VAR`/`FUN` |
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Analysis | 🚧 | Statistical comparison of runs and configurations (Wilcoxon tests, tables, plots) |
 | Meta-optimization | Validation | 🚧 | Run a tuned configuration on a validation set and compare it with the default configuration |
@@ -160,8 +160,8 @@ Code and commits follow [CODING_GUIDELINES.md](CODING_GUIDELINES.md) and
 
 ## Roadmap
 
-Next steps include tree-encoding training runs, the solving track (which needs a new Evolver entry
-point for single algorithm runs), the analysis layer and validation runs. See
+Next steps include tree-encoding training runs, running the configurations a training found on new
+problems, the analysis layer and validation runs. See
 [ROADMAP.md](ROADMAP.md) for details and the use cases behind them.
 
 ## Citation

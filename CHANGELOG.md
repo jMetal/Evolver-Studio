@@ -21,10 +21,16 @@ Works with Evolver 2.2.
   with the flat encoding and, for NSGA-II, AGE-MOEA, AsyncNSGA-II and Random Search, the tree
   encoding. Arbitrary multi-problem training sets, and a guided or expert editor of the base
   algorithm's parameter space.
+- **Run algorithm**: run one of Evolver's configurable algorithms (NSGA-II, MOEA/D, RVEA) on a
+  problem, through `cli.solving`. The configuration starts from the algorithm's default one and can
+  be adjusted within its parameter space (a widget per active parameter, limited to what the space
+  allows, with the parameters that changed marked); the fronts of the independent runs are plotted
+  over the problem's reference front, with the quality indicators of each run and their summary, and
+  the results can be downloaded. Every run is kept under `solve-runs/` and can be reopened.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,
-  Solve, Meta-optimization, Learn). *Run algorithm*, *Analysis* and *Validation* are placeholders.
+  Solve, Meta-optimization, Learn). *Analysis* and *Validation* are placeholders.
 - No Evolver checkout and no Maven needed: the app downloads Evolver's release jar from Maven Central
   (checksum-verified) and copies the reference fronts, weight vectors and TSP instances it needs from
   the release's tag (`make sync-resources`). `EVOLVER_JAR` runs it against another build.
