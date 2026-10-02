@@ -31,7 +31,9 @@ Works with Evolver 2.2.
   for the problem's number of objectives, instead of failing when none matches. A past run can be
   repeated: "Use this configuration for a new run" fills the form with its problem, algorithm,
   configuration (the adjusted one included) and budget, and "Download request.yaml" gives the file
-  to run it outside Evolver-Studio with `SolveRunnerMain`.
+  to run it outside Evolver-Studio with `SolveRunnerMain`. A *Solutions* tab lists the solutions of
+  a run with their objectives and decision variables, filters them by a range for each objective,
+  shows the variables of a selected one (as a permutation when it is one) and downloads the table.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,
