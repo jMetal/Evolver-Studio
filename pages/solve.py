@@ -8,6 +8,7 @@ space. Every run is kept under solve-runs/, so a past one can be reopened.
 
 import datetime as dt
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import streamlit as st
@@ -17,7 +18,12 @@ from evolver_studio.app_state import (
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
-from evolver_studio.catalogue import BASE_ALGORITHMS, QUALITY_INDICATORS, BaseAlgorithm
+from evolver_studio.catalogue import (
+    BASE_ALGORITHMS,
+    QUALITY_INDICATORS,
+    BaseAlgorithm,
+    is_at_least,
+)
 from evolver_studio.configuration import (
     complete_values,
     configuration_string,
@@ -28,6 +34,7 @@ from evolver_studio.configuration import (
 )
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
+    RunStatus,
     cancel_training,
     read_pid,
     read_status,
@@ -37,7 +44,12 @@ from evolver_studio.evolver_client import (
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problems import default_reference_front, reference_front_candidates
-from evolver_studio.resource_files import default_configuration_text, parameter_space_text
+from evolver_studio.progress import estimate_remaining_seconds, format_duration
+from evolver_studio.resource_files import (
+    default_configuration_text,
+    jar_evolver_version,
+    parameter_space_text,
+)
 from evolver_studio.runs import (
     SOLVE_RUNS_DIRECTORY_NAME,
     RunPhase,
@@ -53,6 +65,7 @@ from evolver_studio.solve_results import (
     list_solve_runs,
     read_front,
     read_indicators,
+    read_request,
     read_run_fronts,
     zip_fronts,
 )
@@ -63,6 +76,14 @@ DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 1
 LOG_LINES_SHOWN = 15
+# The evaluations between two updates of the progress that the slider offers, and the one it starts
+# at. Evolver reports in steps of an algorithm's offspring population (usually 100): updating more
+# often than that costs time and shows nothing more, except for a steady-state algorithm.
+PROGRESS_FREQUENCIES = (1, 10, 100, 500, 1000, 5000, 10000, 50000)
+DEFAULT_PROGRESS_FREQUENCY = 500
+SLOW_PROGRESS_FREQUENCY_BELOW = 100
+# The Evolver release from which a run reports its progress while it runs.
+PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
 
 
 def _render_problem() -> tuple[str, str | None] | None:
@@ -194,15 +215,83 @@ def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
     return configuration
 
 
-def _render_budget(has_reference_front: bool) -> tuple[int, int, int, int | None, list[str]]:
-    """Section 4: the population, the budget, the runs, the seed and the indicators.
+@dataclass(slots=True, frozen=True)
+class Budget:
+    """What section 4 chooses.
+
+    Attributes:
+        population_size: The population size.
+        max_evaluations: The evaluations of each run.
+        runs: The number of independent runs.
+        seed: The seed of the first run, or None to draw one.
+        indicators: The quality indicators to compute.
+        status_frequency: Every how many evaluations the progress is updated while a run is in
+            progress, or None to update it only when a run ends.
+    """
+
+    population_size: int
+    max_evaluations: int
+    runs: int
+    seed: int | None
+    indicators: list[str]
+    status_frequency: int | None
+
+
+def _render_progress_controls(max_evaluations: int, runs: int) -> int | None:
+    """Choose whether, and how often, the progress is shown while a run is in progress.
+
+    Args:
+        max_evaluations: The evaluations of each run.
+        runs: The number of independent runs.
+
+    Returns:
+        The evaluations between two updates, or None for none (silent, or an Evolver that cannot).
+    """
+    version = jar_evolver_version(jar)
+    supported = version is None or is_at_least(version, PROGRESS_WITHIN_A_RUN_SINCE)
+    show = st.checkbox(
+        "Show the progress while running",
+        value=supported,
+        disabled=not supported,
+        key="solve_show_progress",
+    )
+    if not supported:
+        st.caption(
+            f"Evolver {version} updates the progress only when each run ends; Evolver "
+            f"{PROGRESS_WITHIN_A_RUN_SINCE} or later does it while the run is in progress."
+        )
+        return None
+    if not show:
+        st.caption("Silent: the progress changes only when each independent run ends.")
+        return None
+    frequency = st.select_slider(
+        "Update every N evaluations",
+        options=PROGRESS_FREQUENCIES,
+        value=DEFAULT_PROGRESS_FREQUENCY,
+        help="How often the progress is refreshed. Each update costs a little time: from 100 "
+        "evaluations on it is a few percent at most, but updating after every single evaluation "
+        "can nearly double the time of an algorithm that reports every evaluation.",
+        key="solve_status_frequency",
+    )
+    frequency = min(frequency, max_evaluations)
+    st.caption(f"About {max(runs * max_evaluations // frequency, 1)} updates in all.")
+    if frequency < SLOW_PROGRESS_FREQUENCY_BELOW:
+        st.warning(
+            f"Updating every {frequency} evaluation(s) can slow the run down a lot: up to about "
+            "twice as long in the cases measured. From 100 evaluations on, the cost is a few "
+            "percent."
+        )
+    return frequency
+
+
+def _render_budget(has_reference_front: bool) -> Budget:
+    """Section 4: the population, the budget, the runs, the seed, the indicators and the progress.
 
     Args:
         has_reference_front: Whether the problem has a reference front (indicators need one).
 
     Returns:
-        The population size, the evaluations, the number of runs, the seed (None to draw one) and
-        the indicators.
+        What was chosen.
     """
     st.subheader("4. Budget")
     columns = st.columns(4)
@@ -225,12 +314,14 @@ def _render_budget(has_reference_front: bool) -> tuple[int, int, int, int | None
         "the seed + i - 1.",
         key=f"solve_indicators_{has_reference_front}",
     )
-    return (
-        int(population_size),
-        int(max_evaluations),
-        int(runs),
-        int(seed) if fix_seed else None,
-        indicators,
+    status_frequency = _render_progress_controls(int(max_evaluations), int(runs))
+    return Budget(
+        population_size=int(population_size),
+        max_evaluations=int(max_evaluations),
+        runs=int(runs),
+        seed=int(seed) if fix_seed else None,
+        indicators=indicators,
+        status_frequency=status_frequency,
     )
 
 
@@ -270,24 +361,23 @@ def _render_form(can_run: bool) -> None:
         return
     algorithm, encoding, extra_config = algorithm_choice
     configuration = _render_configuration(algorithm, encoding)
-    population_size, max_evaluations, runs, seed, indicators = _render_budget(
-        reference_front is not None
-    )
+    budget = _render_budget(reference_front is not None)
 
     def request_for(output_directory: str) -> SolveRequest:
         return SolveRequest(
             algorithm_name=algorithm.registry_name,
             encoding=encoding,
-            population_size=population_size,
+            population_size=budget.population_size,
             yaml_parameter_space_file=algorithm.encodings[encoding],
             extra_config=extra_config,
             configuration=configuration,
             problem=problem_name,
             reference_front_file_name=reference_front,
-            max_evaluations=max_evaluations,
-            number_of_independent_runs=runs,
-            seed=seed,
-            indicator_names=indicators,
+            max_evaluations=budget.max_evaluations,
+            number_of_independent_runs=budget.runs,
+            seed=budget.seed,
+            indicator_names=budget.indicators,
+            status_frequency=budget.status_frequency,
             output_directory=output_directory,
         )
 
@@ -307,9 +397,27 @@ def _cancel(run_dir: Path) -> None:
     mark_cancelled(run_dir)
 
 
+def _progress_text(run_dir: Path, status: RunStatus) -> str:
+    """Write a run's progress: the evaluations, the time elapsed and the time left."""
+    text = f"{status.evaluations_done}/{status.max_evaluations} evaluations"
+    try:
+        started = dt.datetime.strptime(run_dir.name, "%Y%m%d-%H%M%S")
+    except ValueError:
+        return text
+    elapsed = (dt.datetime.now() - started).total_seconds()
+    text += f" · {format_duration(elapsed)} elapsed"
+    remaining = estimate_remaining_seconds(elapsed, status.evaluations_done, status.max_evaluations)
+    if remaining is not None:
+        text += f" · about {format_duration(remaining)} left"
+    return text
+
+
 def _render_run_in_progress(run_dir: Path) -> None:
     """Show the progress of the run in progress, and move on to its results when it ends."""
     st.info(f"Running ({run_dir.name}).")
+    request = read_request(run_dir) or {}
+    if "statusFrequency" not in request:
+        st.caption("This run reports its progress only when each of its independent runs ends.")
     if st.button("Cancel"):
         _cancel(run_dir)
         st.rerun()
@@ -318,10 +426,8 @@ def _render_run_in_progress(run_dir: Path) -> None:
     def _poll() -> None:
         status = read_status(run_dir / "status.yaml")
         if status is not None:
-            done = status.evaluations_done / max(status.max_evaluations, 1)
-            st.progress(
-                done, text=f"{status.evaluations_done}/{status.max_evaluations} evaluations"
-            )
+            fraction = min(status.evaluations_done / max(status.max_evaluations, 1), 1.0)
+            st.progress(fraction, text=_progress_text(run_dir, status))
         else:
             st.progress(0.0, text="Starting…")
         if run_phase(run_dir) not in (RunPhase.STARTING, RunPhase.RUNNING):
