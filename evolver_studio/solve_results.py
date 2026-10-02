@@ -79,6 +79,63 @@ def read_front(front_file: Path) -> pd.DataFrame:
     return front
 
 
+def read_solutions(output_directory: Path, run: int) -> pd.DataFrame:
+    """Read the solutions of a run: their objectives and their decision variables.
+
+    Args:
+        output_directory: A solve run's output directory.
+        run: The run's number (from 1).
+
+    Returns:
+        One row per solution, with the columns f1, f2, ... (its objectives) and x1, x2, ... (its
+        variables); only the objectives if the run has no VAR file.
+    """
+    run_directory = output_directory / f"run-{run}"
+    solutions = read_front(run_directory / "FUN.csv")
+    variables_file = run_directory / "VAR.csv"
+    if not variables_file.is_file():
+        return solutions
+    variables = pd.read_csv(variables_file, header=None)
+    variables.columns = [f"x{index}" for index in range(1, variables.shape[1] + 1)]
+    return pd.concat([solutions, variables], axis=1)
+
+
+def objective_columns(solutions: pd.DataFrame) -> list[str]:
+    """The objective columns of a solutions table (f1, f2, ...)."""
+    return [column for column in solutions.columns if column.startswith("f")]
+
+
+def variable_columns(solutions: pd.DataFrame) -> list[str]:
+    """The decision variable columns of a solutions table (x1, x2, ...)."""
+    return [column for column in solutions.columns if column.startswith("x")]
+
+
+def filter_by_objectives(
+    solutions: pd.DataFrame, ranges: dict[str, tuple[float, float]]
+) -> pd.DataFrame:
+    """Keep the solutions whose objectives lie inside the given ranges.
+
+    Args:
+        solutions: The table `read_solutions` returns.
+        ranges: For each objective column to restrict, its (minimum, maximum), both included.
+
+    Returns:
+        The solutions that satisfy every range, with their original index.
+    """
+    keep = pd.Series(True, index=solutions.index)
+    for column, (lower, upper) in ranges.items():
+        keep &= solutions[column].between(lower, upper)
+    return solutions[keep]
+
+
+def is_permutation(values: pd.Series) -> bool:
+    """Tell whether a solution's variables are a permutation of 0..n-1 (a permutation encoding)."""
+    numbers = list(values)
+    return all(float(n).is_integer() for n in numbers) and sorted(int(n) for n in numbers) == list(
+        range(len(numbers))
+    )
+
+
 def read_indicators(output_directory: Path) -> pd.DataFrame:
     """Read INDICATORS.csv: one row per run, with its seed, time and indicator values.
 
