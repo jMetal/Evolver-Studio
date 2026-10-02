@@ -21,6 +21,11 @@ RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/Ran
 
 from dataclasses import dataclass
 
+# The Evolver version this catalogue mirrors. It may be ahead of the release the app downloads
+# (evolver_client.EVOLVER_VERSION) while it follows Evolver's develop branch; a jar older than it
+# has outdated parameter spaces and cannot run every algorithm marked runnable here.
+CATALOGUE_EVOLVER_VERSION = "2.2"
+
 
 @dataclass(slots=True, frozen=True)
 class BaseAlgorithm:
@@ -340,3 +345,23 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         example_config_file="MetaRandomSearchFlatConfiguration.yaml",
     ),
 )
+
+
+def is_older_than_catalogue(version: str) -> bool:
+    """Tell whether an Evolver version predates the one this catalogue mirrors.
+
+    Only the numeric release is compared, so a snapshot ("2.2-SNAPSHOT", built
+    from develop on its way to 2.2) counts as that release.
+
+    Args:
+        version: An Evolver version, e.g. "2.1" or "2.2-SNAPSHOT".
+
+    Returns:
+        Whether it is older than CATALOGUE_EVOLVER_VERSION.
+    """
+    return _release_numbers(version) < _release_numbers(CATALOGUE_EVOLVER_VERSION)
+
+
+def _release_numbers(version: str) -> tuple[int, ...]:
+    release = version.split("-", 1)[0]
+    return tuple(int(part) for part in release.split(".") if part.isdigit())

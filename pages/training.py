@@ -18,7 +18,7 @@ import streamlit as st
 import yaml
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
-from evolver_studio.app_state import require_evolver_jar
+from evolver_studio.app_state import require_evolver_jar, warn_if_jar_older_than_catalogue
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
@@ -584,6 +584,7 @@ def _render_active_run(active_run: ActiveRun) -> None:
 st.title("Training")
 
 jar = require_evolver_jar()
+warn_if_jar_older_than_catalogue(jar)
 
 active_run = find_active_run(WORKING_DIRECTORY)
 

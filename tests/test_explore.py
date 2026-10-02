@@ -5,7 +5,9 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from evolver_studio.catalogue import is_older_than_catalogue
 from evolver_studio.evolver_client import jar_path
+from evolver_studio.resource_files import jar_evolver_version
 
 EXPLORE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore.py"
 BASE_FILTER_KEY = "explorer_base_filter"
@@ -66,3 +68,15 @@ class TestExplorePage:
 
         # Assert
         assert "Parameter space of NSGA-II (Double) — NSGAIIDouble.yaml" in captions
+
+    def test_should_warn_only_when_the_jar_is_older_than_the_catalogue(self, app: AppTest):
+        """Evolver 2.1's parameter spaces lack what the catalogue's Evolver has (e.g. RVEA's)."""
+        # Arrange
+        version = jar_evolver_version(jar_path())
+        expected = version is not None and is_older_than_catalogue(version)
+
+        # Act
+        warned = any("the jar in use is Evolver" in warning.value for warning in app.warning)
+
+        # Assert
+        assert warned is expected

@@ -71,7 +71,9 @@ below; revisit and reorder as real usage surfaces new ones.
   weight vectors directory, like MOEA/D: `BaseAlgorithm.required_extra_config_keys`, checked
   against the manifest's `requiredExtraConfigKeys`), and AsyncNSGA-II supports the tree encoding
   (`AsyncNSGAIIMetaTree.yaml`); the `.irace` files, gone from Evolver, are no longer triaged. Both
-  need an Evolver jar newer than 2.1 (`EVOLVER_JAR`).
+  need an Evolver jar newer than 2.1 (`EVOLVER_JAR`): the catalogue records the Evolver version it
+  mirrors (`CATALOGUE_EVOLVER_VERSION`), and Explore and Training warn when the jar in use (its
+  `pom.properties` version) is older.
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,

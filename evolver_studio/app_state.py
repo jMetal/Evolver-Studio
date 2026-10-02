@@ -11,6 +11,7 @@ from pathlib import Path
 
 import streamlit as st
 
+from evolver_studio.catalogue import CATALOGUE_EVOLVER_VERSION, is_older_than_catalogue
 from evolver_studio.evolver_client import (
     EVOLVER_VERSION,
     JAR_OVERRIDE_VARIABLE,
@@ -18,6 +19,7 @@ from evolver_studio.evolver_client import (
     is_jar_overridden,
     jar_path,
 )
+from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.result import Err
 
 
@@ -61,3 +63,26 @@ def require_evolver_jar() -> Path:
         st.info("This page needs Evolver: download it from the sidebar.")
         st.stop()
     return jar
+
+
+def warn_if_jar_older_than_catalogue(jar: Path) -> None:
+    """Warn when the jar predates the Evolver version the catalogue mirrors.
+
+    Its parameter spaces may then lack parameters the catalogue's Evolver has
+    (e.g. RVEA's selection and replacement before 2.2), and some algorithms
+    marked runnable cannot run with it. Nothing is shown when the jar records
+    no version.
+
+    Args:
+        jar: Path to Evolver's jar.
+    """
+    version = jar_evolver_version(jar)
+    if version is None or not is_older_than_catalogue(version):
+        return
+    st.warning(
+        f"This page follows Evolver {CATALOGUE_EVOLVER_VERSION}, but the jar in use is Evolver "
+        f"{version}: some parameter spaces may be incomplete, and some algorithms marked "
+        f"runnable cannot run with it. Set `{JAR_OVERRIDE_VARIABLE}` to a newer jar (e.g. one "
+        f"built from Evolver's `develop` branch).",
+        icon="⚠️",
+    )

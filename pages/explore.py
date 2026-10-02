@@ -10,7 +10,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.app_state import require_evolver_jar
+from evolver_studio.app_state import require_evolver_jar, warn_if_jar_older_than_catalogue
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
 from evolver_studio.parameter_form import render_parameter_space_table
 from evolver_studio.parameter_space import parse_parameter_space
@@ -84,6 +84,7 @@ def _render_meta_algorithm_summary(jar: Path, meta: MetaAlgorithm) -> None:
 st.title("Explore")
 
 jar = require_evolver_jar()
+warn_if_jar_older_than_catalogue(jar)
 
 st.subheader("Base algorithms")
 selected_name = st.selectbox(

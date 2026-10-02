@@ -10,6 +10,8 @@ from pathlib import Path
 
 PARAMETER_SPACES_DIRECTORY = "parameterSpaces"
 META_OPTIMIZER_CONFIGURATIONS_DIRECTORY = "metaOptimizerConfigurations"
+# Written by Maven into every jar it builds, with the version of the project.
+POM_PROPERTIES_ENTRY = "META-INF/maven/org.uma.jmetal/Evolver/pom.properties"
 
 
 def parameter_space_text(jar: Path, filename: str) -> str:
@@ -37,6 +39,27 @@ def meta_optimizer_configuration_text(jar: Path, filename: str) -> str:
         That file's content.
     """
     return _jar_entry_text(jar, f"{META_OPTIMIZER_CONFIGURATIONS_DIRECTORY}/{filename}")
+
+
+def jar_evolver_version(jar: Path) -> str | None:
+    """Read the version of Evolver a jar was built from (e.g. "2.1" or "2.2-SNAPSHOT").
+
+    Args:
+        jar: Path to Evolver's fat jar.
+
+    Returns:
+        The version recorded in the jar's Maven pom.properties, or None if the
+        jar does not record one.
+    """
+    try:
+        text = _jar_entry_text(jar, POM_PROPERTIES_ENTRY)
+    except KeyError:
+        return None
+    for line in text.splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.strip() == "version":
+            return value.strip()
+    return None
 
 
 def _jar_entry_text(jar: Path, entry: str) -> str:

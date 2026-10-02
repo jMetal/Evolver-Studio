@@ -8,6 +8,7 @@ from evolver_studio.catalogue import (
     BASE_ALGORITHMS,
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
+    is_older_than_catalogue,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
 from evolver_studio.resource_files import PARAMETER_SPACES_DIRECTORY
@@ -146,6 +147,21 @@ class TestMetaAlgorithms:
         assert all(
             a.supports_tree or a.tree_operator_parameter_space_file is None for a in META_ALGORITHMS
         )
+
+
+class TestIsOlderThanCatalogue:
+    """The catalogue mirrors Evolver 2.2 (CATALOGUE_EVOLVER_VERSION)."""
+
+    @pytest.mark.parametrize("version", ["2.1", "2.0", "1.0.1"])
+    def test_should_flag_an_earlier_release(self, version: str):
+        # Act / Assert
+        assert is_older_than_catalogue(version)
+
+    @pytest.mark.parametrize("version", ["2.2", "2.2-SNAPSHOT", "2.2.1", "2.3-SNAPSHOT", "3.0"])
+    def test_should_accept_the_same_or_a_later_release_or_its_snapshot(self, version: str):
+        """A snapshot built from develop on its way to 2.2 already has its catalogue."""
+        # Act / Assert
+        assert not is_older_than_catalogue(version)
 
 
 class TestCatalogueMatchesEvolverJar:
