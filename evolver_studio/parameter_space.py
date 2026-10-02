@@ -276,3 +276,141 @@ def active_sub_parameters(parameter: ParameterSpec, choices: dict[str, str]) -> 
         for p in choice.conditional_parameters
     ]
     return [*parameter.global_sub_parameters, *conditional]
+
+
+@dataclass(slots=True, frozen=True)
+class ParameterRow:
+    """One parameter of a parameter space, flattened into a table row.
+
+    Attributes:
+        depth: Its nesting level (0 for a top-level parameter).
+        name: The parameter's name.
+        kind: "categorical", "integer" or "double".
+        domain: Its range ("[min, max]") or its values, comma-separated.
+        condition: When it applies: "parent = value" for a conditional
+            parameter, "parent (any)" for a global sub-parameter, "" for a
+            top-level one.
+        parent: The index, in the same row list, of the parameter it hangs
+            from; None for a top-level one.
+    """
+
+    depth: int
+    name: str
+    kind: str
+    domain: str
+    condition: str
+    parent: int | None
+
+
+def parameter_rows(parameters: list[ParameterSpec]) -> list[ParameterRow]:
+    """Flatten a parameter space into table rows, depth-first and in file order.
+
+    Each parameter is followed by its sub-parameters: the conditional ones of
+    each value, in value order, and then the global ones.
+
+    Args:
+        parameters: The top-level parameters.
+
+    Returns:
+        One row per parameter, at any depth.
+    """
+    rows: list[ParameterRow] = []
+    _append_rows(rows, parameters, 0, "", None)
+    return rows
+
+
+def _append_rows(
+    rows: list[ParameterRow],
+    parameters: list[ParameterSpec] | tuple[ParameterSpec, ...],
+    depth: int,
+    condition: str,
+    parent: int | None,
+) -> None:
+    for parameter in parameters:
+        index = len(rows)
+        if isinstance(parameter, RangeParameter):
+            domain = f"[{parameter.lower_bound}, {parameter.upper_bound}]"
+            rows.append(
+                ParameterRow(depth, parameter.name, parameter.kind, domain, condition, parent)
+            )
+            continue
+        domain = ", ".join(choice.value for choice in parameter.choices)
+        rows.append(ParameterRow(depth, parameter.name, "categorical", domain, condition, parent))
+        for choice in parameter.choices:
+            _append_rows(
+                rows,
+                choice.conditional_parameters,
+                depth + 1,
+                f"{parameter.name} = {choice.value}",
+                index,
+            )
+        _append_rows(
+            rows, parameter.global_sub_parameters, depth + 1, f"{parameter.name} (any)", index
+        )
+
+
+def filter_rows(rows: list[ParameterRow], text: str) -> list[ParameterRow]:
+    """Keep the rows matching `text`, together with the rows they hang from.
+
+    A row matches when its name, domain or condition contains `text`,
+    ignoring case. Its ancestors are kept too, so a match never loses the
+    context that explains when it applies.
+
+    Args:
+        rows: Rows built by `parameter_rows`.
+        text: The text to look for; blank keeps every row.
+
+    Returns:
+        The kept rows, in their original order.
+    """
+    needle = text.strip().lower()
+    if not needle:
+        return list(rows)
+    kept: set[int] = set()
+    for index, row in enumerate(rows):
+        if any(needle in field.lower() for field in (row.name, row.domain, row.condition)):
+            current: int | None = index
+            while current is not None and current not in kept:
+                kept.add(current)
+                current = rows[current].parent
+    return [row for index, row in enumerate(rows) if index in kept]
+
+
+@dataclass(slots=True, frozen=True)
+class ParameterSpaceSummary:
+    """Counts describing the size and shape of a parameter space.
+
+    Attributes:
+        total: Every parameter, at any depth.
+        top_level: The top-level parameters.
+        categorical: The categorical parameters, at any depth.
+        numeric: The integer and double parameters, at any depth.
+        max_depth: The deepest nesting level (0 when every parameter is
+            top-level).
+    """
+
+    total: int
+    top_level: int
+    categorical: int
+    numeric: int
+    max_depth: int
+
+
+def summarize_parameter_space(parameters: list[ParameterSpec]) -> ParameterSpaceSummary:
+    """Count a parameter space's parameters by kind and depth.
+
+    Args:
+        parameters: The top-level parameters.
+
+    Returns:
+        Its summary; `total` equals `count_parameters(parameters)`.
+    """
+    rows = parameter_rows(parameters)
+    categorical = sum(1 for row in rows if row.kind == "categorical")
+    return ParameterSpaceSummary(
+        total=len(rows),
+        top_level=len(parameters),
+        categorical=categorical,
+        numeric=len(rows) - categorical,
+        max_depth=max((row.depth for row in rows), default=0),
+    )

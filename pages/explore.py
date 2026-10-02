@@ -1,9 +1,9 @@
 """Explore: read-only browsing of Evolver's algorithms and their parameter spaces.
 
-Nothing here builds a request or launches a run — only NSGA-II/MOEA-D as base
-and NSGA-II/SPEA2/SMPSO/AsyncNSGA-II as meta-optimizer are actually
-runnable today from this app (see evolver_studio/catalogue.py and the
-Training page).
+Nothing here builds a request or launches a run; which algorithms are actually runnable from this
+app is recorded in evolver_studio/catalogue.py and launched from the Training page. Each parameter
+space is shown as a table, one row per parameter, which reads at a glance where a nested list
+would need a long scroll.
 """
 
 from pathlib import Path
@@ -12,7 +12,7 @@ import streamlit as st
 
 from evolver_studio.app_state import require_evolver_jar
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
-from evolver_studio.parameter_form import render_parameter_space_readonly
+from evolver_studio.parameter_form import render_parameter_space_table
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.resource_files import parameter_space_text
 
@@ -55,18 +55,30 @@ def _render_meta_algorithm_summary(jar: Path, meta: MetaAlgorithm) -> None:
         else "🔍 not wired into cli.training"
     )
     with st.expander(f"{meta.name} — {encodings} — {wired}"):
-        if meta.operator_parameter_space_file is not None:
-            st.caption(f"Flat operator catalogue ({meta.operator_parameter_space_file}):")
-            text = parameter_space_text(jar, meta.operator_parameter_space_file)
-            render_parameter_space_readonly(parse_parameter_space(text))
-        else:
-            st.write("**Parameters (flat):**", ", ".join(meta.flat_parameters))
-        if meta.tree_operator_parameter_space_file is not None:
-            st.caption(f"Tree operator catalogue ({meta.tree_operator_parameter_space_file}):")
-            text = parameter_space_text(jar, meta.tree_operator_parameter_space_file)
-            render_parameter_space_readonly(parse_parameter_space(text))
-        elif meta.tree_parameters:
-            st.write("**Parameters (tree):**", ", ".join(meta.tree_parameters))
+        catalogues = [
+            (label, filename, parameters)
+            for label, filename, parameters in (
+                ("Flat", meta.operator_parameter_space_file, meta.flat_parameters),
+                ("Tree", meta.tree_operator_parameter_space_file, meta.tree_parameters),
+            )
+            if filename is not None or parameters
+        ]
+        tabs = st.tabs([label for label, _, _ in catalogues])
+        for tab, (label, filename, parameters) in zip(tabs, catalogues, strict=True):
+            with tab:
+                if filename is not None:
+                    st.caption(f"Operator catalogue ({filename}):")
+                    try:
+                        text = parameter_space_text(jar, filename)
+                    except KeyError:
+                        # The catalogue follows Evolver's develop branch, ahead of the release jar.
+                        st.warning(f"{filename} is not in this Evolver jar; it needs a newer one.")
+                        continue
+                    render_parameter_space_table(
+                        parse_parameter_space(text), key=f"explorer_meta_{meta.name}_{label}"
+                    )
+                else:
+                    st.write("**Parameters:**", ", ".join(parameters))
 
 
 st.title("Explore")
@@ -81,8 +93,11 @@ algorithm = next(a for a in BASE_ALGORITHMS if a.name == selected_name)
 _render_runnable_badge(algorithm.runnable_today)
 
 encoding = st.selectbox("Encoding", list(algorithm.encodings), key="explorer_encoding")
-text = parameter_space_text(jar, algorithm.encodings[encoding])
-render_parameter_space_readonly(parse_parameter_space(text))
+filename = algorithm.encodings[encoding]
+st.caption(f"Parameter space of {algorithm.name} ({encoding}) — {filename}")
+render_parameter_space_table(
+    parse_parameter_space(parameter_space_text(jar, filename)), key="explorer_base"
+)
 
 st.subheader("Meta-optimization algorithms")
 for meta in META_ALGORITHMS:

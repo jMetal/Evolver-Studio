@@ -8,12 +8,17 @@ from evolver_studio.evolver_client import jar_path
 from evolver_studio.parameter_space import (
     CategoricalChoice,
     CategoricalParameter,
+    ParameterRow,
+    ParameterSpaceSummary,
     RangeParameter,
     active_parameter_names,
     active_sub_parameters,
     count_parameters,
+    filter_rows,
+    parameter_rows,
     parse_parameter_space,
     serialize_parameter_space,
+    summarize_parameter_space,
     with_range,
     with_selected_choices,
 )
@@ -290,3 +295,91 @@ class TestActiveParameters:
 
         # Assert
         assert active == []
+
+
+class TestParameterRows:
+    def test_should_list_each_parameter_before_its_sub_parameters_conditional_first(self):
+        """Conditional parameters of each value come first, then the global ones."""
+        # Act
+        rows = parameter_rows(_crossover_space())
+
+        # Assert
+        assert rows == [
+            ParameterRow(0, "crossover", "categorical", "SBX, blxAlpha", "", None),
+            ParameterRow(1, "sbxDistributionIndex", "double", "[5, 400]", "crossover = SBX", 0),
+            ParameterRow(1, "crossoverProbability", "double", "[0, 1]", "crossover (any)", 0),
+            ParameterRow(0, "populationSize", "integer", "[10, 100]", "", None),
+        ]
+
+    def test_should_have_one_row_per_parameter_of_a_real_file(self):
+        """The rows must cover every parameter, as count_parameters counts them."""
+        jar = jar_path()
+        if not jar.is_file():
+            pytest.skip(f"Evolver jar not found at {jar}")
+
+        # Arrange
+        parameters = parse_parameter_space(parameter_space_text(jar, "NSGAIIDouble.yaml"))
+
+        # Act
+        rows = parameter_rows(parameters)
+
+        # Assert
+        assert len(rows) == count_parameters(parameters)
+
+
+class TestFilterRows:
+    def test_should_keep_every_row_for_a_blank_filter(self):
+        # Arrange
+        rows = parameter_rows(_crossover_space())
+
+        # Act
+        kept = filter_rows(rows, "  ")
+
+        # Assert
+        assert kept == rows
+
+    def test_should_keep_the_ancestors_of_a_matching_row(self):
+        """A match must keep the parameter it hangs from, which explains when it applies."""
+        # Arrange
+        rows = parameter_rows(_crossover_space())
+
+        # Act
+        kept = filter_rows(rows, "DISTRIBUTION")
+
+        # Assert
+        assert [row.name for row in kept] == ["crossover", "sbxDistributionIndex"]
+
+    def test_should_match_the_domain_and_the_condition(self):
+        # Arrange
+        rows = parameter_rows(_crossover_space())
+
+        # Act
+        kept = filter_rows(rows, "sbx")
+
+        # Assert
+        assert [row.name for row in kept] == ["crossover", "sbxDistributionIndex"]
+
+    def test_should_keep_nothing_when_nothing_matches(self):
+        # Act
+        kept = filter_rows(parameter_rows(_crossover_space()), "archive")
+
+        # Assert
+        assert kept == []
+
+
+class TestSummarizeParameterSpace:
+    def test_should_count_parameters_by_kind_and_depth(self):
+        # Act
+        summary = summarize_parameter_space(_crossover_space())
+
+        # Assert
+        assert summary == ParameterSpaceSummary(
+            total=4, top_level=2, categorical=1, numeric=3, max_depth=1
+        )
+
+    def test_should_summarize_an_empty_space(self):
+        # Act
+        summary = summarize_parameter_space([])
+
+        # Assert
+        assert summary == ParameterSpaceSummary(0, 0, 0, 0, 0)
