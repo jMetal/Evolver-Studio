@@ -52,7 +52,7 @@ purpose:
 
 | Section | Page | Status | What it does |
 |---|---|:---:|---|
-| Explore | Explore | ✅ | Browse any algorithm's parameter space as a tree; see each meta-optimizer's encodings and operator parameters |
+| Explore | Explore | ✅ | Browse any algorithm's parameter space as a filterable table (one row per parameter, with the condition that activates it); see each meta-optimizer's encodings and operator parameters |
 | Solve | Run algorithm | 🚧 | Configure and run an algorithm on a problem, inspect its front, export `VAR`/`FUN` |
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Analysis | 🚧 | Statistical comparison of runs and configurations (Wilcoxon tests, tables, plots) |
@@ -77,11 +77,14 @@ that can be launched from the app today are:
 
 | Level | Algorithms |
 |---|---|
-| Base level | NSGA-II (Double, Permutation), MOEA/D (Double) |
-| Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding) |
+| Base level | NSGA-II (Double, Permutation), MOEA/D (Double), RVEA (Double)¹ |
+| Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding); NSGA-II, AGE-MOEA, Async NSGA-II¹, Random Search (tree encoding) |
 
-The other base-level algorithms (SMS-EMOA, RDE-MOEA, AGE-MOEA, RVEA, MOPSO, NSGA-III, PAES,
-SSMOEA) are browsable only, until Evolver's command-line runner supports them. See Evolver's
+¹ Needs an Evolver jar newer than 2.1 (e.g. one built from its `develop` branch, set with
+`EVOLVER_JAR`).
+
+The other base-level algorithms (SMS-EMOA, RDE-MOEA, AGE-MOEA, MOPSO, NSGA-III, PAES, SSMOEA) are
+browsable only, until Evolver's command-line runner supports them. See Evolver's
 [supported algorithms](https://github.com/jMetal/Evolver#supported-algorithms) for the full list.
 
 ## Requirements

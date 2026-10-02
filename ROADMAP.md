@@ -24,9 +24,10 @@ below; revisit and reorder as real usage surfaces new ones.
   are a fixed recipe, not a `ParameterSpace` to evolve, so the same guided/expert form does not apply.
 - **Discovery and a read-only parameter space explorer** (formerly "Phase 2"): a multipage app
   (`st.navigation`, one script per page under `pages/`) — the
-  **Explore** page browses any base algorithm's parameter space as a compact, read-only tree
-  (`parameter_form.render_parameter_space_readonly`, no widgets — editing lives only in Training's
-  form) and summarizes every registered meta-optimizer's encoding support and operator parameters.
+  **Explore** page browses any base algorithm's parameter space as a read-only, filterable table,
+  one row per parameter with the condition that activates it
+  (`parameter_form.render_parameter_space_table`, over `parameter_space.parameter_rows`; editing
+  lives only in Training's form) and summarizes every registered meta-optimizer's encoding support and operator parameters.
   Backed by `evolver_studio/catalogue.py`, still a hand-maintained Python mirror of Evolver's
   registries (see "Provisional catalogue" below), cross-checked against Evolver's own introspection
   manifest when Evolver's jar is available (`tests/test_catalogue.py::TestCatalogueMatchesDescribeManifest`).
@@ -62,6 +63,15 @@ below; revisit and reorder as real usage surfaces new ones.
   algorithms; offspring size no longer listed as configurable (Evolver fixes it to the population
   size). The Training page leaves the meta population size to Evolver's own default (50). A new
   manifest test checks `supports_tree` against `DescribeMain`'s `supportsTree`.
+
+- **Parameter spaces as tables, catalogue synced with Evolver `develop` (October 2026)**: Explore
+  shows each parameter space (base algorithm and meta-optimizer operator catalogues, flat and tree
+  in tabs) as a table with a one-line size summary and a text filter that keeps the ancestors of
+  each match, instead of a long nested list. RVEA is runnable as a base algorithm (it needs the
+  weight vectors directory, like MOEA/D: `BaseAlgorithm.required_extra_config_keys`, checked
+  against the manifest's `requiredExtraConfigKeys`), and AsyncNSGA-II supports the tree encoding
+  (`AsyncNSGAIIMetaTree.yaml`); the `.irace` files, gone from Evolver, are no longer triaged. Both
+  need an Evolver jar newer than 2.1 (`EVOLVER_JAR`).
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
@@ -123,7 +133,8 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 ## Phase 5 — Hardening
 
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
-  `AppTest` coverage exists only for the Tutorials page so far, see `tests/test_tutorials.py`.)*
+  `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
+  `tests/test_explore.py`.)*
 - Track Evolver's releases: the app is built against Evolver 2.1 (`evolver_client.EVOLVER_VERSION`,
   the first release that ships `cli.training`); moving to a newer release means bumping that
   constant, running `make sync-resources` and re-running the drift-detection tests against it
