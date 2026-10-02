@@ -27,6 +27,8 @@ Works with Evolver 2.2.
   allows, with the parameters that changed marked); the fronts of the independent runs are plotted
   over the problem's reference front, with the quality indicators of each run and their summary, and
   the results can be downloaded. Every run is kept under `solve-runs/` and can be reopened.
+  For MOEA/D and RVEA the population size is chosen among the sizes that have a weight vector file
+  for the problem's number of objectives, instead of failing when none matches.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,
