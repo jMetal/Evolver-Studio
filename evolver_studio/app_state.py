@@ -15,12 +15,14 @@ from evolver_studio.catalogue import is_older_than_catalogue
 from evolver_studio.evolver_client import (
     EVOLVER_VERSION,
     JAR_OVERRIDE_VARIABLE,
+    WORKING_DIRECTORY,
+    describe,
     download_jar,
     is_jar_overridden,
     jar_path,
 )
 from evolver_studio.resource_files import jar_evolver_version
-from evolver_studio.result import Err
+from evolver_studio.result import Err, Ok
 
 
 def render_sidebar() -> Path | None:
@@ -86,3 +88,22 @@ def warn_if_jar_older_than_catalogue(jar: Path) -> None:
         f"{EVOLVER_VERSION}, or point it at a newer jar.",
         icon="⚠️",
     )
+
+
+@st.cache_data(show_spinner=False)
+def registered_problem_names(jar_str: str) -> list[str] | None:
+    """List the problems Evolver can resolve by name, from DescribeMain's manifest.
+
+    Cached because DescribeMain starts a JVM, fast enough for one call but too slow to repeat on
+    every rerun.
+
+    Args:
+        jar_str: Path to Evolver's jar, as a string (cache keys must be hashable, and
+            st.cache_data hashes Path objects by identity, not by value).
+
+    Returns:
+        The registered problem names, sorted, or None if DescribeMain could not be run (e.g. Java
+        is not installed).
+    """
+    result = describe(WORKING_DIRECTORY, Path(jar_str))
+    return sorted(result.value["problems"]) if isinstance(result, Ok) else None

@@ -18,14 +18,17 @@ import streamlit as st
 import yaml
 
 from evolver_studio.adaptive_poll import AdaptivePollInterval
-from evolver_studio.app_state import require_evolver_jar, warn_if_jar_older_than_catalogue
+from evolver_studio.app_state import (
+    registered_problem_names,
+    require_evolver_jar,
+    warn_if_jar_older_than_catalogue,
+)
 from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
     RunState,
     RunStatus,
     cancel_training,
-    describe,
     read_pid,
     read_status,
     start_training,
@@ -44,7 +47,6 @@ from evolver_studio.request import (
     request_to_yaml,
 )
 from evolver_studio.resource_files import meta_optimizer_configuration_text, parameter_space_text
-from evolver_studio.result import Ok
 from evolver_studio.results import (
     deduplicate_consecutive_checkpoints,
     last_n_checkpoints,
@@ -482,26 +484,6 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
         return _render_guided_editor(default_text, f"{key_prefix}_form")
 
 
-@st.cache_data(show_spinner=False)
-def _cached_problem_names(jar_str: str) -> list[str] | None:
-    """Look up registered training problem names from Evolver's DescribeMain manifest.
-
-    Cached per jar for the session, since it launches a JVM subprocess — cheap
-    enough for one call, too slow to repeat on every rerun.
-
-    Args:
-        jar_str: Path to Evolver's jar, as a string (cache keys must be
-            hashable; st.cache_data hashes Path objects by identity, not by
-            value, so a plain string is used instead).
-
-    Returns:
-        The registered problem names, or None if DescribeMain could not be
-        run (e.g. Java is not installed).
-    """
-    result = describe(WORKING_DIRECTORY, Path(jar_str))
-    return sorted(result.value["problems"]) if isinstance(result, Ok) else None
-
-
 def _render_training_set_editor(jar: Path) -> pd.DataFrame:
     """Let the user define the training set as an editable table of rows.
 
@@ -516,7 +498,7 @@ def _render_training_set_editor(jar: Path) -> pd.DataFrame:
     Returns:
         The current (possibly user-edited) training set table.
     """
-    problem_names = _cached_problem_names(str(jar))
+    problem_names = registered_problem_names(str(jar))
     problem_help = (
         "A curated name (e.g. ZDT4, DTLZ3) or a fully-qualified jMetal class name for any "
         "other Problem<S> on the classpath (e.g. "
