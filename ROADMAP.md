@@ -75,6 +75,12 @@ below; revisit and reorder as real usage surfaces new ones.
   mirrors (`CATALOGUE_EVOLVER_VERSION`), and Explore and Training warn when the jar in use (its
   `pom.properties` version) is older.
 
+- **Moved to Evolver 2.2 (October 2026)**: the app downloads Evolver 2.2 and its resources come from
+  tag `v2.2` (DTLZ2-4 reference fronts regenerated as in jMetal, and DTLZ1Minus-DTLZ4Minus fronts
+  per number of objectives). Studio follows stable releases only, so the catalogue mirrors
+  `EVOLVER_VERSION`: the separate `CATALOGUE_EVOLVER_VERSION` is gone, and the "older jar" warning
+  only shows for an older jar set with `EVOLVER_JAR`.
+
 - **Explore split into four pages (October 2026)**: Base algorithms, Meta-optimizers, Quality
   indicators and Problems (a placeholder), instead of one long page. The algorithm pages open with
   nothing selected and show a space only once an algorithm is chosen; meta-optimizers use the same
@@ -96,13 +102,14 @@ below; revisit and reorder as real usage surfaces new ones.
   first available: reading the tree view, global and conditional sub-parameters, an interactive
   view of the parameters a configuration activates, and two encodings side by side.
   `tests/test_tutorials.py` walks through it with Streamlit's `AppTest`.
-- **No Evolver checkout needed to use the app**: the sidebar downloads Evolver 2.1's jar from Maven
-  Central (checksum-verified) into `lib/`; parameter spaces and meta-optimizer configurations are
-  read from the jar (`evolver_studio/resource_files.py`), and the reference fronts, weight vectors
-  and TSP instances are copied into `resources/` (MaF's fronts left out) from the release's GitHub
-  source archive by `make sync-resources`, with checksums `tests/test_resources.py` checks. Training runs use this repo's root as the JVM's working directory.
-  `EVOLVER_JAR` selects a locally built jar instead. Verified against the real jar: NSGA-II and
-  MOEA/D on ZDT4 and permutation NSGA-II on KroAB100TSP reach `FINISHED`.
+- **No Evolver checkout needed to use the app**: the sidebar downloads the Evolver release's jar
+  from Maven Central (checksum-verified) into `lib/`; parameter spaces and meta-optimizer
+  configurations are read from the jar (`evolver_studio/resource_files.py`), and the reference
+  fronts, weight vectors and TSP instances are copied into `resources/` (MaF's fronts left out) from
+  the release's GitHub source archive by `make sync-resources`, with checksums
+  `tests/test_resources.py` checks. Training runs use this repo's root as the JVM's working
+  directory. `EVOLVER_JAR` selects a locally built jar instead. Verified against the real jar:
+  NSGA-II and MOEA/D on ZDT4 and permutation NSGA-II on KroAB100TSP reach `FINISHED`.
 
 This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`, `get_run_status`,
 `cancel_run`, `get_results`).
@@ -143,14 +150,14 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
   `tests/test_explore_*.py`.)*
-- Track Evolver's releases: the app is built against Evolver 2.1 (`evolver_client.EVOLVER_VERSION`,
-  the first release that ships `cli.training`); moving to a newer release means bumping that
-  constant, running `make sync-resources` and re-running the drift-detection tests against it
-  (or, ahead of a release, against a `develop` jar set by `EVOLVER_JAR`). The rename from `cli.runner` to
-  `cli.training` and the `request.yaml` schema change already broke this integration once; the
-  two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
-  `BaseAlgorithmRegistryCompletenessTest`/`TrainingRunnerMetaBuilderCompletenessTest` in Evolver) and
-  Evolver's `DescribeMain` manifest (see "Done so far") both exist to catch the next one faster.
+- Track Evolver's releases: the app is built against Evolver 2.2 (`evolver_client.EVOLVER_VERSION`)
+  and follows stable releases only; moving to a newer release is the `/bump-evolver` command
+  (bumping that constant, `make sync-resources`, `/sync-catalogue` and the drift-detection tests).
+  Work against a `develop` jar set by `EVOLVER_JAR` goes on an `experiment/*` branch. The rename
+  from `cli.runner` to `cli.training` and the `request.yaml` schema change already broke this
+  integration once; the two-sided drift-detection mechanism (`tests/test_catalogue.py` here,
+  `BaseAlgorithmRegistryCompletenessTest`/`TrainingRunnerMetaBuilderCompletenessTest` in Evolver)
+  and Evolver's `DescribeMain` manifest (see "Done so far") both exist to catch the next one faster.
 - Fully populate `catalogue.py` from `DescribeMain`'s manifest instead of hand-maintained literals,
   for the subset it actually covers (registered/runnable algorithms) — the broader
   browsable-but-unregistered set (SMS-EMOA, RDE-MOEA, NSGA-III, PAES, SSMOEA, Async Genetic
