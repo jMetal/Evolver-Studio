@@ -6,6 +6,7 @@ tracked with a separate marker file in its run directory instead.
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 import yaml
@@ -14,6 +15,8 @@ from evolver_studio.evolver_client import RunState, is_alive, read_pid, read_sta
 
 CANCELLED_MARKER_NAME = "CANCELLED"
 RUNS_DIRECTORY_NAME = "cli-runner-runs"
+# Solve runs are kept apart: find_active_run would take one for a training run.
+SOLVE_RUNS_DIRECTORY_NAME = "solve-runs"
 
 
 @dataclass(slots=True, frozen=True)
@@ -91,3 +94,59 @@ def _active_run_in(run_dir: Path) -> ActiveRun | None:
         pid_file=pid_file,
         indicators_csv=run_dir.parent.parent / output_directory / "INDICATORS.csv",
     )
+
+
+class RunPhase(Enum):
+    """Where a run is, as far as its files and its process say."""
+
+    STARTING = "starting"
+    RUNNING = "running"
+    FINISHED = "finished"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    # The process is gone without the run having written a final status (it crashed, or never
+    # started): its log, if it has one, says why.
+    LOST = "lost"
+
+
+def run_phase(run_dir: Path) -> RunPhase:
+    """Tell where a run is.
+
+    A final status (FINISHED, FAILED) is trusted. Otherwise the run is in progress only if its
+    process is alive: no status yet means it is starting, and a dead process without a final
+    status means it was lost, rather than leaving a stale RUNNING forever.
+
+    Args:
+        run_dir: The run's directory, with its status file, PID file and cancellation marker.
+
+    Returns:
+        The run's phase.
+    """
+    if (run_dir / CANCELLED_MARKER_NAME).exists():
+        return RunPhase.CANCELLED
+    status = read_status(run_dir / "status.yaml")
+    if status is not None and status.state == RunState.FINISHED:
+        return RunPhase.FINISHED
+    if status is not None and status.state == RunState.FAILED:
+        return RunPhase.FAILED
+    pid = read_pid(run_dir / "pid.txt")
+    if pid is None or not is_alive(pid):
+        return RunPhase.LOST
+    return RunPhase.STARTING if status is None else RunPhase.RUNNING
+
+
+def find_run_in_progress(runs_directory: Path) -> Path | None:
+    """Find the most recent run that is starting or running.
+
+    Args:
+        runs_directory: The directory whose subdirectories are runs.
+
+    Returns:
+        The run's directory, or None if no run is in progress.
+    """
+    if not runs_directory.is_dir():
+        return None
+    for run_dir in sorted(runs_directory.iterdir(), reverse=True):
+        if run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            return run_dir
+    return None
