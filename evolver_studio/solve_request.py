@@ -28,6 +28,9 @@ class SolveRequest:
         number_of_independent_runs: How many independent runs.
         seed: The seed of the first run (run i uses seed + i - 1), or None to draw one at random.
         indicator_names: The quality indicators computed for each run; empty for none.
+        status_frequency: Every how many evaluations Evolver updates the status while a run is in
+            progress, or None to update it only when a run ends (Evolver 2.3 or later; older ones
+            ignore it). The more often, the slower the run.
         output_directory: Where the results are written.
     """
 
@@ -43,6 +46,7 @@ class SolveRequest:
     number_of_independent_runs: int
     seed: int | None
     indicator_names: list[str]
+    status_frequency: int | None
     output_directory: str
 
     def validation_errors(self) -> list[str]:
@@ -66,6 +70,8 @@ class SolveRequest:
             errors.append("The maximum number of evaluations must be positive.")
         if self.number_of_independent_runs < 1:
             errors.append("At least one run is needed.")
+        if self.status_frequency is not None and self.status_frequency < 1:
+            errors.append("The progress must be updated every one evaluation or more.")
         return errors
 
 
@@ -76,8 +82,9 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
         request: The request.
 
     Returns:
-        The YAML document text. `seed` and `referenceFrontFileName` are left out when unset, so
-        Evolver draws a seed and computes no indicators.
+        The YAML document text. `seed`, `referenceFrontFileName` and `statusFrequency` are left out
+        when unset, so Evolver draws a seed, computes no indicators and updates the status only
+        when a run ends.
     """
     data: dict = {
         "algorithmName": request.algorithm_name,
@@ -95,5 +102,7 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
     if request.seed is not None:
         data["seed"] = request.seed
     data["indicatorNames"] = request.indicator_names
+    if request.status_frequency is not None:
+        data["statusFrequency"] = request.status_frequency
     data["outputDirectory"] = request.output_directory
     return yaml.safe_dump(data, sort_keys=False)

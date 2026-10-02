@@ -46,6 +46,22 @@ class SolveRunInfo:
     request: dict
 
 
+def read_request(run_dir: Path) -> dict | None:
+    """Read the request a run was started with.
+
+    Args:
+        run_dir: A solve run's directory.
+
+    Returns:
+        The request file's content, or None if it is missing or unreadable.
+    """
+    try:
+        request = yaml.safe_load((run_dir / "request.yaml").read_text())
+    except (OSError, yaml.YAMLError):
+        return None
+    return request if isinstance(request, dict) else None
+
+
 def read_run_fronts(output_directory: Path) -> dict[int, pd.DataFrame]:
     """Read the front each independent run found.
 
