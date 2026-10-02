@@ -19,9 +19,9 @@ It serves two purposes:
 - **Meta-optimization**: launch and monitor training runs, then analyze and validate the
   configurations they find.
 
-> **Status:** early development (v0.1.0). Exploring parameter spaces, launching and monitoring
-> training runs, and the first tutorial are available; the solving, analysis and validation pages
-> are planned. See [ROADMAP.md](ROADMAP.md).
+> **Status:** early development, heading to 0.1.0 (see [CHANGELOG.md](CHANGELOG.md)). Exploring
+> parameter spaces, launching and monitoring training runs, and the first tutorial are available; the
+> solving, analysis and validation pages are planned. See [ROADMAP.md](ROADMAP.md).
 
 ## How it works
 
@@ -96,6 +96,12 @@ Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **
 first release that includes the `cli.training` command-line runner) from Maven Central. Other
 versions are not supported; the expected version is set by `EVOLVER_VERSION` in
 `evolver_studio/evolver_client.py`.
+
+Evolver-Studio is versioned on its own, and works with one Evolver release at a time:
+
+| Evolver-Studio | Evolver |
+|---|---|
+| 0.1.0 (in development) | 2.2 |
 
 ## Installation
 
