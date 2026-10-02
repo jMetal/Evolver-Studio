@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio import tutorial_parameter_spaces
+from evolver_studio import tutorial_parameter_spaces, tutorial_solving
 from evolver_studio.app_state import render_sidebar, require_evolver_jar
 from evolver_studio.tutorials import (
     TUTORIALS,
@@ -15,7 +15,10 @@ from evolver_studio.tutorials import (
 )
 
 # Steps of every tutorial with content in this app, by id (see Tutorial.available).
-TUTORIAL_STEPS = {"S2": tutorial_parameter_spaces.STEPS}
+TUTORIAL_STEPS = {
+    "S2": tutorial_parameter_spaces.STEPS,
+    "S3": tutorial_solving.STEPS,
+}
 SELECTED_KEY = "tutorial_selected"
 STEP_KEY = "tutorial_step"
 

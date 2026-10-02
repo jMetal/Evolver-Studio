@@ -89,6 +89,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
         "Solving",
         "Pick a problem, an algorithm and a configuration, run it and inspect the front.",
         ("E2",),
+        available=True,
     ),
     Tutorial(
         "S4",
