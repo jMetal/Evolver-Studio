@@ -14,7 +14,7 @@ class Page:
     """A page of the app.
 
     Attributes:
-        path: Its script, relative to the app's root (e.g. "pages/explore.py").
+        path: Its script, relative to the app's root (e.g. "pages/training.py").
         title: Its title in the menu and on its card.
         icon: Its icon in the menu and on its card.
         description: What it does, for its card on the home page.
@@ -46,12 +46,35 @@ SECTIONS = (
         "Explore",
         (
             Page(
-                "pages/explore.py",
-                "Explore",
-                "🔍",
-                "Browse the parameter space of every configurable algorithm, and the encodings "
-                "and operators of each meta-optimizer.",
+                "pages/explore_base_algorithms.py",
+                "Base algorithms",
+                "🧬",
+                "Browse the parameter space of every configurable algorithm, for each encoding, "
+                "and see which ones can be run from the app.",
                 available=True,
+            ),
+            Page(
+                "pages/explore_meta_optimizers.py",
+                "Meta-optimizers",
+                "🎛️",
+                "See the encodings each meta-optimizer supports and the operators it can be "
+                "configured with.",
+                available=True,
+            ),
+            Page(
+                "pages/explore_quality_indicators.py",
+                "Quality indicators",
+                "📏",
+                "The quality indicators a training run can minimize, and what each one measures.",
+                available=True,
+            ),
+            Page(
+                "pages/explore_problems.py",
+                "Problems",
+                "🧩",
+                "The benchmark and real-world problems available for training and solving, with "
+                "their objectives, variables and reference fronts.",
+                available=False,
             ),
         ),
     ),

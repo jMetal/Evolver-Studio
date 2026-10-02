@@ -165,18 +165,18 @@ def _render_encodings(jar: Path) -> None:
 def _render_next_steps(jar: Path) -> None:
     st.markdown(
         "You now know how to read a parameter space. Keep exploring on your own in the Explore "
-        "page, which shows each space as a table: one row per parameter, indented under the "
+        "pages, which show each space as a table: one row per parameter, indented under the "
         "parameter it hangs from, with an *Active if* column for the condition that activates it "
         "and a filter to find parameters by name or value:\n\n"
-        "- Open **MOEA/D** with the Double encoding. Which top-level parameters does it add to "
-        "those of NSGA-II?\n"
+        "- In **Base algorithms**, open **MOEA/D** with the Double encoding. Which top-level "
+        "parameters does it add to those of NSGA-II?\n"
         "- Open **NSGA-II** with the Permutation encoding. Which operators does it offer?\n"
-        "- Scroll down to the **meta-optimization algorithms**: NSGA-II, AGE-MOEA and "
-        "AsyncNSGA-II have their own parameter spaces too, one for each encoding they support."
-        "\n\n"
+        "- In **Meta-optimizers**, NSGA-II, AGE-MOEA and AsyncNSGA-II have their own parameter "
+        "spaces too, one for each encoding they support.\n\n"
         f"For the same concepts with Java code, see Evolver's tutorial [E1]({E1_TUTORIAL_URL})."
     )
-    st.page_link("pages/explore.py", label="Go to the Explore page", icon="🔍")
+    st.page_link("pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬")
+    st.page_link("pages/explore_meta_optimizers.py", label="Explore the meta-optimizers", icon="🎛️")
 
 
 def _find(parameters: list[ParameterSpec], name: str) -> CategoricalParameter:
