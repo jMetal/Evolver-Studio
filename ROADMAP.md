@@ -112,8 +112,13 @@ below; revisit and reorder as real usage surfaces new ones.
   guides the selected one step by step. **S2, "Exploring a parameter space"**
   (`evolver_studio/tutorial_parameter_spaces.py`), the companion of Evolver's tutorial E1, is the
   first available: reading the tree view, global and conditional sub-parameters, an interactive
-  view of the parameters a configuration activates, and two encodings side by side.
-  `tests/test_tutorials.py` walks through it with Streamlit's `AppTest`.
+  view of the parameters a configuration activates, and two encodings side by side; its version 1.1
+  reads the spaces in the table of the Explore pages and ends with the meta-optimizers and the
+  quality indicators. **S3, "Solving a problem with a configurable algorithm"**
+  (`evolver_studio/tutorial_solving.py`), the companion of E2, is the first of the solving track:
+  each step has a prepared run (`PreparedRun`: fixed seed, the values the text announces) that runs
+  in the tutorial or opens in Run algorithm. `tests/test_tutorials.py` and
+  `tests/test_tutorial_solving.py` walk through them with Streamlit's `AppTest`.
 - **No Evolver checkout needed to use the app**: the sidebar downloads the Evolver release's jar
   from Maven Central (checksum-verified) into `lib/`; parameter spaces and meta-optimizer
   configurations are read from the jar (`evolver_studio/resource_files.py`), and the reference
