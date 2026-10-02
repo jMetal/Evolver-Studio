@@ -3,6 +3,7 @@
 import hashlib
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -14,10 +15,12 @@ from evolver_studio.evolver_client import (
     RunState,
     cancel_training,
     download_jar,
+    is_alive,
     is_jar_overridden,
     jar_path,
     read_pid,
     read_status,
+    start_solve,
     write_pid_file,
 )
 from evolver_studio.result import Err, Ok
@@ -222,3 +225,73 @@ class TestCancelTraining:
 
         # Assert
         assert isinstance(result, Ok)
+
+
+class TestStartSolve:
+    @pytest.fixture
+    def launched(self, monkeypatch: pytest.MonkeyPatch) -> list:
+        """Replace the JVM by a Python process that prints a line, recording how it was started."""
+        calls = []
+        real_popen = subprocess.Popen
+
+        def fake_popen(command, **keywords):
+            calls.append((command, keywords))
+            return real_popen([sys.executable, "-c", "print('from the runner')"], **keywords)
+
+        monkeypatch.setattr(subprocess, "Popen", fake_popen)
+        return calls
+
+    def test_should_launch_the_solve_runner_with_the_request_and_status_files(
+        self, tmp_path: Path, launched: list
+    ):
+        # Act
+        process = start_solve(
+            tmp_path,
+            Path("evolver.jar"),
+            tmp_path / "r.yaml",
+            tmp_path / "s.yaml",
+            tmp_path / "log",
+        )
+        process.wait()
+
+        # Assert
+        command, keywords = launched[0]
+        assert command == [
+            "java",
+            "-cp",
+            "evolver.jar",
+            "org.uma.evolver.cli.solving.SolveRunnerMain",
+            str(tmp_path / "r.yaml"),
+            str(tmp_path / "s.yaml"),
+        ]
+        assert keywords["cwd"] == tmp_path
+
+    def test_should_write_the_runners_output_to_the_log_file(self, tmp_path: Path, launched: list):
+        # Arrange
+        log_file = tmp_path / "runner.log"
+
+        # Act
+        process = start_solve(
+            tmp_path, Path("evolver.jar"), tmp_path / "r.yaml", tmp_path / "s.yaml", log_file
+        )
+        process.wait()
+
+        # Assert
+        assert log_file.read_text().strip() == "from the runner"
+
+    def test_should_reap_the_process_when_it_ends(self, tmp_path: Path, launched: list):
+        """An unreaped child stays a zombie, which os.kill(pid, 0) still reports as alive."""
+        # Act
+        process = start_solve(
+            tmp_path,
+            Path("evolver.jar"),
+            tmp_path / "r.yaml",
+            tmp_path / "s.yaml",
+            tmp_path / "log",
+        )
+        deadline = time.monotonic() + 10
+        while is_alive(process.pid) and time.monotonic() < deadline:
+            time.sleep(0.05)
+
+        # Assert
+        assert not is_alive(process.pid)

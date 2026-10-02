@@ -4,8 +4,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from evolver_studio.evolver_client import write_pid_file
-from evolver_studio.runs import find_active_run, mark_cancelled
+from evolver_studio.runs import (
+    RunPhase,
+    find_active_run,
+    find_run_in_progress,
+    mark_cancelled,
+    run_phase,
+)
 
 STATUS_RUNNING = (
     "status: RUNNING\nevaluationsDone: 10\nmaxEvaluations: 100\nupdatedAt: '2026-01-01'\n"
@@ -105,3 +113,114 @@ class TestFindActiveRun:
 
         # Assert
         assert active_run.run_id == "20260101-010000"
+
+
+def _live_process() -> subprocess.Popen:
+    return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+
+
+def _dead_pid() -> int:
+    process = subprocess.Popen([sys.executable, "-c", "pass"])
+    process.wait()
+    return process.pid
+
+
+def _solve_run(runs: Path, run_id: str, status_text: str | None, pid: int | None) -> Path:
+    run_dir = runs / run_id
+    run_dir.mkdir(parents=True)
+    if status_text is not None:
+        (run_dir / "status.yaml").write_text(status_text)
+    if pid is not None:
+        write_pid_file(run_dir / "pid.txt", pid)
+    return run_dir
+
+
+class TestRunPhase:
+    def test_should_trust_a_final_status(self, tmp_path: Path):
+        # Arrange
+        finished = _solve_run(tmp_path, "a", STATUS_FINISHED, _dead_pid())
+        failed = _solve_run(
+            tmp_path,
+            "b",
+            "status: FAILED\nevaluationsDone: 0\nmaxEvaluations: 10\nupdatedAt: x\n",
+            _dead_pid(),
+        )
+
+        # Act / Assert
+        assert run_phase(finished) is RunPhase.FINISHED
+        assert run_phase(failed) is RunPhase.FAILED
+
+    def test_should_say_a_run_with_a_live_process_and_no_status_is_starting(self, tmp_path: Path):
+        # Arrange
+        process = _live_process()
+        try:
+            run_dir = _solve_run(tmp_path, "a", None, process.pid)
+
+            # Act / Assert
+            assert run_phase(run_dir) is RunPhase.STARTING
+        finally:
+            process.kill()
+            process.wait()
+
+    def test_should_say_a_run_with_a_live_process_and_a_running_status_is_running(
+        self, tmp_path: Path
+    ):
+        # Arrange
+        process = _live_process()
+        try:
+            run_dir = _solve_run(tmp_path, "a", STATUS_RUNNING, process.pid)
+
+            # Act / Assert
+            assert run_phase(run_dir) is RunPhase.RUNNING
+        finally:
+            process.kill()
+            process.wait()
+
+    @pytest.mark.parametrize("status_text", [None, STATUS_RUNNING])
+    def test_should_say_a_run_whose_process_is_gone_without_a_final_status_is_lost(
+        self, tmp_path: Path, status_text: str | None
+    ):
+        # Arrange
+        run_dir = _solve_run(tmp_path, "a", status_text, _dead_pid())
+
+        # Act / Assert
+        assert run_phase(run_dir) is RunPhase.LOST
+
+    def test_should_say_a_cancelled_run_is_cancelled(self, tmp_path: Path):
+        # Arrange
+        process = _live_process()
+        try:
+            run_dir = _solve_run(tmp_path, "a", STATUS_RUNNING, process.pid)
+            mark_cancelled(run_dir)
+
+            # Act / Assert
+            assert run_phase(run_dir) is RunPhase.CANCELLED
+        finally:
+            process.kill()
+            process.wait()
+
+
+class TestFindRunInProgress:
+    def test_should_find_the_most_recent_run_in_progress(self, tmp_path: Path):
+        # Arrange
+        process = _live_process()
+        try:
+            _solve_run(tmp_path, "20260101-000000", STATUS_FINISHED, _dead_pid())
+            running = _solve_run(tmp_path, "20260102-000000", STATUS_RUNNING, process.pid)
+            _solve_run(tmp_path, "20260103-000000", STATUS_RUNNING, _dead_pid())
+
+            # Act / Assert
+            assert find_run_in_progress(tmp_path) == running
+        finally:
+            process.kill()
+            process.wait()
+
+    def test_should_find_nothing_when_no_run_is_in_progress_or_there_is_no_directory(
+        self, tmp_path: Path
+    ):
+        # Arrange
+        _solve_run(tmp_path, "20260101-000000", STATUS_FINISHED, _dead_pid())
+
+        # Act / Assert
+        assert find_run_in_progress(tmp_path) is None
+        assert find_run_in_progress(tmp_path / "missing") is None
