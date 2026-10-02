@@ -10,3 +10,6 @@ dist/
 /lib/
 /cli-runner-runs/
 /results/
+
+# IDE
+.idea/
