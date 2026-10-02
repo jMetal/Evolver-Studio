@@ -139,7 +139,7 @@ def modified_values(
     return [
         name
         for name in active_parameter_names(parameters, dict(values))
-        if name not in reference or not _same_value(values[name], reference[name])
+        if name not in reference or not same_value(values[name], reference[name])
     ]
 
 
@@ -163,7 +163,16 @@ def _allowed(parameter: ParameterSpec, value: str) -> bool:
     return number is not None and parameter.lower_bound <= number <= parameter.upper_bound
 
 
-def _same_value(first: str, second: str) -> bool:
+def same_value(first: str, second: str) -> bool:
+    """Tell whether two configuration values are the same: numbers as numbers ("0.9" is "0.90").
+
+    Args:
+        first: A value.
+        second: Another value.
+
+    Returns:
+        Whether they are equal.
+    """
     first_number, second_number = _as_number(first), _as_number(second)
     if first_number is not None and second_number is not None:
         return math.isclose(first_number, second_number)
