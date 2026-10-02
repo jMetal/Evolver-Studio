@@ -600,7 +600,7 @@ else:
     )
 
     extra_config = None
-    if algorithm.name == "MOEA/D":
+    if "weightVectorFilesDirectory" in algorithm.required_extra_config_keys:
         weight_vectors_directory = st.text_input(
             "Weight vector files directory", "resources/weightVectors"
         )

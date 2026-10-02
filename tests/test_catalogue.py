@@ -42,13 +42,25 @@ class TestBaseAlgorithms:
         # Act / Assert
         assert all(algorithm.encodings for algorithm in BASE_ALGORITHMS)
 
-    def test_should_mark_only_nsgaii_and_moead_as_runnable_today(self):
-        """BaseAlgorithmRegistry in cli.runner only resolves these two names."""
+    def test_should_mark_only_nsgaii_moead_and_rvea_as_runnable_today(self):
+        """BaseAlgorithmRegistry in cli.training only resolves these three names."""
         # Act
         runnable = {a.name for a in BASE_ALGORITHMS if a.runnable_today}
 
         # Assert
-        assert runnable == {"NSGA-II", "MOEA/D"}
+        assert runnable == {"NSGA-II", "MOEA/D", "RVEA"}
+
+    def test_should_ask_for_weight_vectors_only_for_moead_and_rvea(self):
+        """Both read their weight vectors from files, so both need the directory."""
+        # Act
+        needing = {
+            a.name
+            for a in BASE_ALGORITHMS
+            if "weightVectorFilesDirectory" in a.required_extra_config_keys
+        }
+
+        # Assert
+        assert needing == {"MOEA/D", "RVEA"}
 
     def test_should_set_registry_name_and_runnable_encodings_iff_runnable_today(self):
         """A runnable algorithm needs both to build a request; a non-runnable one needs neither."""
@@ -118,15 +130,15 @@ class TestMetaAlgorithms:
         # Assert
         assert wired == {"NSGA-II", "AGE-MOEA", "SPEA2", "SMPSO", "AsyncNSGA-II", "RandomSearch"}
 
-    def test_should_mark_nsgaii_agemoea_and_random_search_as_supporting_tree_among_wired(self):
-        """MetaAlgorithmRegistry.validateTreeAlgorithm accepts exactly these three."""
+    def test_should_mark_four_wired_meta_algorithms_as_supporting_tree(self):
+        """MetaAlgorithmRegistry.validateTreeAlgorithm accepts exactly these four."""
         # Act
         tree_wired = {
             a.name for a in META_ALGORITHMS if a.wired_into_cli_runner and a.supports_tree
         }
 
         # Assert
-        assert tree_wired == {"NSGA-II", "AGE-MOEA", "RandomSearch"}
+        assert tree_wired == {"NSGA-II", "AGE-MOEA", "AsyncNSGA-II", "RandomSearch"}
 
     def test_should_have_a_tree_operator_catalogue_only_when_tree_is_supported(self):
         """A tree operator catalogue on a flat-only algorithm would never be used."""
@@ -260,3 +272,22 @@ class TestCatalogueMatchesDescribeManifest:
 
         # Assert
         assert manifest_names == runnable_names
+
+    def test_should_match_the_manifest_extra_config_keys_of_every_runnable_base_algorithm(self):
+        """required_extra_config_keys must agree with each manifest's requiredExtraConfigKeys."""
+        manifest = self._manifest()
+        if manifest is None:
+            pytest.skip(f"Evolver jar not found at {jar_path()}")
+
+        # Arrange
+        manifest_keys = {
+            a["name"]: set(a["requiredExtraConfigKeys"]) for a in manifest["baseAlgorithms"]
+        }
+        catalogue_keys = {
+            a.registry_name: set(a.required_extra_config_keys)
+            for a in BASE_ALGORITHMS
+            if a.runnable_today
+        }
+
+        # Assert
+        assert catalogue_keys == manifest_keys

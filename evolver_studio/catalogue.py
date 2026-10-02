@@ -15,8 +15,8 @@ parameter spaces packaged in Evolver's jar.
 `runnable_today`/`wired_into_cli_runner` distinguish "Evolver-Studio can browse this algorithm's
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can
 actually launch a training run with it" (true only where org.uma.evolver.cli.training already
-supports it: NSGA-II/MOEA-D as base algorithms; NSGA-II/AGE-MOEA/SPEA2/SMPSO/AsyncNSGA-II/
-RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/RandomSearch for tree).
+supports it: NSGA-II/MOEA-D/RVEA as base algorithms; NSGA-II/AGE-MOEA/SPEA2/SMPSO/AsyncNSGA-II/
+RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/RandomSearch for tree).
 """
 
 from dataclasses import dataclass
@@ -41,6 +41,10 @@ class BaseAlgorithm:
             any other key in `encodings` is browsable only, not launchable, even
             though the algorithm itself is `runnable_today`. Empty when
             `runnable_today` is False.
+        required_extra_config_keys: The extra configuration entries
+            BaseAlgorithmRegistry needs to build it (its manifest's
+            requiredExtraConfigKeys), e.g. "weightVectorFilesDirectory" for
+            the decomposition-based ones. Empty when it needs none.
     """
 
     name: str
@@ -48,6 +52,7 @@ class BaseAlgorithm:
     runnable_today: bool
     registry_name: str | None = None
     runnable_encodings: tuple[str, ...] = ()
+    required_extra_config_keys: tuple[str, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)
@@ -122,6 +127,7 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         runnable_today=True,
         registry_name="MOEAD",
         runnable_encodings=("Double",),
+        required_extra_config_keys=("weightVectorFilesDirectory",),
     ),
     # org.uma.evolver.algorithm.smsemoa.{Double,Binary,Permutation}SMSEMOA
     BaseAlgorithm(
@@ -144,7 +150,14 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         name="AGE-MOEA", encodings={"Double": "AGEMOEADouble.yaml"}, runnable_today=False
     ),
     # org.uma.evolver.algorithm.rvea.DoubleRVEA (Double only)
-    BaseAlgorithm(name="RVEA", encodings={"Double": "RVEADouble.yaml"}, runnable_today=False),
+    BaseAlgorithm(
+        name="RVEA",
+        encodings={"Double": "RVEADouble.yaml"},
+        runnable_today=True,
+        registry_name="RVEA",
+        runnable_encodings=("Double",),
+        required_extra_config_keys=("weightVectorFilesDirectory",),
+    ),
     # org.uma.evolver.algorithm.mopso.BaseMOPSO (Double only, particle swarm)
     BaseAlgorithm(name="MOPSO", encodings={"Double": "MOPSO.yaml"}, runnable_today=False),
     # org.uma.evolver.algorithm.nsgaiii.DoubleNSGAIII (Double only)
@@ -185,10 +198,8 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         "AGEMOEAMetaDouble.yaml",
         "AGEMOEAMetaTree.yaml",
         "AsyncNSGAIIMetaDouble.yaml",
+        "AsyncNSGAIIMetaTree.yaml",
         "SPEA2MetaDouble.yaml",
-        # irace's own text format (see org.uma.evolver.irace.generator), not Evolver's YAML schema.
-        "NSGAIIDouble.irace",
-        "MOEADouble.irace",
     }
 )
 
@@ -280,12 +291,13 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         example_config_file="MetaSMPSOFlatConfiguration.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("AsyncNSGA-II") — built via
-    # MetaAsyncNSGAIIBuilder, which hardcodes its own selection/replacement; only its
-    # crossover/mutation operators are configurable, via a much smaller parameter space.
+    # MetaAsyncNSGAIIBuilder (flat) and on DerivationTreeSolution (tree), hardcoding its own
+    # selection/replacement; only its crossover/mutation operators are configurable, via a much
+    # smaller parameter space (fixed to subtree/tree for the tree encoding).
     MetaAlgorithm(
         name="AsyncNSGA-II",
         supports_flat=True,
-        supports_tree=False,
+        supports_tree=True,
         flat_parameters=(
             "populationSize",
             "maxEvaluations",
@@ -293,10 +305,11 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
             "crossover",
             "mutation",
         ),
-        tree_parameters=(),
+        tree_parameters=tuple(p for p in _TREE_NSGAII_PARAMETERS if p != "selection"),
         wired_into_cli_runner=True,
         example_config_file="MetaAsyncNSGAIIFlatConfiguration.yaml",
         operator_parameter_space_file="AsyncNSGAIIMetaDouble.yaml",
+        tree_operator_parameter_space_file="AsyncNSGAIIMetaTree.yaml",
     ),
     # org.uma.evolver.meta.builder.MetaAsyncGeneticAlgorithmBuilder
     MetaAlgorithm(
