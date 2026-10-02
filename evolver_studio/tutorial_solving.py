@@ -39,6 +39,7 @@ from evolver_studio.solve_results import (
     variable_columns,
     zip_fronts,
 )
+from evolver_studio.tutorial_navigation import open_tutorial
 from evolver_studio.tutorials import TutorialStep
 
 E2_TUTORIAL_URL = (
@@ -638,7 +639,13 @@ def _render_next_steps(jar: Path) -> None:
         "later tutorials."
     )
     st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
-    st.page_link("pages/tutorials.py", label="All the tutorials", icon="🎓")
+    st.button(
+        "All the tutorials",
+        icon="🎓",
+        on_click=open_tutorial,
+        args=(None,),
+        key=f"{KEY_PREFIX}_all_tutorials",
+    )
 
 
 STEPS: tuple[TutorialStep, ...] = (

@@ -6,6 +6,12 @@ import streamlit as st
 
 from evolver_studio import tutorial_parameter_spaces, tutorial_solving
 from evolver_studio.app_state import render_sidebar, require_evolver_jar
+from evolver_studio.tutorial_navigation import (
+    SELECTED_KEY,
+    STEP_KEY,
+    go_to_step,
+    open_tutorial,
+)
 from evolver_studio.tutorials import (
     TUTORIALS,
     TUTORIALS_CATALOGUE_URL,
@@ -19,13 +25,6 @@ TUTORIAL_STEPS = {
     "S2": tutorial_parameter_spaces.STEPS,
     "S3": tutorial_solving.STEPS,
 }
-SELECTED_KEY = "tutorial_selected"
-STEP_KEY = "tutorial_step"
-
-
-def _open(tutorial_id: str | None) -> None:
-    st.session_state[SELECTED_KEY] = tutorial_id
-    st.session_state[STEP_KEY] = 0
 
 
 def _render_catalogue() -> None:
@@ -50,7 +49,7 @@ def _render_catalogue_entry(tutorial: Tutorial) -> None:
             "Start" if tutorial.available else "Coming soon",
             key=f"tutorial_open_{tutorial.tutorial_id}",
             disabled=not tutorial.available,
-            on_click=_open,
+            on_click=open_tutorial,
             args=(tutorial.tutorial_id,),
         )
 
@@ -58,18 +57,16 @@ def _render_catalogue_entry(tutorial: Tutorial) -> None:
 def _render_tutorial(tutorial: Tutorial, jar: Path) -> None:
     steps = TUTORIAL_STEPS[tutorial.tutorial_id]
     step = st.session_state.get(STEP_KEY, 0)
-    st.button("← All tutorials", on_click=_open, args=(None,))
+    st.button("← All tutorials", on_click=open_tutorial, args=(None,))
     st.header(f"{tutorial.tutorial_id}. {tutorial.title}")
     st.progress((step + 1) / len(steps), text=f"Step {step + 1} of {len(steps)}")
     st.subheader(steps[step].title)
     steps[step].render(jar)
     previous_column, next_column = st.columns(2)
-    previous_column.button("← Previous", disabled=step == 0, on_click=_go_to, args=(step - 1,))
-    next_column.button("Next →", disabled=step == len(steps) - 1, on_click=_go_to, args=(step + 1,))
-
-
-def _go_to(step: int) -> None:
-    st.session_state[STEP_KEY] = step
+    previous_column.button("← Previous", disabled=step == 0, on_click=go_to_step, args=(step - 1,))
+    next_column.button(
+        "Next →", disabled=step == len(steps) - 1, on_click=go_to_step, args=(step + 1,)
+    )
 
 
 st.title("Tutorials")

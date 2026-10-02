@@ -26,6 +26,7 @@ from evolver_studio.parameter_space import (
     parse_parameter_space,
 )
 from evolver_studio.resource_files import parameter_space_text
+from evolver_studio.tutorial_navigation import open_tutorial
 from evolver_studio.tutorials import TutorialStep
 
 E1_TUTORIAL_URL = (
@@ -251,7 +252,13 @@ def _render_next_steps(jar: Path) -> None:
     st.page_link(
         "pages/explore_quality_indicators.py", label="See the quality indicators", icon="📏"
     )
-    st.page_link("pages/tutorials.py", label="All the tutorials", icon="🎓")
+    st.button(
+        "All the tutorials",
+        icon="🎓",
+        on_click=open_tutorial,
+        args=(None,),
+        key=f"{KEY_PREFIX}_all_tutorials",
+    )
 
 
 def _find(parameters: list[ParameterSpec], name: str) -> CategoricalParameter:
