@@ -189,6 +189,35 @@ class TestRunInProgress:
             process.wait()
 
 
+class TestSolutions:
+    def test_should_list_the_solutions_of_a_run_and_filter_them(self, app: AppTest, tmp_path: Path):
+        # Arrange: a finished run with a front in a known place
+        _choose_zdt1_and_nsgaii(app)
+        app.number_input(key="solve_evaluations").set_value(500).run()
+        next(button for button in app.button if button.label == "Run").click().run()
+        run_dir = next((tmp_path / "solve-runs").iterdir())
+        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
+        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the run did not finish"
+            time.sleep(0.2)
+        app.run()
+        app.selectbox(key="solve_history").select(run_dir.name).run()
+        table = next(frame for frame in app.dataframe if "x1" in frame.value.columns)
+        total = len(table.value)
+
+        # Act: restrict the first objective to its lower half
+        slider = app.slider(key=f"solve_filter_{run_dir.name}_1_f1")
+        lower, upper = slider.value
+        slider.set_value((lower, (lower + upper) / 2)).run()
+
+        # Assert
+        shown = next(frame for frame in app.dataframe if "x1" in frame.value.columns)
+        assert 0 < len(shown.value) < total
+        assert shown.value["f1"].max() <= (lower + upper) / 2
+        assert any(f"{len(shown.value)} of {total} solutions" in c.value for c in app.caption)
+        assert len(app.get("download_button")) == 3  # the table, the request and the zip
+
+
 class TestRepeatARun:
     def test_should_fill_the_form_with_a_past_run_and_offer_its_request(
         self, app: AppTest, tmp_path: Path
@@ -220,7 +249,7 @@ class TestRepeatARun:
         assert app.selectbox(key="solve_problem").value == "ZDT1"
         assert "--crossover blxAlpha" in app.code[0].value
         assert "--blxAlphaCrossoverAlpha" in app.code[0].value
-        assert len(app.get("download_button")) == 2  # the request, and the zip
+        assert len(app.get("download_button")) == 3  # the table, the request and the zip
 
 
 class TestRun:
@@ -244,6 +273,6 @@ class TestRun:
         assert not app.exception
         assert app.selectbox(key="solve_problem").value == "ZDT1"  # the form kept its choices
         assert run_phase(run_dir) is RunPhase.FINISHED
-        assert [tab.label for tab in app.tabs] == ["Front", "Indicators", "Details"]
-        assert len(app.dataframe) == 2  # the runs' indicators, and their summary
+        assert [tab.label for tab in app.tabs] == ["Front", "Indicators", "Solutions", "Details"]
+        assert len(app.dataframe) == 3  # the indicators, their summary, and the solutions
         assert (run_dir / "output" / "run-2" / "FUN.csv").is_file()

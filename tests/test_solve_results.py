@@ -9,11 +9,16 @@ import pytest
 
 from evolver_studio.evolver_client import RunState
 from evolver_studio.solve_results import (
+    filter_by_objectives,
     indicator_summary,
+    is_permutation,
     list_solve_runs,
+    objective_columns,
     read_front,
     read_indicators,
     read_run_fronts,
+    read_solutions,
+    variable_columns,
     zip_fronts,
 )
 
@@ -66,6 +71,71 @@ class TestReadRunFronts:
 
         # Act / Assert
         assert list(read_front(file).columns) == ["f1", "f2", "f3"]
+
+
+class TestReadSolutions:
+    def test_should_join_the_objectives_and_the_variables_of_each_solution(self, output: Path):
+        # Arrange: the fixture's VAR files have one solution row each, FUN files two and one
+        (output / "run-1" / "VAR.csv").write_text("0.1,0.2,0.3\n0.4,0.5,0.6\n")
+
+        # Act
+        solutions = read_solutions(output, 1)
+
+        # Assert
+        assert list(solutions.columns) == ["f1", "f2", "x1", "x2", "x3"]
+        assert objective_columns(solutions) == ["f1", "f2"]
+        assert variable_columns(solutions) == ["x1", "x2", "x3"]
+        assert solutions.loc[1, "x1"] == 0.4
+
+    def test_should_give_only_the_objectives_when_the_run_has_no_variables_file(self, output: Path):
+        # Arrange
+        (output / "run-2" / "VAR.csv").unlink()
+
+        # Act
+        solutions = read_solutions(output, 2)
+
+        # Assert
+        assert list(solutions.columns) == ["f1", "f2"]
+
+
+class TestFilterByObjectives:
+    @staticmethod
+    def _solutions() -> pd.DataFrame:
+        return pd.DataFrame({"f1": [0.0, 0.5, 1.0], "f2": [1.0, 0.5, 0.0], "x1": [9, 8, 7]})
+
+    def test_should_keep_the_solutions_inside_every_range_with_their_index(self):
+        # Act
+        kept = filter_by_objectives(self._solutions(), {"f1": (0.4, 1.0), "f2": (0.0, 0.5)})
+
+        # Assert
+        assert list(kept.index) == [1, 2]
+
+    def test_should_keep_everything_without_ranges(self):
+        # Act / Assert
+        assert len(filter_by_objectives(self._solutions(), {})) == 3
+
+    def test_should_include_the_bounds(self):
+        # Act
+        kept = filter_by_objectives(self._solutions(), {"f1": (0.5, 0.5)})
+
+        # Assert
+        assert list(kept.index) == [1]
+
+
+class TestIsPermutation:
+    @pytest.mark.parametrize(
+        ("values", "expected"),
+        [
+            ([2, 0, 1], True),
+            ([2.0, 0.0, 1.0], True),
+            ([1, 2, 3], False),
+            ([0, 0, 1], False),
+            ([0.5, 1.5, 2.5], False),
+        ],
+    )
+    def test_should_tell_a_permutation_of_zero_to_n_minus_one(self, values: list, expected: bool):
+        # Act / Assert
+        assert is_permutation(pd.Series(values)) is expected
 
 
 class TestIndicators:
