@@ -8,6 +8,7 @@ from evolver_studio.catalogue import (
     BASE_ALGORITHMS,
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
+    QUALITY_INDICATORS,
     is_older_than_catalogue,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
@@ -147,6 +148,18 @@ class TestMetaAlgorithms:
         assert all(
             a.supports_tree or a.tree_operator_parameter_space_file is None for a in META_ALGORITHMS
         )
+
+
+class TestQualityIndicators:
+    def test_should_have_unique_registry_and_short_names(self):
+        """Two entries with the same name would make the indicators page ambiguous."""
+        # Act
+        registry_names = [indicator.registry_name for indicator in QUALITY_INDICATORS]
+        short_names = [indicator.short_name for indicator in QUALITY_INDICATORS]
+
+        # Assert
+        assert len(registry_names) == len(set(registry_names))
+        assert len(short_names) == len(set(short_names))
 
 
 class TestIsOlderThanCatalogue:
@@ -307,3 +320,15 @@ class TestCatalogueMatchesDescribeManifest:
 
         # Assert
         assert catalogue_keys == manifest_keys
+
+    def test_should_have_an_indicator_entry_for_every_manifest_indicator(self):
+        """QUALITY_INDICATORS must list exactly what IndicatorRegistry registers."""
+        manifest = self._manifest()
+        if manifest is None:
+            pytest.skip(f"Evolver jar not found at {jar_path()}")
+
+        # Arrange
+        catalogue_names = {indicator.registry_name for indicator in QUALITY_INDICATORS}
+
+        # Assert
+        assert catalogue_names == set(manifest["indicators"])

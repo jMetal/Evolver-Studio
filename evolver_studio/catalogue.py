@@ -347,6 +347,63 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
 )
 
 
+@dataclass(slots=True, frozen=True)
+class QualityIndicator:
+    """A quality indicator a training run can minimize.
+
+    Attributes:
+        registry_name: The name a training request uses for it, as
+            org.uma.evolver.cli.IndicatorRegistry registers it.
+        short_name: Its abbreviation, as jMetal names it (the column header of
+            INDICATORS.csv).
+        full_name: Its full name.
+        measures: What it measures, in a sentence.
+    """
+
+    registry_name: str
+    short_name: str
+    full_name: str
+    measures: str
+
+
+# org.uma.evolver.cli.IndicatorRegistry. Evolver normalizes each front with the reference front of
+# its problem and computes every indicator against that front; all of them are minimized.
+QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
+    # org.uma.jmetal.qualityindicator.impl.Epsilon
+    QualityIndicator(
+        registry_name="Epsilon",
+        short_name="EP",
+        full_name="Additive epsilon",
+        measures="The smallest amount by which the front must be shifted to weakly dominate the "
+        "reference front: convergence, and coverage of its extremes.",
+    ),
+    # org.uma.jmetal.qualityindicator.impl.NormalizedHypervolume
+    QualityIndicator(
+        registry_name="NormalizedHypervolume",
+        short_name="NHV",
+        full_name="Normalized hypervolume",
+        measures="1 − HV(front)/HV(reference front): convergence and spread together; 0 when "
+        "the front covers as much of the objective space as the reference front.",
+    ),
+    # org.uma.jmetal.qualityindicator.impl.InvertedGenerationalDistancePlus
+    QualityIndicator(
+        registry_name="InvertedGenerationalDistancePlus",
+        short_name="IGD+",
+        full_name="Inverted generational distance plus",
+        measures="The average distance from each reference point to the front, counting only "
+        "the objectives the front is worse in: convergence and spread, weakly Pareto compliant.",
+    ),
+    # org.uma.evolver.util.HypervolumeMinus
+    QualityIndicator(
+        registry_name="HypervolumeMinus",
+        short_name="HVMinus",
+        full_name="Hypervolume, negated",
+        measures="−HV(front): the hypervolume, negated so that it can be minimized like the "
+        "other indicators.",
+    ),
+)
+
+
 def is_older_than_catalogue(version: str) -> bool:
     """Tell whether an Evolver version predates the one this catalogue mirrors.
 
