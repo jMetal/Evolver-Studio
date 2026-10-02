@@ -1,18 +1,437 @@
-"""Run algorithm: configure and run a base-level algorithm on a problem. Not implemented yet."""
+"""Run algorithm: run one of Evolver's configurable algorithms on a problem.
+
+The page builds a solve request (a problem, an algorithm with a configuration, a budget), launches
+Evolver's cli.solving as a detached subprocess, and shows the fronts and the indicators of the runs.
+The configuration starts from the algorithm's default one and can be adjusted within its parameter
+space. Every run is kept under solve-runs/, so a past one can be reopened.
+"""
+
+import datetime as dt
+from collections.abc import Callable
+from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.app_state import render_sidebar
+from evolver_studio.app_state import (
+    registered_problem_names,
+    require_evolver_jar,
+    warn_if_jar_older_than_catalogue,
+)
+from evolver_studio.catalogue import BASE_ALGORITHMS, QUALITY_INDICATORS, BaseAlgorithm
+from evolver_studio.configuration import (
+    complete_values,
+    configuration_string,
+    modified_values,
+    parse_configuration,
+    starting_values,
+    values_outside_the_space,
+)
+from evolver_studio.evolver_client import (
+    WORKING_DIRECTORY,
+    cancel_training,
+    read_pid,
+    read_status,
+    start_solve,
+    write_pid_file,
+)
+from evolver_studio.parameter_form import render_configuration_form
+from evolver_studio.parameter_space import parse_parameter_space
+from evolver_studio.problems import default_reference_front, reference_front_candidates
+from evolver_studio.resource_files import default_configuration_text, parameter_space_text
+from evolver_studio.runs import (
+    SOLVE_RUNS_DIRECTORY_NAME,
+    RunPhase,
+    find_run_in_progress,
+    mark_cancelled,
+    run_phase,
+)
+from evolver_studio.solve_figures import build_front_figure
+from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
+from evolver_studio.solve_results import (
+    SolveRunInfo,
+    indicator_summary,
+    list_solve_runs,
+    read_front,
+    read_indicators,
+    read_run_fronts,
+    zip_fronts,
+)
+
+RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
+NO_REFERENCE_FRONT = "(none: no indicators)"
+DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
+DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
+LIVE_FRAGMENT_RUN_EVERY_SECONDS = 1
+LOG_LINES_SHOWN = 15
+
+
+def _render_problem() -> tuple[str, str | None] | None:
+    """Section 1: the problem and its reference front.
+
+    Returns:
+        The problem's name and its reference front file (None for no indicators), or None while
+        either is not chosen yet.
+    """
+    st.subheader("1. Problem")
+    names = registered_problem_names(str(jar))
+    if names is None:
+        st.warning("Could not list the problems (is Java installed?).")
+        return None
+    problem = st.selectbox(
+        "Problem", names, index=None, placeholder="Choose a problem", key="solve_problem"
+    )
+    if problem is None:
+        return None
+    candidates = reference_front_candidates(problem)
+    if not candidates:
+        st.info("This problem has no reference front among the resources: no indicators.")
+        return problem, None
+    choice = st.selectbox(
+        "Reference front",
+        [*candidates, NO_REFERENCE_FRONT],
+        index=_default_front_index(candidates),
+        placeholder="Choose the reference front",
+        key=f"solve_reference_front_{problem}",
+        help="The indicators compare each front with it. Fronts with a dimension suffix (3D) "
+        "belong to the problem with that number of objectives: it must match the problem's.",
+    )
+    if choice is None:
+        return None
+    return problem, None if choice == NO_REFERENCE_FRONT else choice
+
+
+def _default_front_index(candidates: list[str]) -> int | None:
+    default = default_reference_front(candidates)
+    return candidates.index(default) if default is not None else None
+
+
+def _render_algorithm() -> tuple[BaseAlgorithm, str, dict[str, str] | None] | None:
+    """Section 2: the algorithm, its encoding and what it needs besides.
+
+    Returns:
+        The algorithm, the encoding and the extra configuration (None if it needs none), or None
+        while no algorithm is chosen.
+    """
+    st.subheader("2. Algorithm")
+    runnable = [algorithm for algorithm in BASE_ALGORITHMS if algorithm.runnable_today]
+    name = st.selectbox(
+        "Algorithm",
+        [algorithm.name for algorithm in runnable],
+        index=None,
+        placeholder="Choose an algorithm",
+        key="solve_algorithm",
+    )
+    if name is None:
+        return None
+    algorithm = next(algorithm for algorithm in runnable if algorithm.name == name)
+    encodings = algorithm.runnable_encodings
+    if len(encodings) == 1:
+        (encoding,) = encodings
+    else:
+        encoding = st.selectbox("Encoding", encodings, key=f"solve_encoding_{algorithm.name}")
+    extra_config = None
+    if "weightVectorFilesDirectory" in algorithm.required_extra_config_keys:
+        directory = st.text_input(
+            "Weight vector files directory",
+            DEFAULT_WEIGHT_VECTORS_DIRECTORY,
+            help="The population size must match one of its files (W<objectives>D_<size>.dat).",
+            key="solve_weight_vectors",
+        )
+        extra_config = {"weightVectorFilesDirectory": directory}
+    return algorithm, encoding, extra_config
+
+
+def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
+    """Section 3: the default configuration, adjustable within the parameter space.
+
+    Args:
+        algorithm: The chosen algorithm.
+        encoding: The chosen encoding.
+
+    Returns:
+        The configuration string, "--parameter value ...".
+    """
+    st.subheader("3. Configuration")
+    parameters = parse_parameter_space(parameter_space_text(jar, algorithm.encodings[encoding]))
+    defaults = algorithm.default_configurations.get(encoding, ())
+    if defaults:
+        labels = [label for label, _ in defaults]
+        label = (
+            st.radio(
+                "Default configuration",
+                labels,
+                horizontal=True,
+                key=f"solve_default_{algorithm.name}_{encoding}",
+            )
+            if len(labels) > 1
+            else labels[0]
+        )
+        filename = dict(defaults)[label]
+        reference = parse_configuration(default_configuration_text(jar, filename))
+        st.caption(f"Starting from `{filename}`; adjust the parameters below if you want.")
+    else:
+        label = "starting values"
+        reference = starting_values(parameters)
+        st.caption(
+            "Evolver has no default configuration for this algorithm and encoding: starting from "
+            "the first value of each choice and the middle of each range of the parameter space."
+        )
+    values = complete_values(parameters, reference)
+    version = st.session_state.setdefault("solve_configuration_version", 0)
+    key_prefix = f"solve_configuration_{algorithm.name}_{encoding}_{label}_{version}"
+    with st.expander("Adjust the parameters"):
+        if st.button("Reset to the default configuration"):
+            st.session_state["solve_configuration_version"] = version + 1
+            st.rerun()
+        edited = render_configuration_form(parameters, values, reference, key_prefix)
+    outside = values_outside_the_space(parameters, edited)
+    if outside:
+        st.warning("Outside the parameter space: " + ", ".join(f"`{name}`" for name in outside))
+    changed = modified_values(parameters, edited, reference)
+    st.caption(f"{len(changed)} parameter(s) changed from the starting configuration.")
+    configuration = configuration_string(parameters, edited)
+    st.code(configuration, language=None, wrap_lines=True)
+    return configuration
+
+
+def _render_budget(has_reference_front: bool) -> tuple[int, int, int, int | None, list[str]]:
+    """Section 4: the population, the budget, the runs, the seed and the indicators.
+
+    Args:
+        has_reference_front: Whether the problem has a reference front (indicators need one).
+
+    Returns:
+        The population size, the evaluations, the number of runs, the seed (None to draw one) and
+        the indicators.
+    """
+    st.subheader("4. Budget")
+    columns = st.columns(4)
+    population_size = columns[0].number_input(
+        "Population size", 2, value=100, key="solve_population"
+    )
+    max_evaluations = columns[1].number_input(
+        "Evaluations per run", 100, value=25000, step=1000, key="solve_evaluations"
+    )
+    runs = columns[2].number_input("Independent runs", 1, value=1, key="solve_runs")
+    with columns[3]:
+        fix_seed = st.checkbox("Fix the seed", key="solve_fix_seed")
+        seed = st.number_input("Seed", 0, value=1, disabled=not fix_seed, key="solve_seed")
+    indicators = st.multiselect(
+        "Quality indicators",
+        [indicator.registry_name for indicator in QUALITY_INDICATORS],
+        default=list(DEFAULT_INDICATORS) if has_reference_front else [],
+        disabled=not has_reference_front,
+        help="Computed on each run's front, normalized with the reference front. Run `i` uses "
+        "the seed + i - 1.",
+        key=f"solve_indicators_{has_reference_front}",
+    )
+    return (
+        int(population_size),
+        int(max_evaluations),
+        int(runs),
+        int(seed) if fix_seed else None,
+        indicators,
+    )
+
+
+def _launch(request_for: Callable[[str], SolveRequest]) -> None:
+    """Write the request of a new run, start it and remember it."""
+    run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir = RUNS_DIRECTORY / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    request = request_for(f"{SOLVE_RUNS_DIRECTORY_NAME}/{run_id}/output")
+    (run_dir / "request.yaml").write_text(solve_request_to_yaml(request))
+    process = start_solve(
+        WORKING_DIRECTORY,
+        jar,
+        run_dir / "request.yaml",
+        run_dir / "status.yaml",
+        run_dir / "runner.log",
+    )
+    write_pid_file(run_dir / "pid.txt", process.pid)
+    st.session_state.pop("solve_history", None)
+
+
+def _render_form(can_run: bool) -> None:
+    """The five sections that build and launch a run, each shown once the previous is chosen.
+
+    The form stays on screen while a run is in progress (unmounting its widgets would lose what
+    the user chose), with the Run button disabled.
+
+    Args:
+        can_run: Whether a run can be started: none is in progress.
+    """
+    problem = _render_problem()
+    if problem is None:
+        return
+    problem_name, reference_front = problem
+    algorithm_choice = _render_algorithm()
+    if algorithm_choice is None:
+        return
+    algorithm, encoding, extra_config = algorithm_choice
+    configuration = _render_configuration(algorithm, encoding)
+    population_size, max_evaluations, runs, seed, indicators = _render_budget(
+        reference_front is not None
+    )
+
+    def request_for(output_directory: str) -> SolveRequest:
+        return SolveRequest(
+            algorithm_name=algorithm.registry_name,
+            encoding=encoding,
+            population_size=population_size,
+            yaml_parameter_space_file=algorithm.encodings[encoding],
+            extra_config=extra_config,
+            configuration=configuration,
+            problem=problem_name,
+            reference_front_file_name=reference_front,
+            max_evaluations=max_evaluations,
+            number_of_independent_runs=runs,
+            seed=seed,
+            indicator_names=indicators,
+            output_directory=output_directory,
+        )
+
+    errors = request_for("").validation_errors()
+    for error in errors:
+        st.warning(error)
+    if st.button("Run", type="primary", disabled=bool(errors) or not can_run):
+        _launch(request_for)
+        st.rerun()
+
+
+def _cancel(run_dir: Path) -> None:
+    """Stop a run's process and mark it cancelled."""
+    pid = read_pid(run_dir / "pid.txt")
+    if pid is not None:
+        cancel_training(pid)
+    mark_cancelled(run_dir)
+
+
+def _render_run_in_progress(run_dir: Path) -> None:
+    """Show the progress of the run in progress, and move on to its results when it ends."""
+    st.info(f"Running ({run_dir.name}).")
+    if st.button("Cancel"):
+        _cancel(run_dir)
+        st.rerun()
+
+    @st.fragment(run_every=LIVE_FRAGMENT_RUN_EVERY_SECONDS, key=f"solve_poll_{run_dir.name}")
+    def _poll() -> None:
+        status = read_status(run_dir / "status.yaml")
+        if status is not None:
+            done = status.evaluations_done / max(status.max_evaluations, 1)
+            st.progress(
+                done, text=f"{status.evaluations_done}/{status.max_evaluations} evaluations"
+            )
+        else:
+            st.progress(0.0, text="Starting…")
+        if run_phase(run_dir) not in (RunPhase.STARTING, RunPhase.RUNNING):
+            st.session_state["solve_history"] = run_dir.name
+            st.rerun()
+
+    _poll()
+
+
+def _render_results(run: SolveRunInfo) -> None:
+    """Show a run's outcome: its fronts and indicators, or why it has none."""
+    phase = run_phase(run.run_dir)
+    if phase == RunPhase.CANCELLED:
+        st.info("This run was cancelled.")
+        return
+    if phase in (RunPhase.FAILED, RunPhase.LOST):
+        status = read_status(run.run_dir / "status.yaml")
+        st.error(
+            status.error_message
+            if status is not None and status.error_message
+            else "The run ended without writing its results."
+        )
+        _render_runner_log(run.run_dir / "runner.log")
+        return
+    if phase != RunPhase.FINISHED:
+        st.info("This run is still in progress.")
+        return
+    tabs = st.tabs(["Front", "Indicators", "Details"])
+    with tabs[0]:
+        _render_front(run)
+    with tabs[1]:
+        _render_indicators(run)
+    with tabs[2]:
+        _render_details(run)
+
+
+def _render_runner_log(log_file: Path) -> None:
+    if log_file.is_file() and (text := log_file.read_text().strip()):
+        with st.expander("Runner output"):
+            st.code("\n".join(text.splitlines()[-LOG_LINES_SHOWN:]), language=None)
+
+
+def _render_front(run: SolveRunInfo) -> None:
+    fronts = read_run_fronts(run.output_directory)
+    chosen = st.multiselect(
+        "Runs", list(fronts), default=list(fronts), format_func=lambda number: f"Run {number}"
+    )
+    reference_file = run.request.get("referenceFrontFileName")
+    reference = read_front(WORKING_DIRECTORY / reference_file) if reference_file else None
+    st.plotly_chart(
+        build_front_figure({number: fronts[number] for number in chosen}, reference),
+        width="stretch",
+        key=f"solve_front_{run.run_id}",
+    )
+
+
+def _render_indicators(run: SolveRunInfo) -> None:
+    if not run.request.get("indicatorNames"):
+        st.info("This run computed no indicators.")
+        return
+    indicators = read_indicators(run.output_directory)
+    st.dataframe(indicators, hide_index=True, width="stretch")
+    if len(indicators) > 1:
+        st.markdown("**Over the runs**")
+        st.dataframe(indicator_summary(indicators), width="stretch")
+
+
+def _render_details(run: SolveRunInfo) -> None:
+    st.write(f"Results folder: `{run.output_directory}`")
+    st.markdown("**Configuration**")
+    st.code(run.request["configuration"], language=None, wrap_lines=True)
+    with st.expander("METADATA.txt"):
+        st.text((run.output_directory / "METADATA.txt").read_text())
+    st.download_button(
+        "Download the fronts and indicators (zip)",
+        zip_fronts(run.output_directory),
+        file_name=f"{run.run_id}.zip",
+        mime="application/zip",
+        key=f"solve_download_{run.run_id}",
+    )
+
+
+def _render_history() -> None:
+    """Choose a past run and show its results."""
+    runs = {run.run_id: run for run in list_solve_runs(RUNS_DIRECTORY, WORKING_DIRECTORY)}
+    if not runs:
+        return
+    st.subheader("Results")
+    chosen = st.selectbox(
+        "Previous runs",
+        list(runs),
+        index=None,
+        placeholder="Choose a run to see its results",
+        format_func=lambda run_id: (
+            f"{run_id} · {runs[run_id].algorithm} · {runs[run_id].problem}"
+            + (f" · {runs[run_id].state.value}" if runs[run_id].state else "")
+        ),
+        key="solve_history",
+    )
+    if chosen is not None:
+        _render_results(runs[chosen])
+
 
 st.title("Run algorithm")
 
-render_sidebar()
+jar = require_evolver_jar()
+warn_if_jar_older_than_catalogue(jar)
 
-st.info(
-    "🔍 Not implemented yet — see ROADMAP.md, Next up (solving track).\n\n"
-    "Planned: configure and run one of Evolver's configurable algorithms on a concrete problem, "
-    "in the style of jMetal's runners — choose the problem, the algorithm and its encoding, and a "
-    "configuration (default, tuned or edited in the guided form); run it; inspect the front and "
-    "its quality indicators; export VAR/FUN. Needs an Evolver-side entry point for single "
-    "algorithm runs, analogous to cli.training."
-)
+run_in_progress = find_run_in_progress(RUNS_DIRECTORY)
+if run_in_progress is not None:
+    _render_run_in_progress(run_in_progress)
+_render_form(can_run=run_in_progress is None)
+_render_history()

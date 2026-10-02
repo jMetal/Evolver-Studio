@@ -85,9 +85,10 @@ SECTIONS = (
                 "pages/solve.py",
                 "Run algorithm",
                 "▶️",
-                "Choose a problem, an algorithm and a configuration (default, tuned or your own), "
-                "run it, and inspect its front and quality indicators.",
-                available=False,
+                "Choose a problem and an algorithm, start from its default configuration and "
+                "adjust it within the parameter space, run it, and inspect the fronts and the "
+                "quality indicators.",
+                available=True,
             ),
         ),
     ),
