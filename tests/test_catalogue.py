@@ -97,6 +97,49 @@ class TestBaseAlgorithms:
         assert set(nsgaii.runnable_encodings) == {"Double", "Permutation"}
 
 
+class TestDefaultConfigurations:
+    def test_should_only_name_encodings_the_algorithm_has(self):
+        """A default configuration for a missing encoding would never be offered."""
+        # Act / Assert
+        for algorithm in BASE_ALGORITHMS:
+            assert set(algorithm.default_configurations) <= set(algorithm.encodings)
+
+    def test_should_offer_a_default_configuration_for_most_runnable_encodings(self):
+        """Only NSGA-II's Permutation has none, so the Run algorithm page starts from the space."""
+        # Act
+        without = {
+            (a.name, encoding)
+            for a in BASE_ALGORITHMS
+            for encoding in a.runnable_encodings
+            if encoding not in a.default_configurations
+        }
+
+        # Assert
+        assert without == {("NSGA-II", "Permutation")}
+
+    def test_should_reference_default_configuration_files_that_exist_in_the_jar(self):
+        """A stale filename would break the Run algorithm page when it is chosen."""
+        jar = jar_path()
+        if not jar.is_file():
+            pytest.skip(f"Evolver jar not found at {jar}")
+
+        # Arrange
+        with zipfile.ZipFile(jar) as archive:
+            names = set(archive.namelist())
+
+        # Act
+        missing = [
+            filename
+            for algorithm in BASE_ALGORITHMS
+            for configurations in algorithm.default_configurations.values()
+            for _, filename in configurations
+            if f"defaultConfigurations/{filename}" not in names
+        ]
+
+        # Assert
+        assert missing == []
+
+
 class TestMetaAlgorithms:
     def test_should_have_unique_names(self):
         """Two entries with the same name would make lookups ambiguous."""
