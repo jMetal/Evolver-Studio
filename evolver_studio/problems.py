@@ -44,6 +44,23 @@ def reference_front_candidates(
     return [path for _, path in sorted(found)]
 
 
+def reference_front_dimension(front_file: Path) -> int | None:
+    """Count the objectives of a reference front: the columns of its first line.
+
+    Args:
+        front_file: A reference front file (comma-separated, no header).
+
+    Returns:
+        The number of objectives, or None if the file cannot be read or is empty.
+    """
+    try:
+        with front_file.open() as lines:
+            first_line = next(lines, "").strip()
+    except OSError:
+        return None
+    return len(first_line.split(",")) if first_line else None
+
+
 def default_reference_front(candidates: list[str]) -> str | None:
     """Pick the reference front to start from, when there is no doubt about it.
 
