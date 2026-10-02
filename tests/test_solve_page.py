@@ -6,10 +6,13 @@ import time
 from pathlib import Path
 
 import pytest
+import yaml
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import evolver_client
+from evolver_studio.catalogue import is_at_least
 from evolver_studio.evolver_client import jar_path, write_pid_file
+from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.runs import RunPhase, run_phase
 
 PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "solve.py"
@@ -22,6 +25,12 @@ NSGAII_DEFAULT = (
     "--polynomialMutationDistributionIndex 20.0 --selection tournament --selectionTournamentSize 2"
 )
 RUN_TIMEOUT_SECONDS = 60
+
+
+def _jar_reports_progress() -> bool:
+    """Whether the Evolver jar in use updates the status while a run is in progress (2.3 on)."""
+    version = jar_evolver_version(jar_path())
+    return version is None or is_at_least(version, "2.3")
 
 
 @pytest.fixture
@@ -119,6 +128,65 @@ class TestConfiguration:
         assert any("no default configuration" in caption.value for caption in app.caption)
 
 
+class TestProgressControls:
+    def test_should_offer_the_progress_slider_only_when_the_jar_can_report_it(self, app: AppTest):
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        checkbox = app.checkbox(key="solve_show_progress")
+        assert checkbox.value is _jar_reports_progress()
+        assert len(app.select_slider) == (1 if _jar_reports_progress() else 0)
+
+    def test_should_say_why_there_is_no_progress_slider_with_an_older_jar(self, app: AppTest):
+        # Arrange
+        if _jar_reports_progress():
+            pytest.skip("the Evolver jar in use reports the progress while running")
+
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert app.checkbox(key="solve_show_progress").disabled
+        assert any("only when each run ends" in caption.value for caption in app.caption)
+
+    def test_should_warn_that_updating_after_every_evaluation_slows_the_run(self, app: AppTest):
+        # Arrange
+        if not _jar_reports_progress():
+            pytest.skip("the Evolver jar in use cannot report the progress while running")
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.select_slider(key="solve_status_frequency").set_value(1).run()
+
+        # Assert
+        assert any("slow the run down" in warning.value for warning in app.warning)
+
+    def test_should_not_warn_at_the_default_frequency(self, app: AppTest):
+        # Arrange
+        if not _jar_reports_progress():
+            pytest.skip("the Evolver jar in use cannot report the progress while running")
+
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert not any("slow the run down" in warning.value for warning in app.warning)
+
+    def test_should_go_silent_when_the_progress_is_switched_off(self, app: AppTest):
+        # Arrange
+        if not _jar_reports_progress():
+            pytest.skip("the Evolver jar in use cannot report the progress while running")
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.checkbox(key="solve_show_progress").uncheck().run()
+
+        # Assert
+        assert len(app.select_slider) == 0
+        assert any("Silent" in caption.value for caption in app.caption)
+
+
 class TestRunInProgress:
     def test_should_show_the_progress_and_keep_the_form_with_the_run_button_disabled(
         self, app: AppTest, tmp_path: Path
@@ -169,3 +237,5 @@ class TestRun:
         assert [tab.label for tab in app.tabs] == ["Front", "Indicators", "Details"]
         assert len(app.dataframe) == 2  # the runs' indicators, and their summary
         assert (run_dir / "output" / "run-2" / "FUN.csv").is_file()
+        request = yaml.safe_load((run_dir / "request.yaml").read_text())
+        assert ("statusFrequency" in request) is _jar_reports_progress()

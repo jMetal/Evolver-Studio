@@ -13,6 +13,7 @@ from evolver_studio.solve_results import (
     list_solve_runs,
     read_front,
     read_indicators,
+    read_request,
     read_run_fronts,
     zip_fronts,
 )
@@ -66,6 +67,26 @@ class TestReadRunFronts:
 
         # Act / Assert
         assert list(read_front(file).columns) == ["f1", "f2", "f3"]
+
+
+class TestReadRequest:
+    def test_should_read_the_request_of_a_run(self, tmp_path: Path):
+        # Arrange
+        (tmp_path / "request.yaml").write_text("algorithmName: NSGA-II\nstatusFrequency: 500\n")
+
+        # Act / Assert
+        assert read_request(tmp_path) == {"algorithmName": "NSGA-II", "statusFrequency": 500}
+
+    @pytest.mark.parametrize("content", [None, "[not, a, mapping]", "a: [unclosed"])
+    def test_should_give_none_when_there_is_no_readable_request(
+        self, tmp_path: Path, content: str | None
+    ):
+        # Arrange
+        if content is not None:
+            (tmp_path / "request.yaml").write_text(content)
+
+        # Act / Assert
+        assert read_request(tmp_path) is None
 
 
 class TestIndicators:

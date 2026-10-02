@@ -9,6 +9,7 @@ from evolver_studio.catalogue import (
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
     QUALITY_INDICATORS,
+    is_at_least,
     is_older_than_catalogue,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
@@ -218,6 +219,24 @@ class TestIsOlderThanCatalogue:
         """A snapshot built from develop on its way to 2.2 already has its catalogue."""
         # Act / Assert
         assert not is_older_than_catalogue(version)
+
+
+class TestIsAtLeast:
+    @pytest.mark.parametrize(
+        ("version", "minimum", "expected"),
+        [
+            ("2.3", "2.3", True),
+            ("2.3-SNAPSHOT", "2.3", True),
+            ("2.10", "2.3", True),
+            ("3.0", "2.3", True),
+            ("2.2", "2.3", False),
+            ("2.2.9", "2.3", False),
+        ],
+    )
+    def test_should_compare_releases_numerically(self, version: str, minimum: str, expected: bool):
+        """A snapshot counts as its release, and 2.10 is later than 2.3."""
+        # Act / Assert
+        assert is_at_least(version, minimum) is expected
 
 
 class TestCatalogueMatchesEvolverJar:
