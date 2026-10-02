@@ -64,4 +64,6 @@ Atomic Conventional Commits with explicit paths, e.g.:
 - the `feat(catalogue)` commit(s) from `/sync-catalogue`,
 - `docs: describe Evolver <version> as the release the app runs`.
 
-Do not push unless asked.
+Work on `develop` (`main` holds Studio's releases), and add the entry to `CHANGELOG.md`'s unreleased
+section ("Works with Evolver <version>"; the README's compatibility table too). Do not push unless
+asked.

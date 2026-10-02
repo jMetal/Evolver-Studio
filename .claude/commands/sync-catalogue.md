@@ -89,4 +89,5 @@ protocol works (load `/`, then click the link whose `href` ends in `/explore_bas
 
 Atomic Conventional Commits with explicit paths (`GIT_GUIDELINES.md`), e.g.
 `feat(catalogue): sync with Evolver <version>` for the catalogue, the Training page and their tests,
-and `docs: ...` for README/ROADMAP. Do not push unless asked.
+and `docs: ...` for README/ROADMAP and the entry in `CHANGELOG.md`'s unreleased section. Work on
+`develop` (`main` holds Studio's releases). Do not push unless asked.

@@ -156,3 +156,8 @@ GitHub source archive of the `EVOLVER_VERSION` release; run it whenever that ver
 
 Follow `CODING_GUIDELINES.md` (Python style, typing, testing) and `GIT_GUIDELINES.md` (Conventional
 Commits, atomic commits) in this repo's root.
+
+Work on `develop`: `main` holds the releases and only moves when one is cut (see "Branches and
+releases" in `GIT_GUIDELINES.md`). Evolver-Studio's version is its own (`pyproject.toml`, `X.Y.0.dev0`
+on `develop`), and every user-visible change adds an entry to `CHANGELOG.md`, in the same commit as
+its documentation.

@@ -65,11 +65,28 @@ Each commit must represent **one single logical change**. Guidelines:
 - Never mix production code changes with test changes in the same commit.
 - Never mix code changes with documentation changes in the same commit.
 
-## Merge commits
+## Branches and releases
 
-Prefer squash-merging pull requests so `main` keeps one Conventional Commit per logical change.
-If a merge commit is unavoidable, the default `Merge pull request #N from ...` message is
-acceptable as an exception to the `<type>: ...` format.
+Evolver-Studio has its own version numbers (`MAJOR.MINOR.PATCH`), independent of Evolver's. The
+workflow is Evolver's:
+
+- **`develop`** is where the work happens, as atomic commits. Its version is the upcoming release
+  with a `.dev0` suffix (`pyproject.toml`: `0.2.0.dev0`, PEP 440's form of Evolver's `-SNAPSHOT`),
+  and the top section of [CHANGELOG.md](CHANGELOG.md) is that release, marked `(unreleased)`. Every
+  user-visible change adds an entry to it, in the same commit as its documentation.
+- **`main`** holds the releases only, and moves only when a release is cut (or when asked).
+- **A release** is a `chore(release): prepare release X.Y.Z` commit on `develop` (the version in
+  `pyproject.toml`, the changelog section dated, the version and the Evolver release it works with
+  in the README), then the annotated tag `vX.Y.Z` ("Evolver-Studio X.Y.Z") and `main`
+  fast-forwarded to it, and the release on GitHub. Right after, a
+  `chore: start X.Y+1.0.dev0 development` commit on `develop` opens the next version.
+- Studio follows **stable Evolver releases only** (`EVOLVER_VERSION`): moving to a new one is the
+  `/bump-evolver` command, on `develop`. Work against an Evolver `develop` build goes on an
+  `experiment/*` branch.
+
+Merging a branch other than `develop` into it: prefer squash-merging pull requests, so `develop`
+keeps one Conventional Commit per logical change. If a merge commit is unavoidable, the default
+`Merge pull request #N from ...` message is acceptable as an exception to the `<type>: ...` format.
 
 ## Examples
 
