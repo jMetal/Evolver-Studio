@@ -19,7 +19,7 @@ supports it: NSGA-II/MOEA-D/RVEA as base algorithms; NSGA-II/AGE-MOEA/SPEA2/SMPS
 RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/RandomSearch for tree).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from evolver_studio.evolver_client import EVOLVER_VERSION
 
@@ -47,6 +47,10 @@ class BaseAlgorithm:
             BaseAlgorithmRegistry needs to build it (its manifest's
             requiredExtraConfigKeys), e.g. "weightVectorFilesDirectory" for
             the decomposition-based ones. Empty when it needs none.
+        default_configurations: Encoding name to the default configurations Evolver's jar ships
+            for it, as (label, filename) pairs, under defaultConfigurations/ — the ones the Run
+            algorithm page offers to start from. An encoding with none is missing (e.g. NSGA-II's
+            Permutation).
     """
 
     name: str
@@ -55,6 +59,7 @@ class BaseAlgorithm:
     registry_name: str | None = None
     runnable_encodings: tuple[str, ...] = ()
     required_extra_config_keys: tuple[str, ...] = ()
+    default_configurations: dict[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
 
 
 @dataclass(slots=True, frozen=True)
@@ -117,6 +122,7 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         runnable_today=True,
         registry_name="NSGA-II",
         runnable_encodings=("Double", "Permutation"),
+        default_configurations={"Double": (("Default", "NSGAIIDoubleDefault.txt"),)},
     ),
     # org.uma.evolver.algorithm.moead.{Double,Binary,Permutation}MOEAD
     BaseAlgorithm(
@@ -130,6 +136,7 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         registry_name="MOEAD",
         runnable_encodings=("Double",),
         required_extra_config_keys=("weightVectorFilesDirectory",),
+        default_configurations={"Double": (("Default", "MOEADDoubleDefault.txt"),)},
     ),
     # org.uma.evolver.algorithm.smsemoa.{Double,Binary,Permutation}SMSEMOA
     BaseAlgorithm(
@@ -159,6 +166,14 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         registry_name="RVEA",
         runnable_encodings=("Double",),
         required_extra_config_keys=("weightVectorFilesDirectory",),
+        # The three variants of the RVEA family differ in their `replacement` parameter.
+        default_configurations={
+            "Double": (
+                ("RVEA", "RVEADoubleDefault.txt"),
+                ("RVEA*", "RVEAStarDoubleDefault.txt"),
+                ("iRVEA", "IRVEADoubleDefault.txt"),
+            )
+        },
     ),
     # org.uma.evolver.algorithm.mopso.BaseMOPSO (Double only, particle swarm)
     BaseAlgorithm(name="MOPSO", encodings={"Double": "MOPSO.yaml"}, runnable_today=False),
