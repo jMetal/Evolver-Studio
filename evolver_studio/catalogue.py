@@ -21,10 +21,7 @@ RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/Ran
 
 from dataclasses import dataclass
 
-# The Evolver version this catalogue mirrors. It may be ahead of the release the app downloads
-# (evolver_client.EVOLVER_VERSION) while it follows Evolver's develop branch; a jar older than it
-# has outdated parameter spaces and cannot run every algorithm marked runnable here.
-CATALOGUE_EVOLVER_VERSION = "2.2"
+from evolver_studio.evolver_client import EVOLVER_VERSION
 
 
 @dataclass(slots=True, frozen=True)
@@ -405,18 +402,20 @@ QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
 
 
 def is_older_than_catalogue(version: str) -> bool:
-    """Tell whether an Evolver version predates the one this catalogue mirrors.
+    """Tell whether an Evolver version predates the release this catalogue mirrors.
 
-    Only the numeric release is compared, so a snapshot ("2.2-SNAPSHOT", built
-    from develop on its way to 2.2) counts as that release.
+    The catalogue mirrors the release the app runs (evolver_client.EVOLVER_VERSION): a jar older
+    than it, set with EVOLVER_JAR, has outdated parameter spaces and cannot run every algorithm
+    marked runnable here. Only the numeric release is compared, so a snapshot ("2.3-SNAPSHOT",
+    built from develop on its way to 2.3) counts as that release.
 
     Args:
-        version: An Evolver version, e.g. "2.1" or "2.2-SNAPSHOT".
+        version: An Evolver version, e.g. "2.1" or "2.3-SNAPSHOT".
 
     Returns:
-        Whether it is older than CATALOGUE_EVOLVER_VERSION.
+        Whether it is older than EVOLVER_VERSION.
     """
-    return _release_numbers(version) < _release_numbers(CATALOGUE_EVOLVER_VERSION)
+    return _release_numbers(version) < _release_numbers(EVOLVER_VERSION)
 
 
 def _release_numbers(version: str) -> tuple[int, ...]:

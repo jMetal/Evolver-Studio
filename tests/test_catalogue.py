@@ -163,7 +163,7 @@ class TestQualityIndicators:
 
 
 class TestIsOlderThanCatalogue:
-    """The catalogue mirrors Evolver 2.2 (CATALOGUE_EVOLVER_VERSION)."""
+    """The catalogue mirrors the release the app runs, Evolver 2.2 (EVOLVER_VERSION)."""
 
     @pytest.mark.parametrize("version", ["2.1", "2.0", "1.0.1"])
     def test_should_flag_an_earlier_release(self, version: str):

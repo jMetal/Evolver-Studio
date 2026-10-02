@@ -26,8 +26,9 @@ STUDIO_HOME = Path(__file__).resolve().parent.parent
 # so it must hold the resources/ directory copied from Evolver.
 WORKING_DIRECTORY = STUDIO_HOME
 
-# Evolver release this app is built against (the `v2.1` tag of jMetal/Evolver).
-EVOLVER_VERSION = "2.1"
+# Evolver release this app is built against (the `v2.2` tag of jMetal/Evolver). Only stable
+# releases: evolver_studio/catalogue.py mirrors this one.
+EVOLVER_VERSION = "2.2"
 JAR_FILE_NAME = f"Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar"
 JAR_DIRECTORY = STUDIO_HOME / "lib"
 MAVEN_CENTRAL_JAR_URL = (

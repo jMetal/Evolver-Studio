@@ -11,7 +11,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.catalogue import CATALOGUE_EVOLVER_VERSION, is_older_than_catalogue
+from evolver_studio.catalogue import is_older_than_catalogue
 from evolver_studio.evolver_client import (
     EVOLVER_VERSION,
     JAR_OVERRIDE_VARIABLE,
@@ -80,9 +80,9 @@ def warn_if_jar_older_than_catalogue(jar: Path) -> None:
     if version is None or not is_older_than_catalogue(version):
         return
     st.warning(
-        f"This page follows Evolver {CATALOGUE_EVOLVER_VERSION}, but the jar in use is Evolver "
+        f"This page follows Evolver {EVOLVER_VERSION}, but the jar in use is Evolver "
         f"{version}: some parameter spaces may be incomplete, and some algorithms marked "
-        f"runnable cannot run with it. Set `{JAR_OVERRIDE_VARIABLE}` to a newer jar (e.g. one "
-        f"built from Evolver's `develop` branch).",
+        f"runnable cannot run with it. Unset `{JAR_OVERRIDE_VARIABLE}` to use Evolver "
+        f"{EVOLVER_VERSION}, or point it at a newer jar.",
         icon="⚠️",
     )
