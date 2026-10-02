@@ -21,12 +21,12 @@ class TestTutorialsCatalogue:
         # Assert
         assert ids == EVOLVER_STUDIO_TUTORIAL_IDS
 
-    def test_should_mark_only_s2_as_available(self):
+    def test_should_mark_only_s2_and_s3_as_available(self):
         # Act
         available = [tutorial.tutorial_id for tutorial in TUTORIALS if tutorial.available]
 
         # Assert
-        assert available == ["S2"]
+        assert available == ["S2", "S3"]
 
     @pytest.mark.parametrize("level", list(TutorialLevel))
     def test_should_group_every_tutorial_under_its_level(self, level: TutorialLevel):
