@@ -189,6 +189,40 @@ class TestRunInProgress:
             process.wait()
 
 
+class TestRepeatARun:
+    def test_should_fill_the_form_with_a_past_run_and_offer_its_request(
+        self, app: AppTest, tmp_path: Path
+    ):
+        # Arrange: a finished run of NSGA-II with crossover blxAlpha, 2 runs of 500 evaluations
+        _choose_zdt1_and_nsgaii(app)
+        app.selectbox(key="solve_configuration_NSGA-II_Double_Default_0_crossover").select(
+            "blxAlpha"
+        ).run()
+        app.number_input(key="solve_evaluations").set_value(500)
+        app.number_input(key="solve_runs").set_value(2).run()
+        next(button for button in app.button if button.label == "Run").click().run()
+        run_dir = next((tmp_path / "solve-runs").iterdir())
+        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
+        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the run did not finish"
+            time.sleep(0.2)
+        app.run()
+        app.selectbox(key="solve_history").select(run_dir.name).run()
+
+        # Act: change the form, then restore the run
+        app.number_input(key="solve_evaluations").set_value(900).run()
+        app.button(key=f"solve_load_{run_dir.name}").click().run()
+
+        # Assert
+        assert not app.exception
+        assert app.number_input(key="solve_evaluations").value == 500
+        assert app.number_input(key="solve_runs").value == 2
+        assert app.selectbox(key="solve_problem").value == "ZDT1"
+        assert "--crossover blxAlpha" in app.code[0].value
+        assert "--blxAlphaCrossoverAlpha" in app.code[0].value
+        assert len(app.get("download_button")) == 2  # the request, and the zip
+
+
 class TestRun:
     def test_should_run_the_algorithm_and_show_its_results(self, app: AppTest, tmp_path: Path):
         # Arrange
