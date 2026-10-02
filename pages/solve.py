@@ -27,6 +27,7 @@ from evolver_studio.configuration import (
     values_outside_the_space,
 )
 from evolver_studio.evolver_client import (
+    EVOLVER_VERSION,
     WORKING_DIRECTORY,
     cancel_training,
     read_pid,
@@ -50,6 +51,24 @@ from evolver_studio.runs import (
     run_phase,
 )
 from evolver_studio.solve_figures import build_front_figure
+from evolver_studio.solve_form import (
+    ALGORITHM_KEY,
+    CONFIGURATION_VERSION_KEY,
+    EVALUATIONS_KEY,
+    FIX_SEED_KEY,
+    LOADED_CONFIGURATION_KEY,
+    NO_REFERENCE_FRONT,
+    POPULATION_CHOICE_KEY,
+    POPULATION_KEY,
+    PROBLEM_KEY,
+    RUNS_KEY,
+    SEED_KEY,
+    WEIGHT_VECTORS_KEY,
+    encoding_key,
+    form_state_from_request,
+    indicators_key,
+    reference_front_key,
+)
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
 from evolver_studio.solve_results import (
     SolveRunInfo,
@@ -63,7 +82,6 @@ from evolver_studio.solve_results import (
 from evolver_studio.weight_vectors import available_population_sizes
 
 RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
-NO_REFERENCE_FRONT = "(none: no indicators)"
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
 DEFAULT_POPULATION_SIZE = 100
@@ -84,7 +102,7 @@ def _render_problem() -> tuple[str, str | None] | None:
         st.warning("Could not list the problems (is Java installed?).")
         return None
     problem = st.selectbox(
-        "Problem", names, index=None, placeholder="Choose a problem", key="solve_problem"
+        "Problem", names, index=None, placeholder="Choose a problem", key=PROBLEM_KEY
     )
     if problem is None:
         return None
@@ -97,7 +115,7 @@ def _render_problem() -> tuple[str, str | None] | None:
         [*candidates, NO_REFERENCE_FRONT],
         index=_default_front_index(candidates),
         placeholder="Choose the reference front",
-        key=f"solve_reference_front_{problem}",
+        key=reference_front_key(problem),
         help="The indicators compare each front with it. Fronts with a dimension suffix (3D) "
         "belong to the problem with that number of objectives: it must match the problem's.",
     )
@@ -125,7 +143,7 @@ def _render_algorithm() -> tuple[BaseAlgorithm, str, dict[str, str] | None] | No
         [algorithm.name for algorithm in runnable],
         index=None,
         placeholder="Choose an algorithm",
-        key="solve_algorithm",
+        key=ALGORITHM_KEY,
     )
     if name is None:
         return None
@@ -134,14 +152,14 @@ def _render_algorithm() -> tuple[BaseAlgorithm, str, dict[str, str] | None] | No
     if len(encodings) == 1:
         (encoding,) = encodings
     else:
-        encoding = st.selectbox("Encoding", encodings, key=f"solve_encoding_{algorithm.name}")
+        encoding = st.selectbox("Encoding", encodings, key=encoding_key(algorithm.name))
     extra_config = None
     if "weightVectorFilesDirectory" in algorithm.required_extra_config_keys:
         directory = st.text_input(
             "Weight vector files directory",
             DEFAULT_WEIGHT_VECTORS_DIRECTORY,
             help="The population size must match one of its files (W<objectives>D_<size>.dat).",
-            key="solve_weight_vectors",
+            key=WEIGHT_VECTORS_KEY,
         )
         extra_config = {"weightVectorFilesDirectory": directory}
     return algorithm, encoding, extra_config
@@ -182,12 +200,21 @@ def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
             "Evolver has no default configuration for this algorithm and encoding: starting from "
             "the first value of each choice and the middle of each range of the parameter space."
         )
-    values = complete_values(parameters, reference)
-    version = st.session_state.setdefault("solve_configuration_version", 0)
+    loaded = st.session_state.get(LOADED_CONFIGURATION_KEY)
+    if loaded and (loaded["algorithm"], loaded["encoding"]) == (algorithm.name, encoding):
+        st.caption(
+            "Starting from the configuration of the run you chose; the marks show what "
+            "differs from the default one."
+        )
+        values = complete_values(parameters, loaded["values"])
+    else:
+        values = complete_values(parameters, reference)
+    version = st.session_state.setdefault(CONFIGURATION_VERSION_KEY, 0)
     key_prefix = f"solve_configuration_{algorithm.name}_{encoding}_{label}_{version}"
     with st.expander("Adjust the parameters"):
         if st.button("Reset to the default configuration"):
-            st.session_state["solve_configuration_version"] = version + 1
+            st.session_state[CONFIGURATION_VERSION_KEY] = version + 1
+            st.session_state.pop(LOADED_CONFIGURATION_KEY, None)
             st.rerun()
         edited = render_configuration_form(parameters, values, reference, key_prefix)
     outside = values_outside_the_space(parameters, edited)
@@ -219,10 +246,10 @@ def _render_population_size(column, population_sizes: list[int] | None) -> int:
             population_sizes,
             index=population_sizes.index(default) if default in population_sizes else 0,
             help="These sizes have a weight vector file for the problem's number of objectives.",
-            key="solve_population_choice",
+            key=POPULATION_CHOICE_KEY,
         )
     population_size = column.number_input(
-        "Population size", 2, value=DEFAULT_POPULATION_SIZE, key="solve_population"
+        "Population size", 2, value=DEFAULT_POPULATION_SIZE, key=POPULATION_KEY
     )
     if population_sizes is not None:
         column.warning("No weight vector file for this number of objectives in that directory.")
@@ -247,12 +274,12 @@ def _render_budget(
     columns = st.columns(4)
     population_size = _render_population_size(columns[0], population_sizes)
     max_evaluations = columns[1].number_input(
-        "Evaluations per run", 100, value=25000, step=1000, key="solve_evaluations"
+        "Evaluations per run", 100, value=25000, step=1000, key=EVALUATIONS_KEY
     )
-    runs = columns[2].number_input("Independent runs", 1, value=1, key="solve_runs")
+    runs = columns[2].number_input("Independent runs", 1, value=1, key=RUNS_KEY)
     with columns[3]:
-        fix_seed = st.checkbox("Fix the seed", key="solve_fix_seed")
-        seed = st.number_input("Seed", 0, value=1, disabled=not fix_seed, key="solve_seed")
+        fix_seed = st.checkbox("Fix the seed", key=FIX_SEED_KEY)
+        seed = st.number_input("Seed", 0, value=1, disabled=not fix_seed, key=SEED_KEY)
     indicators = st.multiselect(
         "Quality indicators",
         [indicator.registry_name for indicator in QUALITY_INDICATORS],
@@ -260,7 +287,7 @@ def _render_budget(
         disabled=not has_reference_front,
         help="Computed on each run's front, normalized with the reference front. Run `i` uses "
         "the seed + i - 1.",
-        key=f"solve_indicators_{has_reference_front}",
+        key=indicators_key(has_reference_front),
     )
     return (
         int(population_size),
@@ -448,12 +475,51 @@ def _render_indicators(run: SolveRunInfo) -> None:
         st.dataframe(indicator_summary(indicators), width="stretch")
 
 
+def _load_run(run: SolveRunInfo) -> None:
+    """Set the form to the settings of a past run (a button's callback, so it runs before the
+    form's widgets are created and may set their values)."""
+    names = registered_problem_names(str(jar)) or []
+    state = form_state_from_request(
+        run.request,
+        BASE_ALGORITHMS,
+        names,
+        st.session_state.get(CONFIGURATION_VERSION_KEY, 0),
+    )
+    if state is None:
+        st.session_state["solve_load_error"] = run.run_id
+        return
+    st.session_state.pop("solve_load_error", None)
+    st.session_state.update(state)
+
+
 def _render_details(run: SolveRunInfo) -> None:
     st.write(f"Results folder: `{run.output_directory}`")
     st.markdown("**Configuration**")
     st.code(run.request["configuration"], language=None, wrap_lines=True)
     with st.expander("METADATA.txt"):
         st.text((run.output_directory / "METADATA.txt").read_text())
+    st.button(
+        "Use this configuration for a new run",
+        on_click=_load_run,
+        args=(run,),
+        help="Fills the form above with this run's problem, algorithm, configuration and budget.",
+        key=f"solve_load_{run.run_id}",
+    )
+    if st.session_state.get("solve_load_error") == run.run_id:
+        st.warning(
+            "This run's settings cannot be restored: its algorithm or problem is not offered."
+        )
+    st.download_button(
+        "Download request.yaml",
+        (run.run_dir / "request.yaml").read_text(),
+        file_name="request.yaml",
+        mime="application/x-yaml",
+        help="To run it outside Evolver-Studio: "
+        f"java -cp Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar "
+        "org.uma.evolver.cli.solving.SolveRunnerMain request.yaml, from the directory that holds "
+        "resources/ (adjust outputDirectory).",
+        key=f"solve_download_request_{run.run_id}",
+    )
     st.download_button(
         "Download the fronts and indicators (zip)",
         zip_fronts(run.output_directory),
