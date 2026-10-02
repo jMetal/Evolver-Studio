@@ -4,6 +4,7 @@ import hashlib
 import os
 import signal
 import subprocess
+import threading
 import time
 import urllib.request
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from evolver_studio.result import Err, Ok
 CANCEL_GRACE_PERIOD_SECONDS = 2.0
 
 TRAINING_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.training.TrainingRunnerMain"
+SOLVE_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.solving.SolveRunnerMain"
 DESCRIBE_MAIN_CLASS = "org.uma.evolver.cli.training.DescribeMain"
 
 STUDIO_HOME = Path(__file__).resolve().parent.parent
@@ -155,6 +157,37 @@ def start_training(
         stderr=subprocess.STDOUT,
         text=True,
     )
+
+
+def start_solve(
+    working_directory: Path, jar: Path, request_yaml: Path, status_yaml: Path, log_file: Path
+) -> subprocess.Popen:
+    """Launch SolveRunnerMain as a background subprocess.
+
+    Unlike `start_training`, the runner's output goes to a log file, which is what tells the user
+    why a run that never wrote its status (Java missing, a bad jar) did not start, and the process
+    is reaped when it ends, so that a finished run is not mistaken for a live one.
+
+    Args:
+        working_directory: Working directory the JVM resolves relative paths against.
+        jar: Path to Evolver's fat jar.
+        request_yaml: Path to the solve request YAML.
+        status_yaml: Path where the run's status is written.
+        log_file: Path where the runner's standard output and error are written.
+
+    Returns:
+        The launched subprocess.
+    """
+    with log_file.open("w") as log:
+        process = subprocess.Popen(
+            ["java", "-cp", str(jar), SOLVE_RUNNER_MAIN_CLASS, str(request_yaml), str(status_yaml)],
+            cwd=working_directory,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    threading.Thread(target=process.wait, daemon=True).start()
+    return process
 
 
 def write_pid_file(pid_file: Path, pid: int) -> None:
