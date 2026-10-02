@@ -76,3 +76,94 @@ def _parallel_coordinates(combined: pd.DataFrame, objectives: list[str]) -> go.F
     )
     figure.update_layout(coloraxis_colorbar={"tickvals": [int(run) for run in runs]})
     return figure
+
+
+def build_live_front_figure(
+    solutions: pd.DataFrame, reference_front: pd.DataFrame | None = None
+) -> go.Figure:
+    """Plot the solutions of the run in progress, over the reference front.
+
+    The dominated solutions (when Evolver writes the whole population) are drawn small and grey,
+    the non-dominated ones in color. Two objectives give a scatter, three a 3D scatter, and more a
+    parallel-coordinates plot of the non-dominated solutions.
+
+    Args:
+        solutions: The current solutions, with the columns Run, Evaluations, NonDominated and
+            f1, f2, ... as `solve_results.read_current_front` returns them.
+        reference_front: The problem's reference front, with columns f1, f2, ..., or None.
+
+    Returns:
+        The figure, titled with the run and its evaluations so far.
+    """
+    objectives = [column for column in solutions.columns if column.startswith("f")]
+    run, evaluations = int(solutions["Run"].iloc[0]), int(solutions["Evaluations"].iloc[0])
+    nondominated = solutions[solutions["NonDominated"] == 1]
+    dominated = solutions[solutions["NonDominated"] == 0]
+    if len(objectives) >= 4:
+        figure = _parallel_coordinates(
+            nondominated.assign(Run=run).astype({"Run": str}), objectives
+        )
+    elif len(objectives) == 3:
+        figure = go.Figure()
+        _add_reference(figure, reference_front, 3)
+        _add_solutions(figure, dominated, "Dominated", "lightgrey", 2, 3)
+        _add_solutions(figure, nondominated, "Non-dominated", "#1f77b4", 3, 3)
+    else:
+        figure = go.Figure()
+        _add_reference(figure, reference_front, 2)
+        _add_solutions(figure, dominated, "Dominated", "lightgrey", 5, 2)
+        _add_solutions(figure, nondominated, "Non-dominated", "#1f77b4", 7, 2)
+        figure.update_layout(xaxis_title="f1", yaxis_title="f2")
+    figure.update_layout(title=f"Run {run}, {evaluations} evaluations")
+    return figure
+
+
+def _add_reference(
+    figure: go.Figure, reference_front: pd.DataFrame | None, dimensions: int
+) -> None:
+    if reference_front is None:
+        return
+    if dimensions == 3:
+        figure.add_trace(
+            go.Scatter3d(
+                x=reference_front["f1"],
+                y=reference_front["f2"],
+                z=reference_front["f3"],
+                mode="markers",
+                name="Reference front",
+                marker={"size": 1.5, "color": REFERENCE_FRONT_COLOR},
+            )
+        )
+        return
+    figure.add_trace(
+        go.Scatter(
+            x=reference_front["f1"],
+            y=reference_front["f2"],
+            mode="lines",
+            name="Reference front",
+            line={"color": REFERENCE_FRONT_COLOR},
+        )
+    )
+
+
+def _add_solutions(
+    figure: go.Figure, solutions: pd.DataFrame, name: str, color: str, size: float, dimensions: int
+) -> None:
+    if solutions.empty:
+        return
+    marker = {"size": size, "color": color}
+    if dimensions == 3:
+        figure.add_trace(
+            go.Scatter3d(
+                x=solutions["f1"],
+                y=solutions["f2"],
+                z=solutions["f3"],
+                mode="markers",
+                name=name,
+                marker=marker,
+            )
+        )
+        return
+    figure.add_trace(
+        go.Scatter(x=solutions["f1"], y=solutions["f2"], mode="markers", name=name, marker=marker)
+    )
