@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from evolver_studio.problems import default_reference_front, reference_front_candidates
+from evolver_studio.problems import (
+    default_reference_front,
+    reference_front_candidates,
+    reference_front_dimension,
+)
 
 
 @pytest.fixture
@@ -78,3 +82,31 @@ class TestDefaultReferenceFront:
     def test_should_not_pick_when_there_is_none_or_a_doubt(self, candidates: list[str]):
         # Act / Assert
         assert default_reference_front(candidates) is None
+
+
+class TestReferenceFrontDimension:
+    def test_should_count_the_columns_of_the_first_line(self, tmp_path: Path):
+        # Arrange
+        front = tmp_path / "front.csv"
+        front.write_text("0.1,0.2,0.3\n0.4,0.5,0.6\n")
+
+        # Act / Assert
+        assert reference_front_dimension(front) == 3
+
+    def test_should_have_no_dimension_for_a_missing_or_empty_file(self, tmp_path: Path):
+        # Arrange
+        empty = tmp_path / "empty.csv"
+        empty.write_text("")
+
+        # Act / Assert
+        assert reference_front_dimension(empty) is None
+        assert reference_front_dimension(tmp_path / "missing.csv") is None
+
+    def test_should_read_the_real_front_of_dtlz2_with_three_objectives(self):
+        # Act
+        dimension = reference_front_dimension(
+            Path(__file__).parent.parent / "resources/referenceFronts/DTLZ2.3D.csv"
+        )
+
+        # Assert
+        assert dimension == 3

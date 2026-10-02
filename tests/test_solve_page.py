@@ -119,6 +119,50 @@ class TestConfiguration:
         assert any("no default configuration" in caption.value for caption in app.caption)
 
 
+class TestPopulationSize:
+    def test_should_offer_only_the_sizes_with_a_weight_vector_file_for_moead(self, app: AppTest):
+        # Act: ZDT1 has two objectives
+        app.selectbox(key="solve_problem").select("ZDT1").run()
+        app.selectbox(key="solve_algorithm").select("MOEA/D").run()
+
+        # Assert
+        sizes = app.selectbox(key="solve_population_choice").options
+        assert list(sizes)[:3] == ["100", "300", "400"]
+        assert not any(box.label == "Population size" for box in app.number_input)
+
+    def test_should_follow_the_objectives_of_the_problem(self, app: AppTest):
+        # Act: DTLZ2 with its three-objective front
+        app.selectbox(key="solve_problem").select("DTLZ2").run()
+        app.selectbox(key="solve_reference_front_DTLZ2").select(
+            "resources/referenceFronts/DTLZ2.3D.csv"
+        ).run()
+        app.selectbox(key="solve_algorithm").select("RVEA").run()
+
+        # Assert
+        assert "91" in app.selectbox(key="solve_population_choice").options
+
+    def test_should_keep_a_free_number_for_an_algorithm_without_weight_vectors(self, app: AppTest):
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert app.number_input(key="solve_population").value == 100
+        assert len(app.selectbox(key="solve_algorithm").options) > 0
+        assert not any(box.key == "solve_population_choice" for box in app.selectbox)
+
+    def test_should_warn_when_the_directory_has_no_file_for_the_objectives(self, app: AppTest):
+        # Arrange
+        app.selectbox(key="solve_problem").select("ZDT1").run()
+        app.selectbox(key="solve_algorithm").select("MOEA/D").run()
+
+        # Act
+        app.text_input(key="solve_weight_vectors").set_value("resources/nowhere").run()
+
+        # Assert
+        assert app.number_input(key="solve_population").value == 100
+        assert any("No weight vector file" in warning.value for warning in app.warning)
+
+
 class TestRunInProgress:
     def test_should_show_the_progress_and_keep_the_form_with_the_run_button_disabled(
         self, app: AppTest, tmp_path: Path
