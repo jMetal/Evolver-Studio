@@ -10,6 +10,7 @@ from pathlib import Path
 
 PARAMETER_SPACES_DIRECTORY = "parameterSpaces"
 META_OPTIMIZER_CONFIGURATIONS_DIRECTORY = "metaOptimizerConfigurations"
+DEFAULT_CONFIGURATIONS_DIRECTORY = "defaultConfigurations"
 # Written by Maven into every jar it builds, with the version of the project.
 POM_PROPERTIES_ENTRY = "META-INF/maven/org.uma.jmetal/Evolver/pom.properties"
 
@@ -39,6 +40,19 @@ def meta_optimizer_configuration_text(jar: Path, filename: str) -> str:
         That file's content.
     """
     return _jar_entry_text(jar, f"{META_OPTIMIZER_CONFIGURATIONS_DIRECTORY}/{filename}")
+
+
+def default_configuration_text(jar: Path, filename: str) -> str:
+    """Read a default configuration file's raw text.
+
+    Args:
+        jar: Path to Evolver's fat jar.
+        filename: The configuration's filename, under defaultConfigurations/.
+
+    Returns:
+        That file's content: a configuration, "--parameter value ...".
+    """
+    return _jar_entry_text(jar, f"{DEFAULT_CONFIGURATIONS_DIRECTORY}/{filename}")
 
 
 def jar_evolver_version(jar: Path) -> str | None:
