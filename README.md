@@ -52,7 +52,10 @@ purpose:
 
 | Section | Page | Status | What it does |
 |---|---|:---:|---|
-| Explore | Explore | ✅ | Browse any algorithm's parameter space as a filterable table (one row per parameter, with the condition that activates it); see each meta-optimizer's encodings and operator parameters |
+| Explore | Base algorithms | ✅ | Browse an algorithm's parameter space, per encoding, as a filterable table (one row per parameter, with the condition that activates it) |
+| Explore | Meta-optimizers | ✅ | See each meta-optimizer's encodings and the operators it can be configured with |
+| Explore | Quality indicators | ✅ | The indicators a training run can minimize, and what each one measures |
+| Explore | Problems | 🚧 | Browse the problems available for training and solving |
 | Solve | Run algorithm | 🚧 | Configure and run an algorithm on a problem, inspect its front, export `VAR`/`FUN` |
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Analysis | 🚧 | Statistical comparison of runs and configurations (Wilcoxon tests, tables, plots) |
@@ -113,7 +116,7 @@ make run   # streamlit run app.py
 
 1. The first time, click **Download Evolver 2.1** in the sidebar. The jar (about 130 MB) is
    downloaded from Maven Central into `lib/` and its checksum is verified.
-2. The home page shows the parts of the app. Open **Explore** to browse the algorithms and their parameter spaces.
+2. The home page shows the parts of the app. Open **Base algorithms**, under Explore, to browse the algorithms and their parameter spaces.
 3. Open **Training**, keep the default settings (NSGA-II on ZDT4) or edit them, and click
    **Launch training**. The indicator front updates as the run progresses.
 4. Paths are relative to the Evolver-Studio directory. Each run's request files (`request.yaml`,

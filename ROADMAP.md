@@ -75,6 +75,12 @@ below; revisit and reorder as real usage surfaces new ones.
   mirrors (`CATALOGUE_EVOLVER_VERSION`), and Explore and Training warn when the jar in use (its
   `pom.properties` version) is older.
 
+- **Explore split into four pages (October 2026)**: Base algorithms, Meta-optimizers, Quality
+  indicators and Problems (a placeholder), instead of one long page. The algorithm pages open with
+  nothing selected and show a space only once an algorithm is chosen; meta-optimizers use the same
+  selector as base algorithms (they were a list of expanders). Quality indicators come from
+  `catalogue.QUALITY_INDICATORS`, checked against the manifest's `indicators`.
+
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
   `pages/tutorials.py`). Run algorithm is a placeholder for the solving track (see Next up), like
@@ -136,7 +142,7 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
-  `tests/test_explore.py`.)*
+  `tests/test_explore_*.py`.)*
 - Track Evolver's releases: the app is built against Evolver 2.1 (`evolver_client.EVOLVER_VERSION`,
   the first release that ships `cli.training`); moving to a newer release means bumping that
   constant, running `make sync-resources` and re-running the drift-detection tests against it
@@ -187,7 +193,8 @@ phase currently plans for it.
 **F. Onboarding / new users**
 14. "Try Evolver" on a bundled example with sensible defaults, minimal setup — *shipped* (the ZDT4
     quick-start).
-15. Discover which algorithms/problems/indicators exist — *shipped* (Explore page).
+15. Discover which algorithms/problems/indicators exist — *shipped* for algorithms and indicators
+    (Explore pages); problems still a placeholder.
 
 **G. Reproducibility**
 16. Recover a run's exact `request.yaml` to reproduce or cite it — *shipped* (already persisted per run

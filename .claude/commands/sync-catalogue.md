@@ -1,6 +1,6 @@
 Bring Evolver-Studio's catalogue (`evolver_studio/catalogue.py`) in line with an Evolver release:
-its base algorithms, meta-optimizers and parameter space files, as the Explore and Training pages
-show them.
+its base algorithms, meta-optimizers, parameter space files and quality indicators, as the Explore
+and Training pages show them.
 
 The Evolver version to sync with is: $ARGUMENTS (empty: `EVOLVER_VERSION` in
 `evolver_studio/evolver_client.py`).
@@ -27,7 +27,8 @@ Below, `JAR=<path of that jar>` and `PY=/opt/anaconda3/envs/evolver-studio/bin/p
 
 - The manifest of what `cli.training` can run:
   `java -cp $JAR org.uma.evolver.cli.training.DescribeMain` (`baseAlgorithms` with `encoding` and
-  `requiredExtraConfigKeys`; `metaAlgorithms` with `supportsTree` and `operatorParameterSpaceFile`).
+  `requiredExtraConfigKeys`; `metaAlgorithms` with `supportsTree` and `operatorParameterSpaceFile`;
+  `indicators`).
 - The parameter spaces: `unzip -l $JAR 'parameterSpaces/*'`, and the meta-optimizer configurations:
   `unzip -l $JAR 'metaOptimizerConfigurations/*'`.
 - For a parameter space whose content may have changed (new parameters, new values), compare it with
@@ -46,6 +47,7 @@ Present a table to the user with, per row, what changed and the edit it implies:
 | `supportsTree: true`, catalogue says no | `supports_tree=True`, `tree_operator_parameter_space_file` (`*MetaTree.yaml`), `tree_parameters` (the fields of its `Meta*TreeConfiguration.yaml`) |
 | new `parameterSpaces/` file | a new encoding of a `BaseAlgorithm`, or an entry with its reason in `KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES` |
 | file referenced by the catalogue, gone from the jar | remove the reference |
+| indicator in `indicators`, not in `QUALITY_INDICATORS` (or the reverse) | add (or remove) the `QualityIndicator`: `short_name` and `full_name` from the jMetal/Evolver class's `name()`/`description()`, and a one-sentence `measures` |
 | new algorithm class without a parameter space or registry entry | nothing to add yet; mention it |
 
 Wait for the user's confirmation if anything is ambiguous (e.g. a file that could be either a base
@@ -77,11 +79,11 @@ EVOLVER_JAR=$JAR $PY -m pytest -q
 With the release jar that `EVOLVER_VERSION` names, no `EVOLVER_JAR` is needed. Every test must pass,
 none skipped for lack of the jar.
 
-Then look at the page: `EVOLVER_JAR=$JAR make run`, open Explore through the navigation, and check
-each changed algorithm's table (its parameters, the *Active if* column) and, for meta-optimizers, the
-Flat/Tree tabs. Without a browser at hand, a headless Chrome screenshot through the DevTools
-protocol works (load `/`, then click the link whose `href` ends in `/explore`; opening `/explore`
-directly bypasses `st.navigation`).
+Then look at the pages: `EVOLVER_JAR=$JAR make run`, open Explore's pages through the navigation,
+choose each changed algorithm and check its table (its parameters, the *Active if* column) and, for
+meta-optimizers, the Flat/Tree tabs; check Quality indicators if they changed. Without a browser at hand, a headless Chrome screenshot through the DevTools
+protocol works (load `/`, then click the link whose `href` ends in `/explore_base_algorithms` or
+`/explore_meta_optimizers`; opening those URLs directly bypasses `st.navigation`).
 
 ### 6. Commit
 
