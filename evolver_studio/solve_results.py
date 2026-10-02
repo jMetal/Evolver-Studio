@@ -34,6 +34,7 @@ class SolveRunInfo:
         algorithm: The algorithm's name.
         problem: The problem's name.
         state: Its state, or None if its status file is missing or unreadable.
+        request: Its request file's content, as Evolver reads it.
     """
 
     run_id: str
@@ -42,6 +43,7 @@ class SolveRunInfo:
     algorithm: str
     problem: str
     state: RunState | None
+    request: dict
 
 
 def read_run_fronts(output_directory: Path) -> dict[int, pd.DataFrame]:
@@ -148,6 +150,7 @@ def list_solve_runs(runs_directory: Path, working_directory: Path) -> list[Solve
                     algorithm=request["algorithmName"],
                     problem=request["problem"],
                     state=status.state if status is not None else None,
+                    request=request,
                 )
             )
         except (OSError, yaml.YAMLError, KeyError, TypeError):
