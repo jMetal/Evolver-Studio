@@ -28,7 +28,10 @@ Works with Evolver 2.2.
   over the problem's reference front, with the quality indicators of each run and their summary, and
   the results can be downloaded. Every run is kept under `solve-runs/` and can be reopened.
   For MOEA/D and RVEA the population size is chosen among the sizes that have a weight vector file
-  for the problem's number of objectives, instead of failing when none matches.
+  for the problem's number of objectives, instead of failing when none matches. A past run can be
+  repeated: "Use this configuration for a new run" fills the form with its problem, algorithm,
+  configuration (the adjusted one included) and budget, and "Download request.yaml" gives the file
+  to run it outside Evolver-Studio with `SolveRunnerMain`.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,
