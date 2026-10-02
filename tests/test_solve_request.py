@@ -22,6 +22,8 @@ def _request(**changes) -> SolveRequest:
         seed=7,
         indicator_names=["Epsilon", "NormalizedHypervolume"],
         status_frequency=500,
+        front_frequency=None,
+        write_population=False,
         output_directory="solve-runs/20260101-120000/output",
     )
     return dataclasses.replace(request, **changes)
@@ -59,6 +61,7 @@ class TestSolveRequestToYaml:
                     reference_front_file_name=None,
                     indicator_names=[],
                     status_frequency=None,
+                    front_frequency=None,
                 )
             )
         )
@@ -67,7 +70,27 @@ class TestSolveRequestToYaml:
         assert "seed" not in data
         assert "referenceFrontFileName" not in data
         assert "statusFrequency" not in data
+        assert "frontFrequency" not in data
+        assert "writePopulation" not in data
         assert data["indicatorNames"] == []
+
+    def test_should_write_the_front_frequency_and_whether_to_write_the_population(self):
+        # Act
+        data = yaml.safe_load(
+            solve_request_to_yaml(_request(front_frequency=1000, write_population=True))
+        )
+
+        # Assert
+        assert data["frontFrequency"] == 1000
+        assert data["writePopulation"] is True
+
+    def test_should_not_write_writepopulation_when_it_is_off(self):
+        # Act
+        data = yaml.safe_load(solve_request_to_yaml(_request(front_frequency=1000)))
+
+        # Assert
+        assert data["frontFrequency"] == 1000
+        assert "writePopulation" not in data
 
     def test_should_write_the_extra_configuration(self):
         # Act
@@ -108,6 +131,16 @@ class TestValidationErrors:
         assert len(errors) == 1
         assert "evaluation" in errors[0]
 
+    def test_should_reject_a_front_frequency_below_one_and_the_population_without_a_front(self):
+        # Act
+        below_one = _request(front_frequency=0).validation_errors()
+        without_front = _request(write_population=True).validation_errors()
+
+        # Assert
+        assert len(below_one) == 1
+        assert len(without_front) == 1
+        assert "live front" in without_front[0]
+
     def test_should_report_every_problem_found(self):
         # Act
         errors = _request(
@@ -117,7 +150,8 @@ class TestValidationErrors:
             number_of_independent_runs=0,
             configuration=" ",
             status_frequency=-1,
+            front_frequency=-1,
         ).validation_errors()
 
         # Assert
-        assert len(errors) == 6
+        assert len(errors) == 7

@@ -11,6 +11,7 @@ from evolver_studio.evolver_client import RunState
 from evolver_studio.solve_results import (
     indicator_summary,
     list_solve_runs,
+    read_current_front,
     read_front,
     read_indicators,
     read_request,
@@ -67,6 +68,35 @@ class TestReadRunFronts:
 
         # Act / Assert
         assert list(read_front(file).columns) == ["f1", "f2", "f3"]
+
+
+class TestReadCurrentFront:
+    def test_should_read_the_solutions_with_lowercase_objective_columns(self, tmp_path: Path):
+        # Arrange
+        (tmp_path / "CURRENT_FRONT.csv").write_text(
+            "Run,Evaluations,NonDominated,F1,F2\n2,500,1,0.1,0.9\n2,500,0,0.8,0.8\n"
+        )
+
+        # Act
+        front = read_current_front(tmp_path)
+
+        # Assert
+        assert list(front.columns) == ["Run", "Evaluations", "NonDominated", "f1", "f2"]
+        assert list(front["NonDominated"]) == [1, 0]
+
+    @pytest.mark.parametrize(
+        "content", [None, "", "Run,Evaluations,NonDominated,F1\n", "not,a,front\n1,2,3\n"]
+    )
+    def test_should_give_none_when_there_is_no_front_to_show(
+        self, tmp_path: Path, content: str | None
+    ):
+        """It is missing before the first write and after the runs end, and may be empty."""
+        # Arrange
+        if content is not None:
+            (tmp_path / "CURRENT_FRONT.csv").write_text(content)
+
+        # Act / Assert
+        assert read_current_front(tmp_path) is None
 
 
 class TestReadRequest:
