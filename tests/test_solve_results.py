@@ -148,6 +148,7 @@ class TestListSolveRuns:
         assert [run.state for run in listed] == [None, RunState.FAILED, RunState.FINISHED]
         assert listed[0].output_directory == tmp_path / "solve-runs/20260103-100000/output"
         assert (listed[0].algorithm, listed[0].problem) == ("NSGA-II", "ZDT1")
+        assert listed[0].request["algorithmName"] == "NSGA-II"
 
     def test_should_skip_a_directory_without_a_readable_request(self, tmp_path: Path):
         # Arrange
