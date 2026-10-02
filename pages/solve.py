@@ -10,6 +10,7 @@ import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 from evolver_studio.app_state import (
@@ -72,11 +73,15 @@ from evolver_studio.solve_form import (
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
 from evolver_studio.solve_results import (
     SolveRunInfo,
+    filter_by_objectives,
     indicator_summary,
+    is_permutation,
     list_solve_runs,
+    objective_columns,
     read_front,
     read_indicators,
     read_run_fronts,
+    read_solutions,
     zip_fronts,
 )
 from evolver_studio.weight_vectors import available_population_sizes
@@ -435,12 +440,14 @@ def _render_results(run: SolveRunInfo) -> None:
     if phase != RunPhase.FINISHED:
         st.info("This run is still in progress.")
         return
-    tabs = st.tabs(["Front", "Indicators", "Details"])
+    tabs = st.tabs(["Front", "Indicators", "Solutions", "Details"])
     with tabs[0]:
         _render_front(run)
     with tabs[1]:
         _render_indicators(run)
     with tabs[2]:
+        _render_solutions(run)
+    with tabs[3]:
         _render_details(run)
 
 
@@ -462,6 +469,81 @@ def _render_front(run: SolveRunInfo) -> None:
         width="stretch",
         key=f"solve_front_{run.run_id}",
     )
+
+
+def _render_solutions(run: SolveRunInfo) -> None:
+    """Show the solutions of one run, with their objectives and variables.
+
+    The table can be filtered by a range for each objective, sorted by any column, downloaded, and
+    a row can be selected to see that solution's decision variables.
+    """
+    numbers = list(read_run_fronts(run.output_directory))
+    number = st.selectbox(
+        "Run",
+        numbers,
+        format_func=lambda n: f"Run {n}",
+        key=f"solve_solutions_run_{run.run_id}",
+    )
+    solutions = read_solutions(run.output_directory, number)
+    shown = filter_by_objectives(solutions, _objective_ranges(run, number, solutions))
+    st.caption(f"{len(shown)} of {len(solutions)} solutions.")
+    selection = st.dataframe(
+        shown,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="single-row",
+        key=f"solve_solutions_table_{run.run_id}_{number}",
+    )
+    if selection.selection.rows:
+        position = selection.selection.rows[0]
+        _render_solution(shown.iloc[position], shown.index[position])
+    st.download_button(
+        "Download this table (CSV)",
+        shown.to_csv(index_label="solution"),
+        file_name=f"{run.run_id}-run-{number}-solutions.csv",
+        mime="text/csv",
+        key=f"solve_solutions_download_{run.run_id}_{number}",
+    )
+
+
+def _objective_ranges(
+    run: SolveRunInfo, number: int, solutions: pd.DataFrame
+) -> dict[str, tuple[float, float]]:
+    """Let the user restrict each objective to a range; only the restricted ones are returned."""
+    ranges: dict[str, tuple[float, float]] = {}
+    objectives = objective_columns(solutions)
+    with st.expander("Filter by objective"):
+        columns = st.columns(min(len(objectives), 4))
+        for index, objective in enumerate(objectives):
+            lower, upper = float(solutions[objective].min()), float(solutions[objective].max())
+            if lower == upper:
+                continue
+            ranges[objective] = columns[index % len(columns)].slider(
+                objective,
+                lower,
+                upper,
+                (lower, upper),
+                format="%.4g",
+                key=f"solve_filter_{run.run_id}_{number}_{objective}",
+            )
+    return ranges
+
+
+def _render_solution(solution: pd.Series, identifier: int) -> None:
+    """Show one solution: its objectives, and its decision variables."""
+    st.markdown(f"**Solution {identifier}**")
+    st.caption(
+        ", ".join(f"{name} = {solution[name]:.6g}" for name in solution.index if name[0] == "f")
+    )
+    variables = solution[[name for name in solution.index if name[0] == "x"]]
+    if variables.empty:
+        return
+    if is_permutation(variables):
+        st.caption("A permutation of 0 to n-1:")
+        st.code(" ".join(str(int(value)) for value in variables), language=None, wrap_lines=True)
+    else:
+        st.caption("Decision variables:")
+        st.bar_chart(variables)
 
 
 def _render_indicators(run: SolveRunInfo) -> None:
