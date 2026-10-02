@@ -2,14 +2,21 @@
 
 The interactive counterpart of Evolver's tutorial E1 (docs/tutorials/parameter_spaces.rst): the
 same concepts, on the same parameter spaces (NSGA-II for continuous and binary problems), read
-drawn as a tree instead of Java code.
+in the tables of the Explore pages instead of through Java code. Version 1.1: the spaces are shown
+as the Explore pages show them (a table with an *Active if* column), and the tutorial ends with the
+meta-optimizers and the quality indicators, the other pages of Explore.
 """
 
 from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.parameter_form import render_parameter_space_readonly
+from evolver_studio.catalogue import META_ALGORITHMS, QUALITY_INDICATORS
+from evolver_studio.configuration import complete_values, configuration_string
+from evolver_studio.parameter_form import (
+    render_parameter_space_readonly,
+    render_parameter_space_table,
+)
 from evolver_studio.parameter_space import (
     CategoricalParameter,
     ParameterSpec,
@@ -43,36 +50,61 @@ def _render_introduction(jar: Path) -> None:
         "- **Tuning an algorithm**: a meta-optimizer searches the parameter space for the "
         "configurations that perform best.\n\n"
         "In this tutorial you will read the parameter space of NSGA-II, see how its parameters "
-        "depend on each other, find out which ones a configuration activates, and compare two "
-        "encodings of the same algorithm. It is the interactive companion of Evolver's tutorial "
-        f"[E1. Parameter spaces]({E1_TUTORIAL_URL}), which covers the same ideas with Java code."
+        "depend on each other, find out which ones a configuration activates, compare two "
+        "encodings of the same algorithm, and visit the other things the **Explore** pages show: "
+        "the operators of the meta-optimizers and the quality indicators. It is the interactive "
+        f"companion of Evolver's tutorial [E1. Parameter spaces]({E1_TUTORIAL_URL}), which covers "
+        "the same ideas with Java code.\n\n"
+        "The spaces you will read here are the ones you can browse yourself in **Explore › Base "
+        "algorithms**, and the ones the form of **Run algorithm** adjusts when you configure an "
+        "algorithm (tutorial S3)."
     )
 
 
-def _render_reading_the_tree(jar: Path) -> None:
+def _render_reading_the_table(jar: Path) -> None:
     parameters = _load(jar, "NSGAIIDouble.yaml")
     st.markdown(
         "This is the parameter space of NSGA-II for continuous problems (`NSGAIIDouble.yaml`), "
-        "drawn as a tree. Each bullet is a parameter, in **bold**:\n\n"
-        "- A **categorical** parameter lists its values (e.g. `createInitialSolutions`).\n"
-        "- A **double** or **integer** parameter shows its range `[min, max]` (e.g. "
+        "as the Explore page shows it: **one row per parameter**.\n\n"
+        "- *Parameter*: its name, indented under the parameter it depends on.\n"
+        "- *Type*: **categorical** (it takes one of a list of values, e.g. "
+        "`createInitialSolutions`), **integer** or **double** (a number in a range, e.g. "
         "`crossoverProbability`).\n"
-        "- The first-level bullets are the **top-level** parameters: every configuration sets them."
+        "- *Active if*: when it applies (you will see how in the next step); empty for the "
+        "**top-level** parameters, which every configuration sets.\n"
+        "- *Domain*: its values, or its range `[min, max]`.\n\n"
+        "The line above the table counts the parameters. The filter keeps the rows that mention "
+        "what you type, together with the parameters they hang from."
     )
-    st.metric("Top-level parameters", len(parameters))
-    with st.container(height=400):
-        render_parameter_space_readonly(parameters)
+    render_parameter_space_table(parameters, key=f"{KEY_PREFIX}_table")
+    st.markdown(
+        "**Try it:** type `archive` in the filter. Which parameter do the matches hang from?"
+    )
+    answer = st.radio(
+        "Quick check: how many top-level parameters does this space have?",
+        ["3", "5", "34"],
+        index=None,
+        key=f"{KEY_PREFIX}_top_level_quiz",
+    )
+    if answer == "5":
+        st.success("Right: five, and 34 parameters in all, counting every sub-parameter.")
+    elif answer is not None:
+        st.error("Not quite: look at the summary above the table.")
+    with st.expander("The same space as a tree"):
+        with st.container(height=400):
+            render_parameter_space_readonly(parameters)
 
 
 def _render_relations(jar: Path) -> None:
     parameters = _load(jar, "NSGAIIDouble.yaml")
     crossover = _find(parameters, "crossover")
     st.markdown(
-        "Parameters can have sub-parameters of two kinds, which the tree marks differently:\n\n"
-        "- *always:* introduces **global sub-parameters**, which apply whatever value their parent "
+        "Parameters can have sub-parameters of two kinds, which the *Active if* column of the "
+        "table tells apart:\n\n"
+        "- `crossover (any)`: a **global sub-parameter**, which applies whatever value its parent "
         "takes. Every crossover has a probability, so `crossoverProbability` is a global "
         "sub-parameter of `crossover`.\n"
-        "- *if SBX:* introduces **conditional parameters**, which apply only when their parent "
+        "- `crossover = SBX`: a **conditional parameter**, which applies only when its parent "
         "takes that value. `sbxDistributionIndex` only makes sense for SBX.\n\n"
         "Pick a crossover and see which of its sub-parameters apply:"
     )
@@ -110,6 +142,20 @@ def _render_activation(jar: Path) -> None:
     active = active_parameter_names(parameters, choices)
     st.metric("Active parameters", f"{len(active)} of {count_parameters(parameters)}")
     st.write(", ".join(f"`{name}`" for name in active))
+    st.markdown(
+        "A **configuration** gives a value to each active parameter. Written as Evolver reads it "
+        "(`--parameter value`, in the order of the space), the choices above are:"
+    )
+    st.code(
+        configuration_string(parameters, complete_values(parameters, choices)),
+        language=None,
+        wrap_lines=True,
+    )
+    st.caption(
+        "The numbers are the middle of each range, only so that there is a value to show. This is "
+        "what the form of **Run algorithm** shows and adjusts, with a widget for each active "
+        "parameter."
+    )
 
 
 def _render_choice_widgets(
@@ -134,35 +180,78 @@ def _render_encodings(jar: Path) -> None:
         "single-point crossover and bit-flip mutation instead. Evolver turns each value into the "
         "right component for the encoding through a *parameter factory*."
     )
-    columns = st.columns(2)
-    for column, (label, filename) in zip(
-        columns,
-        (("Continuous (Double)", "NSGAIIDouble.yaml"), ("Binary", "NSGAIIBinary.yaml")),
-        strict=True,
-    ):
-        parameters = _load(jar, filename)
-        with column:
-            st.markdown(f"**{label}** — `{filename}`")
-            st.metric("Parameters", count_parameters(parameters))
-            with st.container(height=400):
-                render_parameter_space_readonly(parameters)
+    tabs = st.tabs(["Continuous (Double)", "Binary"])
+    for tab, filename in zip(tabs, ("NSGAIIDouble.yaml", "NSGAIIBinary.yaml"), strict=True):
+        with tab:
+            st.caption(filename)
+            render_parameter_space_table(_load(jar, filename), key=f"{KEY_PREFIX}_{filename}")
+
+
+def _render_beyond_algorithms(jar: Path) -> None:
+    st.markdown(
+        "The algorithms you have read so far are the ones you **run**. Evolver also has "
+        "**meta-optimizers**, the algorithms that *search* a parameter space for good "
+        "configurations (training), and the page **Explore › Meta-optimizers** shows what each "
+        "one is made of. A meta-optimizer is configured through its own operators (crossover, "
+        "mutation, selection), and for each *encoding* of the configurations it searches: a flat "
+        "vector of numbers, or a derivation tree."
+    )
+    nsgaii = next(meta for meta in META_ALGORITHMS if meta.name == "NSGA-II")
+    flat, tree = st.tabs(["NSGA-II, flat encoding", "NSGA-II, tree encoding"])
+    with flat:
+        st.caption(nsgaii.operator_parameter_space_file)
+        render_parameter_space_table(
+            _load(jar, nsgaii.operator_parameter_space_file), key=f"{KEY_PREFIX}_meta_flat"
+        )
+    with tree:
+        st.caption(nsgaii.tree_operator_parameter_space_file)
+        render_parameter_space_table(
+            _load(jar, nsgaii.tree_operator_parameter_space_file), key=f"{KEY_PREFIX}_meta_tree"
+        )
+    answer = st.radio(
+        "Quick check: which crossover does the tree encoding offer?",
+        ["SBX", "subtree", "blxAlpha"],
+        index=None,
+        key=f"{KEY_PREFIX}_tree_quiz",
+    )
+    if answer == "subtree":
+        st.success("Right: the only one. It crosses derivation trees, so SBX does not apply.")
+    elif answer is not None:
+        st.error("Not quite: look at the *crossover* row of the tree encoding's table.")
+    st.markdown(
+        "Training also needs to know what *good* means. The page **Explore › Quality "
+        "indicators** lists the measures of a front a training can minimize, and a training run "
+        "minimizes two of them:\n\n"
+        + "\n".join(
+            f"- **{indicator.short_name}**, {indicator.full_name}: {indicator.measures}"
+            for indicator in QUALITY_INDICATORS
+        )
+        + "\n\nThe page **Explore › Problems** will list the problems an algorithm can be run on."
+    )
 
 
 def _render_next_steps(jar: Path) -> None:
     st.markdown(
         "You now know how to read a parameter space. Keep exploring on your own in the Explore "
-        "pages, which show each space as a table: one row per parameter, indented under the "
-        "parameter it hangs from, with an *Active if* column for the condition that activates it "
-        "and a filter to find parameters by name or value:\n\n"
+        "pages, which show each space as a table:\n\n"
         "- In **Base algorithms**, open **MOEA/D** with the Double encoding. Which top-level "
         "parameters does it add to those of NSGA-II?\n"
+        "- Open **RVEA**: its `replacement` parameter chooses between three variants of the "
+        "algorithm. Which parameters does each one activate?\n"
         "- Open **NSGA-II** with the Permutation encoding. Which operators does it offer?\n"
-        "- In **Meta-optimizers**, NSGA-II, AGE-MOEA and AsyncNSGA-II have their own parameter "
-        "spaces too, one for each encoding they support.\n\n"
-        f"For the same concepts with Java code, see Evolver's tutorial [E1]({E1_TUTORIAL_URL})."
+        "- In **Meta-optimizers**, open **AsyncNSGA-II**: how does its flat catalogue differ from "
+        "NSGA-II's?\n\n"
+        "**Next:** tutorial **S3** configures one of these algorithms, runs it on a problem and "
+        "reads the front it finds; the form you will use shows the parameters you have just "
+        "learned to read. For the same concepts with Java code, see Evolver's tutorial "
+        f"[E1]({E1_TUTORIAL_URL})."
     )
     st.page_link("pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬")
     st.page_link("pages/explore_meta_optimizers.py", label="Explore the meta-optimizers", icon="🎛️")
+    st.page_link(
+        "pages/explore_quality_indicators.py", label="See the quality indicators", icon="📏"
+    )
+    st.page_link("pages/tutorials.py", label="All the tutorials", icon="🎓")
 
 
 def _find(parameters: list[ParameterSpec], name: str) -> CategoricalParameter:
@@ -179,9 +268,10 @@ def _find(parameters: list[ParameterSpec], name: str) -> CategoricalParameter:
 
 STEPS: tuple[TutorialStep, ...] = (
     TutorialStep("What is a parameter space?", _render_introduction),
-    TutorialStep("Reading the tree", _render_reading_the_tree),
+    TutorialStep("Reading a parameter space", _render_reading_the_table),
     TutorialStep("Global and conditional sub-parameters", _render_relations),
     TutorialStep("Active parameters", _render_activation),
     TutorialStep("The same algorithm, another encoding", _render_encodings),
+    TutorialStep("Beyond the algorithms", _render_beyond_algorithms),
     TutorialStep("Explore on your own", _render_next_steps),
 )
