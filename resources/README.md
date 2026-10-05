@@ -1,7 +1,7 @@
 # Resources copied from Evolver
 
 The files in this directory are copied, unchanged, from the `resources/` directory of
-[Evolver](https://github.com/jMetal/Evolver) at tag `v2.2`, and are distributed under the same
+[Evolver](https://github.com/jMetal/Evolver) at tag `v2.3`, and are distributed under the same
 license (GNU GPL v3). Evolver's training runs read them through paths relative to their working
 directory (for example `resources/referenceFronts/ZDT4.csv`), so they keep Evolver's layout.
 
