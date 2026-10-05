@@ -75,6 +75,12 @@ below; revisit and reorder as real usage surfaces new ones.
   mirrors (`CATALOGUE_EVOLVER_VERSION`), and Explore and Training warn when the jar in use (its
   `pom.properties` version) is older.
 
+- **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
+  tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
+  default configurations of Evolver 2.3 for the binary and permutation encodings (every runnable
+  encoding now has one), the Spread and GeneralizedSpread indicators, and classifies the space of
+  the GECCO 2019 study used by Evolver's tutorial E6 (`NSGAIIDoubleGECCO2019.yaml`).
+
 - **Moved to Evolver 2.2 (October 2026)**: the app downloads Evolver 2.2 and its resources come from
   tag `v2.2` (DTLZ2-4 reference fronts regenerated as in jMetal, and DTLZ1Minus-DTLZ4Minus fronts
   per number of objectives). Studio follows stable releases only, so the catalogue mirrors
@@ -139,7 +145,8 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 - **Solving track, next steps** (the first version of Run algorithm is done): start from a
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem; problem arguments (number of objectives and variables of DTLZ, WFG,
-  ZCAT), which need the Problems page of Explore; the Spread indicators, with Evolver 2.3.
+  ZCAT), which need the Problems page of Explore. Binary and permutation problems cannot be chosen
+  yet: `DescribeMain` lists the problems without their encoding.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
   documentation counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time
   (S2 is done).
@@ -166,7 +173,7 @@ Landing page now exists (`pages/validation.py`), currently a placeholder pointin
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
   `tests/test_explore_*.py`.)*
-- Track Evolver's releases: the app is built against Evolver 2.2 (`evolver_client.EVOLVER_VERSION`)
+- Track Evolver's releases: the app is built against Evolver 2.3 (`evolver_client.EVOLVER_VERSION`)
   and follows stable releases only; moving to a newer release is the `/bump-evolver` command
   (bumping that constant, `make sync-resources`, `/sync-catalogue` and the drift-detection tests).
   Work against a `develop` jar set by `EVOLVER_JAR` goes on an `experiment/*` branch. The rename

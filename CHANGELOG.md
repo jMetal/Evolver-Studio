@@ -6,7 +6,7 @@ version works with.
 
 ## 0.1.0 (unreleased)
 
-Works with Evolver 2.2.
+Works with Evolver 2.3.
 
 ### Added
 
@@ -16,7 +16,7 @@ Works with Evolver 2.2.
   *Problems* is a placeholder. The pages open with nothing selected, and warn when the Evolver jar
   in use is older than the release the app mirrors.
 - **Training**: configure, launch, monitor and cancel a meta-optimization run, with a live view of
-  the front of configurations found. NSGA-II (Double and Permutation), MOEA/D and RVEA as base
+  the front of configurations found. NSGA-II (Double, Binary and Permutation), MOEA/D and RVEA as base
   algorithms; NSGA-II, AGE-MOEA, SPEA2, SMPSO, AsyncNSGA-II and Random Search as meta-optimizers,
   with the flat encoding and, for NSGA-II, AGE-MOEA, AsyncNSGA-II and Random Search, the tree
   encoding. Arbitrary multi-problem training sets, and a guided or expert editor of the base

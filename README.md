@@ -31,7 +31,7 @@ talks to it through files rather than a server:
 ```text
 Evolver-Studio (Streamlit)
   └─> writes request.yaml (+ reusable baseLevel / metaSearch files)
-       └─> java -cp Evolver-2.2-jar-with-dependencies.jar
+       └─> java -cp Evolver-2.3-jar-with-dependencies.jar
                 org.uma.evolver.cli.training.TrainingRunnerMain request.yaml status.yaml
             ├─> status.yaml   polled for progress (RUNNING / FINISHED / FAILED)
             └─> METADATA.txt, INDICATORS.csv, CONFIGURATIONS.csv, VAR_CONF.txt
@@ -80,7 +80,7 @@ that can be launched from the app today are:
 
 | Level | Algorithms |
 |---|---|
-| Base level | NSGA-II (Double, Permutation), MOEA/D (Double), RVEA (Double) |
+| Base level | NSGA-II (Double, Binary, Permutation), MOEA/D (Double), RVEA (Double) |
 | Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding); NSGA-II, AGE-MOEA, Async NSGA-II, Random Search (tree encoding) |
 
 The other base-level algorithms (SMS-EMOA, RDE-MOEA, AGE-MOEA, MOPSO, NSGA-III, PAES, SSMOEA) are
@@ -92,8 +92,8 @@ browsable only, until Evolver's command-line runner supports them. See Evolver's
 - Python 3.11+ and [Conda](https://docs.conda.io/)
 - Java 21 or newer, on the `PATH`
 
-Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.2** (the
-first release that includes the `cli.training` command-line runner) from Maven Central. Other
+Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.3** (the
+release the app is built against) from Maven Central. Other
 versions are not supported; the expected version is set by `EVOLVER_VERSION` in
 `evolver_studio/evolver_client.py`.
 
@@ -101,7 +101,7 @@ Evolver-Studio is versioned on its own, and works with one Evolver release at a 
 
 | Evolver-Studio | Evolver |
 |---|---|
-| 0.1.0 (in development) | 2.2 |
+| 0.1.0 (in development) | 2.3 |
 
 ## Installation
 
@@ -117,7 +117,7 @@ make env   # creates (or updates) the 'evolver-studio' environment from environm
 make run   # streamlit run app.py
 ```
 
-1. The first time, click **Download Evolver 2.2** in the sidebar. The jar (about 130 MB) is
+1. The first time, click **Download Evolver 2.3** in the sidebar. The jar (about 130 MB) is
    downloaded from Maven Central into `lib/` and its checksum is verified.
 2. The home page shows the parts of the app. Open **Base algorithms**, under Explore, to browse the algorithms and their parameter spaces.
 3. Open **Training**, keep the default settings (NSGA-II on ZDT4) or edit them, and click
