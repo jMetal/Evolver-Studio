@@ -18,6 +18,7 @@ from evolver_studio.evolver_client import RunState, read_status
 
 RUN_DIRECTORY_PATTERN = re.compile(r"run-(\d+)")
 INDICATORS_FILE = "INDICATORS.csv"
+CURRENT_FRONT_FILE = "CURRENT_FRONT.csv"
 METADATA_FILE = "METADATA.txt"
 # INDICATORS.csv's columns that are not indicators.
 RUN_COLUMNS = ("Run", "Seed", "TimeMs")
@@ -44,6 +45,44 @@ class SolveRunInfo:
     problem: str
     state: RunState | None
     request: dict
+
+
+def read_request(run_dir: Path) -> dict | None:
+    """Read the request a run was started with.
+
+    Args:
+        run_dir: A solve run's directory.
+
+    Returns:
+        The request file's content, or None if it is missing or unreadable.
+    """
+    try:
+        request = yaml.safe_load((run_dir / "request.yaml").read_text())
+    except (OSError, yaml.YAMLError):
+        return None
+    return request if isinstance(request, dict) else None
+
+
+def read_current_front(output_directory: Path) -> pd.DataFrame | None:
+    """Read the front of the run in progress, as Evolver writes it while the run goes on.
+
+    The file holds a row per solution: `Run,Evaluations,NonDominated,F1,...,Fm`. Evolver moves it
+    into place atomically, but it is removed when the runs end, so it may be missing.
+
+    Args:
+        output_directory: A solve run's output directory.
+
+    Returns:
+        The solutions, with the columns Run, Evaluations, NonDominated and f1, f2, ...; or None if
+        there is no readable front (not written yet, already removed, or empty).
+    """
+    try:
+        front = pd.read_csv(output_directory / CURRENT_FRONT_FILE)
+    except (OSError, pd.errors.ParserError, pd.errors.EmptyDataError):
+        return None
+    if front.empty or "NonDominated" not in front.columns:
+        return None
+    return front.rename(columns={c: c.lower() for c in front.columns if c.startswith("F")})
 
 
 def read_run_fronts(output_directory: Path) -> dict[int, pd.DataFrame]:

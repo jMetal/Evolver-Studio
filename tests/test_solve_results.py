@@ -14,8 +14,10 @@ from evolver_studio.solve_results import (
     is_permutation,
     list_solve_runs,
     objective_columns,
+    read_current_front,
     read_front,
     read_indicators,
+    read_request,
     read_run_fronts,
     read_solutions,
     variable_columns,
@@ -136,6 +138,55 @@ class TestIsPermutation:
     def test_should_tell_a_permutation_of_zero_to_n_minus_one(self, values: list, expected: bool):
         # Act / Assert
         assert is_permutation(pd.Series(values)) is expected
+
+
+class TestReadCurrentFront:
+    def test_should_read_the_solutions_with_lowercase_objective_columns(self, tmp_path: Path):
+        # Arrange
+        (tmp_path / "CURRENT_FRONT.csv").write_text(
+            "Run,Evaluations,NonDominated,F1,F2\n2,500,1,0.1,0.9\n2,500,0,0.8,0.8\n"
+        )
+
+        # Act
+        front = read_current_front(tmp_path)
+
+        # Assert
+        assert list(front.columns) == ["Run", "Evaluations", "NonDominated", "f1", "f2"]
+        assert list(front["NonDominated"]) == [1, 0]
+
+    @pytest.mark.parametrize(
+        "content", [None, "", "Run,Evaluations,NonDominated,F1\n", "not,a,front\n1,2,3\n"]
+    )
+    def test_should_give_none_when_there_is_no_front_to_show(
+        self, tmp_path: Path, content: str | None
+    ):
+        """It is missing before the first write and after the runs end, and may be empty."""
+        # Arrange
+        if content is not None:
+            (tmp_path / "CURRENT_FRONT.csv").write_text(content)
+
+        # Act / Assert
+        assert read_current_front(tmp_path) is None
+
+
+class TestReadRequest:
+    def test_should_read_the_request_of_a_run(self, tmp_path: Path):
+        # Arrange
+        (tmp_path / "request.yaml").write_text("algorithmName: NSGA-II\nstatusFrequency: 500\n")
+
+        # Act / Assert
+        assert read_request(tmp_path) == {"algorithmName": "NSGA-II", "statusFrequency": 500}
+
+    @pytest.mark.parametrize("content", [None, "[not, a, mapping]", "a: [unclosed"])
+    def test_should_give_none_when_there_is_no_readable_request(
+        self, tmp_path: Path, content: str | None
+    ):
+        # Arrange
+        if content is not None:
+            (tmp_path / "request.yaml").write_text(content)
+
+        # Act / Assert
+        assert read_request(tmp_path) is None
 
 
 class TestIndicators:

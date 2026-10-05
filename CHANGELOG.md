@@ -33,7 +33,13 @@ Works with Evolver 2.3.
   configuration (the adjusted one included) and budget, and "Download request.yaml" gives the file
   to run it outside Evolver-Studio with `SolveRunnerMain`. A *Solutions* tab lists the solutions of
   a run with their objectives and decision variables, filters them by a range for each objective,
-  shows the variables of a selected one (as a permutation when it is one) and downloads the table.
+  shows the variables of a selected one (as a permutation when it is one) and downloads the table. With
+  Evolver 2.3 or later the run can be followed while it is in progress, in three modes: *Silent*
+  (the progress changes only when each independent run ends, as with Evolver 2.2), *Progress bar*
+  (evaluations, time elapsed and an estimate of what is left) and *Live front* (the bar and a chart of
+  the front as it evolves over the reference front, optionally with the dominated solutions in
+  grey). A slider sets how often it is refreshed, and the page warns of the cost: updating the
+  progress is cheap, but writing the front often can make the run several times slower.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1: it reads a space in the same table the Explore pages show, with its *Active if*
   column and filter, writes the configuration a choice of values gives, and ends with the

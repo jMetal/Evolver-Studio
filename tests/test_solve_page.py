@@ -7,10 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import catalogue, evolver_client
+from evolver_studio.catalogue import is_at_least
 from evolver_studio.evolver_client import jar_path, write_pid_file
+from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.runs import RunPhase, run_phase
 
 PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "solve.py"
@@ -23,6 +26,12 @@ NSGAII_DEFAULT = (
     "--polynomialMutationDistributionIndex 20.0 --selection tournament --selectionTournamentSize 2"
 )
 RUN_TIMEOUT_SECONDS = 60
+
+
+def _jar_reports_progress() -> bool:
+    """Whether the Evolver jar in use updates the status while a run is in progress (2.3 on)."""
+    version = jar_evolver_version(jar_path())
+    return version is None or is_at_least(version, "2.3")
 
 
 @pytest.fixture
@@ -195,6 +204,128 @@ class TestPopulationSize:
         assert any("No weight vector file" in warning.value for warning in app.warning)
 
 
+class TestTrackingControls:
+    @staticmethod
+    def _supported_or_skip() -> None:
+        if not _jar_reports_progress():
+            pytest.skip("the Evolver jar in use cannot report the progress while running")
+
+    def test_should_offer_the_tracking_modes_only_when_the_jar_can_report_them(self, app: AppTest):
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        radio = app.radio(key="solve_tracking")
+        if _jar_reports_progress():
+            assert list(radio.options) == ["Silent", "Progress bar", "Live front"]
+            assert radio.value == "Progress bar"
+        else:
+            assert list(radio.options) == ["Silent"]
+            assert radio.disabled
+
+    def test_should_say_why_there_is_only_the_silent_mode_with_an_older_jar(self, app: AppTest):
+        # Arrange
+        if _jar_reports_progress():
+            pytest.skip("the Evolver jar in use reports the progress while running")
+
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert any("only when each run ends" in caption.value for caption in app.caption)
+        assert len(app.select_slider) == 0
+
+    def test_should_show_the_frequency_slider_in_the_progress_bar_mode(self, app: AppTest):
+        # Arrange
+        self._supported_or_skip()
+
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert app.select_slider(key="solve_update_every_Progress bar").value == 500
+        assert len(app.checkbox) == 1  # only "Fix the seed"
+        assert not any("slow" in warning.value for warning in app.warning)
+
+    def test_should_warn_when_updating_the_progress_after_every_evaluation(self, app: AppTest):
+        # Arrange
+        self._supported_or_skip()
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.select_slider(key="solve_update_every_Progress bar").set_value(1).run()
+
+        # Assert
+        assert any("slow the run down" in warning.value for warning in app.warning)
+
+    def test_should_show_no_slider_in_the_silent_mode(self, app: AppTest):
+        # Arrange
+        self._supported_or_skip()
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.radio(key="solve_tracking").set_value("Silent").run()
+
+        # Assert
+        assert len(app.select_slider) == 0
+        assert any(
+            "only when each independent run ends" in caption.value for caption in app.caption
+        )
+
+    def test_should_offer_the_whole_population_in_the_live_front_mode(self, app: AppTest):
+        # Arrange
+        self._supported_or_skip()
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.radio(key="solve_tracking").set_value("Live front").run()
+
+        # Assert: it starts at 1000, where writing the front costs little, and has no warning
+        assert app.select_slider(key="solve_update_every_Live front").value == 1000
+        assert app.checkbox(key="solve_whole_population").value is False
+        assert not any("front" in warning.value for warning in app.warning)
+
+    @pytest.mark.parametrize(("frequency", "fragment"), [(100, "costs more"), (1, "several times")])
+    def test_should_warn_that_writing_the_front_often_slows_the_run(
+        self, app: AppTest, frequency: int, fragment: str
+    ):
+        # Arrange
+        self._supported_or_skip()
+        _choose_zdt1_and_nsgaii(app)
+        app.radio(key="solve_tracking").set_value("Live front").run()
+
+        # Act
+        app.select_slider(key="solve_update_every_Live front").set_value(frequency).run()
+
+        # Assert
+        assert any(fragment in warning.value for warning in app.warning)
+
+    def test_should_run_with_the_live_front_and_write_the_request_for_it(
+        self, app: AppTest, tmp_path: Path
+    ):
+        # Arrange
+        self._supported_or_skip()
+        _choose_zdt1_and_nsgaii(app)
+        app.number_input(key="solve_evaluations").set_value(500)
+        app.radio(key="solve_tracking").set_value("Live front").run()
+        app.checkbox(key="solve_whole_population").check().run()
+
+        # Act
+        next(button for button in app.button if button.label == "Run").click().run()
+        run_dir = next((tmp_path / "solve-runs").iterdir())
+        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
+        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the run did not finish"
+            time.sleep(0.2)
+
+        # Assert
+        request = yaml.safe_load((run_dir / "request.yaml").read_text())
+        assert request["frontFrequency"] == 500  # the slider's 1000, limited to the 500 evaluations
+        assert request["writePopulation"] is True
+        assert run_phase(run_dir) is RunPhase.FINISHED
+        assert not (run_dir / "output" / "CURRENT_FRONT.csv").exists()
+
+
 class TestRunInProgress:
     def test_should_show_the_progress_and_keep_the_form_with_the_run_button_disabled(
         self, app: AppTest, tmp_path: Path
@@ -284,6 +415,58 @@ class TestRepeatARun:
         assert len(app.get("download_button")) == 3  # the table, the request and the zip
 
 
+class TestLiveFront:
+    def test_should_plot_the_current_front_of_a_run_in_progress(self, app: AppTest, tmp_path: Path):
+        # Arrange: a run in progress that asked for the front, and has written one
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        try:
+            run_dir = tmp_path / "solve-runs" / "20260101-000000"
+            (run_dir / "output").mkdir(parents=True)
+            (run_dir / "request.yaml").write_text(
+                "algorithmName: NSGA-II\nproblem: ZDT1\nfrontFrequency: 1000\n"
+                "referenceFrontFileName: resources/referenceFronts/ZDT1.csv\n"
+                "outputDirectory: solve-runs/20260101-000000/output\n"
+            )
+            (run_dir / "status.yaml").write_text(
+                "status: RUNNING\nevaluationsDone: 10\nmaxEvaluations: 100\nupdatedAt: x\n"
+            )
+            (run_dir / "output" / "CURRENT_FRONT.csv").write_text(
+                "Run,Evaluations,NonDominated,F1,F2\n1,500,1,0.1,0.9\n1,500,0,0.8,0.8\n"
+            )
+            write_pid_file(run_dir / "pid.txt", process.pid)
+
+            # Act
+            app.run()
+
+            # Assert
+            assert not app.exception
+            assert len(app.get("plotly_chart")) == 1
+        finally:
+            process.kill()
+            process.wait()
+
+    def test_should_wait_for_the_first_front(self, app: AppTest, tmp_path: Path):
+        # Arrange: the same run, before Evolver has written any front
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        try:
+            run_dir = tmp_path / "solve-runs" / "20260101-000000"
+            (run_dir / "output").mkdir(parents=True)
+            (run_dir / "request.yaml").write_text(
+                "algorithmName: NSGA-II\nproblem: ZDT1\nfrontFrequency: 1000\n"
+                "outputDirectory: solve-runs/20260101-000000/output\n"
+            )
+            write_pid_file(run_dir / "pid.txt", process.pid)
+
+            # Act
+            app.run()
+
+            # Assert
+            assert any("Waiting for the first front" in caption.value for caption in app.caption)
+        finally:
+            process.kill()
+            process.wait()
+
+
 class TestRun:
     def test_should_run_the_algorithm_and_show_its_results(self, app: AppTest, tmp_path: Path):
         # Arrange
@@ -308,3 +491,5 @@ class TestRun:
         assert [tab.label for tab in app.tabs] == ["Front", "Indicators", "Solutions", "Details"]
         assert len(app.dataframe) == 3  # the indicators, their summary, and the solutions
         assert (run_dir / "output" / "run-2" / "FUN.csv").is_file()
+        request = yaml.safe_load((run_dir / "request.yaml").read_text())
+        assert ("statusFrequency" in request) is _jar_reports_progress()

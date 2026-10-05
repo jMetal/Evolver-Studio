@@ -28,6 +28,14 @@ class SolveRequest:
         number_of_independent_runs: How many independent runs.
         seed: The seed of the first run (run i uses seed + i - 1), or None to draw one at random.
         indicator_names: The quality indicators computed for each run; empty for none.
+        status_frequency: Every how many evaluations Evolver updates the status while a run is in
+            progress, or None to update it only when a run ends (Evolver 2.3 or later; older ones
+            ignore it). The more often, the slower the run.
+        front_frequency: Every how many evaluations Evolver writes the current front while a run
+            is in progress, or None to write none (Evolver 2.3 or later). The more often, the
+            slower the run, and more so than the status.
+        write_population: Whether that file holds the whole population instead of only the
+            non-dominated solutions; needs `front_frequency`.
         output_directory: Where the results are written.
     """
 
@@ -43,6 +51,9 @@ class SolveRequest:
     number_of_independent_runs: int
     seed: int | None
     indicator_names: list[str]
+    status_frequency: int | None
+    front_frequency: int | None
+    write_population: bool
     output_directory: str
 
     def validation_errors(self) -> list[str]:
@@ -51,22 +62,31 @@ class SolveRequest:
         Returns:
             One message per problem found; empty when the request is valid.
         """
-        errors = []
-        if not self.problem:
-            errors.append("Choose a problem.")
-        if not self.algorithm_name:
-            errors.append("Choose an algorithm.")
-        if not self.configuration.strip():
-            errors.append("The configuration is empty.")
-        if self.indicator_names and not self.reference_front_file_name:
-            errors.append("The indicators need a reference front: choose one, or no indicators.")
-        if self.population_size < 1:
-            errors.append("The population size must be positive.")
-        if self.max_evaluations < 1:
-            errors.append("The maximum number of evaluations must be positive.")
-        if self.number_of_independent_runs < 1:
-            errors.append("At least one run is needed.")
-        return errors
+        checks = [
+            (not self.problem, "Choose a problem."),
+            (not self.algorithm_name, "Choose an algorithm."),
+            (not self.configuration.strip(), "The configuration is empty."),
+            (
+                bool(self.indicator_names) and not self.reference_front_file_name,
+                "The indicators need a reference front: choose one, or no indicators.",
+            ),
+            (self.population_size < 1, "The population size must be positive."),
+            (self.max_evaluations < 1, "The maximum number of evaluations must be positive."),
+            (self.number_of_independent_runs < 1, "At least one run is needed."),
+            (
+                self.status_frequency is not None and self.status_frequency < 1,
+                "The progress must be updated every one evaluation or more.",
+            ),
+            (
+                self.front_frequency is not None and self.front_frequency < 1,
+                "The front must be updated every one evaluation or more.",
+            ),
+            (
+                self.write_population and self.front_frequency is None,
+                "Showing the whole population needs the live front.",
+            ),
+        ]
+        return [message for failed, message in checks if failed]
 
 
 def solve_request_to_yaml(request: SolveRequest) -> str:
@@ -76,8 +96,9 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
         request: The request.
 
     Returns:
-        The YAML document text. `seed` and `referenceFrontFileName` are left out when unset, so
-        Evolver draws a seed and computes no indicators.
+        The YAML document text. `seed`, `referenceFrontFileName`, `statusFrequency` and
+        `frontFrequency` are left out when unset, so Evolver draws a seed, computes no indicators,
+        updates the status only when a run ends and writes no front meanwhile.
     """
     data: dict = {
         "algorithmName": request.algorithm_name,
@@ -95,5 +116,11 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
     if request.seed is not None:
         data["seed"] = request.seed
     data["indicatorNames"] = request.indicator_names
+    if request.status_frequency is not None:
+        data["statusFrequency"] = request.status_frequency
+    if request.front_frequency is not None:
+        data["frontFrequency"] = request.front_frequency
+        if request.write_population:
+            data["writePopulation"] = True
     data["outputDirectory"] = request.output_directory
     return yaml.safe_dump(data, sort_keys=False)

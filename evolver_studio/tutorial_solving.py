@@ -216,6 +216,10 @@ def prepared_request(prepared: PreparedRun, jar: Path, output_directory: str) ->
         number_of_independent_runs=prepared.runs,
         seed=1,
         indicator_names=["Epsilon", "NormalizedHypervolume"],
+        # The tutorial's runs are short and its steps wait for each one to end: no live progress
+        status_frequency=None,
+        front_frequency=None,
+        write_population=False,
         output_directory=output_directory,
     )
 

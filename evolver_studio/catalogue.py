@@ -459,6 +459,21 @@ def is_older_than_catalogue(version: str) -> bool:
     return _release_numbers(version) < _release_numbers(EVOLVER_VERSION)
 
 
+def is_at_least(version: str, minimum: str) -> bool:
+    """Tell whether an Evolver version is at least a given release.
+
+    Only the numeric release is compared, so a snapshot ("2.3-SNAPSHOT") counts as its release.
+
+    Args:
+        version: An Evolver version, e.g. "2.2" or "2.3-SNAPSHOT".
+        minimum: The release it must reach, e.g. "2.3".
+
+    Returns:
+        Whether `version` is `minimum` or later.
+    """
+    return _release_numbers(version) >= _release_numbers(minimum)
+
+
 def _release_numbers(version: str) -> tuple[int, ...]:
     release = version.split("-", 1)[0]
     return tuple(int(part) for part in release.split(".") if part.isdigit())
