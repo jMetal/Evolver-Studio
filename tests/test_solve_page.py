@@ -3,12 +3,13 @@
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from evolver_studio import evolver_client
+from evolver_studio import catalogue, evolver_client
 from evolver_studio.evolver_client import jar_path, write_pid_file
 from evolver_studio.runs import RunPhase, run_phase
 
@@ -106,8 +107,39 @@ class TestConfiguration:
         assert "--sbxDistributionIndex" not in configuration
         assert not any("0 parameter(s) changed" in caption.value for caption in app.caption)
 
-    def test_should_start_an_algorithm_without_default_from_the_parameter_space(self, app: AppTest):
-        # Arrange: NSGA-II with a permutation encoding has no default configuration
+    @pytest.mark.parametrize(
+        ("encoding", "file"),
+        [("Binary", "NSGAIIBinaryDefault.txt"), ("Permutation", "NSGAIIPermutationDefault.txt")],
+    )
+    def test_should_start_every_encoding_of_nsgaii_from_its_default(
+        self, app: AppTest, encoding: str, file: str
+    ):
+        # Arrange
+        app.selectbox(key="solve_problem").select("ZDT1").run()
+        app.selectbox(key="solve_algorithm").select("NSGA-II").run()
+
+        # Act
+        app.selectbox(key="solve_encoding_NSGA-II").select(encoding).run()
+
+        # Assert
+        assert not app.exception
+        assert any(f"Starting from `{file}`" in caption.value for caption in app.caption)
+
+    def test_should_start_an_algorithm_without_default_from_the_parameter_space(
+        self, app: AppTest, monkeypatch: pytest.MonkeyPatch
+    ):
+        # Arrange: Evolver 2.3 ships a default for every runnable encoding, so the case is built
+        # from a catalogue whose NSGA-II has none (as with a jar that does not ship them)
+        monkeypatch.setattr(
+            catalogue,
+            "BASE_ALGORITHMS",
+            tuple(
+                replace(algorithm, default_configurations={})
+                if algorithm.name == "NSGA-II"
+                else algorithm
+                for algorithm in catalogue.BASE_ALGORITHMS
+            ),
+        )
         app.selectbox(key="solve_problem").select("ZDT1").run()
         app.selectbox(key="solve_algorithm").select("NSGA-II").run()
 
