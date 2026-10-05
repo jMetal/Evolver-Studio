@@ -88,13 +88,13 @@ class TestBaseAlgorithms:
             for encoding in algorithm.runnable_encodings:
                 assert encoding in algorithm.encodings
 
-    def test_should_mark_nsgaii_as_runnable_for_both_double_and_permutation(self):
-        """BaseAlgorithmRegistry now registers ("NSGA-II", "Permutation") too."""
+    def test_should_mark_nsgaii_as_runnable_for_every_encoding(self):
+        """BaseAlgorithmRegistry registers NSGA-II for Double, Binary and Permutation."""
         # Arrange
         nsgaii = next(a for a in BASE_ALGORITHMS if a.name == "NSGA-II")
 
         # Act / Assert
-        assert set(nsgaii.runnable_encodings) == {"Double", "Permutation"}
+        assert set(nsgaii.runnable_encodings) == {"Double", "Binary", "Permutation"}
 
 
 class TestDefaultConfigurations:
@@ -104,8 +104,8 @@ class TestDefaultConfigurations:
         for algorithm in BASE_ALGORITHMS:
             assert set(algorithm.default_configurations) <= set(algorithm.encodings)
 
-    def test_should_offer_a_default_configuration_for_most_runnable_encodings(self):
-        """Only NSGA-II's Permutation has none, so the Run algorithm page starts from the space."""
+    def test_should_offer_a_default_configuration_for_every_runnable_encoding(self):
+        """Evolver 2.3 ships one for each, so the Run algorithm page never starts from the space."""
         # Act
         without = {
             (a.name, encoding)
@@ -115,7 +115,7 @@ class TestDefaultConfigurations:
         }
 
         # Assert
-        assert without == {("NSGA-II", "Permutation")}
+        assert without == set()
 
     def test_should_reference_default_configuration_files_that_exist_in_the_jar(self):
         """A stale filename would break the Run algorithm page when it is chosen."""
@@ -206,16 +206,16 @@ class TestQualityIndicators:
 
 
 class TestIsOlderThanCatalogue:
-    """The catalogue mirrors the release the app runs, Evolver 2.2 (EVOLVER_VERSION)."""
+    """The catalogue mirrors the release the app runs, Evolver 2.3 (EVOLVER_VERSION)."""
 
-    @pytest.mark.parametrize("version", ["2.1", "2.0", "1.0.1"])
+    @pytest.mark.parametrize("version", ["2.2", "2.1", "2.0", "1.0.1"])
     def test_should_flag_an_earlier_release(self, version: str):
         # Act / Assert
         assert is_older_than_catalogue(version)
 
-    @pytest.mark.parametrize("version", ["2.2", "2.2-SNAPSHOT", "2.2.1", "2.3-SNAPSHOT", "3.0"])
+    @pytest.mark.parametrize("version", ["2.3", "2.3-SNAPSHOT", "2.3.1", "2.4-SNAPSHOT", "3.0"])
     def test_should_accept_the_same_or_a_later_release_or_its_snapshot(self, version: str):
-        """A snapshot built from develop on its way to 2.2 already has its catalogue."""
+        """A snapshot built from develop on its way to 2.3 already has its catalogue."""
         # Act / Assert
         assert not is_older_than_catalogue(version)
 
