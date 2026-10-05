@@ -121,8 +121,12 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         },
         runnable_today=True,
         registry_name="NSGA-II",
-        runnable_encodings=("Double", "Permutation"),
-        default_configurations={"Double": (("Default", "NSGAIIDoubleDefault.txt"),)},
+        runnable_encodings=("Double", "Binary", "Permutation"),
+        default_configurations={
+            "Double": (("Default", "NSGAIIDoubleDefault.txt"),),
+            "Binary": (("Default", "NSGAIIBinaryDefault.txt"),),
+            "Permutation": (("Default", "NSGAIIPermutationDefault.txt"),),
+        },
     ),
     # org.uma.evolver.algorithm.moead.{Double,Binary,Permutation}MOEAD
     BaseAlgorithm(
@@ -203,6 +207,9 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         # Meta-level parameter spaces (the search space for the *meta*-optimizer's own operators,
         # passed as metaYamlParameterSpaceFile — smaller companions to a same-named file above).
         "NSGAIIDoubleReduced.yaml",
+        # An alternative base-level space of NSGA-II, the one of Nebro et al. (GECCO 2019), used by
+        # Evolver's tutorial E6: a smaller companion of NSGAIIDouble.yaml, not the algorithm's own.
+        "NSGAIIDoubleGECCO2019.yaml",
         "MOEADDoubleReduced.yaml",
         "RDEMOEADoubleReduced.yaml",
         "SMSEMOADoubleReduced.yaml",
@@ -412,6 +419,25 @@ QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
         full_name="Hypervolume, negated",
         measures="−HV(front): the hypervolume, negated so that it can be minimized like the "
         "other indicators.",
+    ),
+    # org.uma.jmetal.qualityindicator.impl.Spread
+    QualityIndicator(
+        registry_name="Spread",
+        short_name="SP",
+        full_name="Spread",
+        measures="Deb's diversity indicator: how evenly the solutions are distributed along the "
+        "front, and how well it reaches the extremes of the reference front; not convergence. "
+        "Defined only for two objectives: Evolver rejects a request that uses it on a problem "
+        "with any other number.",
+    ),
+    # org.uma.jmetal.qualityindicator.impl.GeneralizedSpread
+    QualityIndicator(
+        registry_name="GeneralizedSpread",
+        short_name="GSPREAD",
+        full_name="Generalized spread",
+        measures="The diversity of the solutions, as Spread, for any number of objectives: how "
+        "evenly they are distributed and how well they reach the extremes of the reference "
+        "front; not convergence.",
     ),
 )
 
