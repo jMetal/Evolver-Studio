@@ -285,20 +285,31 @@ class TestTrackingControls:
         assert app.checkbox(key="solve_whole_population").value is False
         assert not any("front" in warning.value for warning in app.warning)
 
-    @pytest.mark.parametrize(("frequency", "fragment"), [(100, "costs more"), (1, "several times")])
-    def test_should_warn_that_writing_the_front_often_slows_the_run(
-        self, app: AppTest, frequency: int, fragment: str
-    ):
+    def test_should_warn_that_writing_the_front_very_often_slows_the_run(self, app: AppTest):
         # Arrange
         self._supported_or_skip()
         _choose_zdt1_and_nsgaii(app)
         app.radio(key="solve_tracking").set_value("Live front").run()
 
         # Act
-        app.select_slider(key="solve_update_every_Live front").set_value(frequency).run()
+        app.select_slider(key="solve_update_every_Live front").set_value(1).run()
 
         # Assert
-        assert any(fragment in warning.value for warning in app.warning)
+        assert any("several times" in warning.value for warning in app.warning)
+
+    def test_should_not_warn_about_the_cost_of_the_front_at_a_moderate_frequency(
+        self, app: AppTest
+    ):
+        # Arrange
+        self._supported_or_skip()
+        _choose_zdt1_and_nsgaii(app)
+        app.radio(key="solve_tracking").set_value("Live front").run()
+
+        # Act: showing the front is expected to slow the run down
+        app.select_slider(key="solve_update_every_Live front").set_value(100).run()
+
+        # Assert
+        assert not any("front" in warning.value for warning in app.warning)
 
     def test_should_run_with_the_live_front_and_write_the_request_for_it(
         self, app: AppTest, tmp_path: Path

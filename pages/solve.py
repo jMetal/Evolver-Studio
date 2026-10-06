@@ -113,7 +113,6 @@ PROGRESS_FREQUENCIES = (1, 10, 100, 500, 1000, 5000, 10000, 50000)
 DEFAULT_PROGRESS_FREQUENCY = 500
 SLOW_PROGRESS_FREQUENCY_BELOW = 100
 DEFAULT_FRONT_FREQUENCY = 1000
-SLOW_FRONT_FREQUENCY_BELOW = 1000
 TRACKING_SILENT = "Silent"
 TRACKING_PROGRESS = "Progress bar"
 TRACKING_FRONT = "Live front"
@@ -329,17 +328,13 @@ class Budget:
 
 def _frequency_warning(mode: str, frequency: int) -> str | None:
     """Say what updating this often costs, from what was measured on NSGA-II (see Evolver's
-    docs/utilities/cli_tools.rst), or None when it costs little."""
+    docs/utilities/cli_tools.rst), or None when it costs little. Showing the front is expected to
+    slow the run down, so only an excessive frequency is warned about."""
     if mode == TRACKING_FRONT:
         if frequency < SLOW_PROGRESS_FREQUENCY_BELOW:
             return (
                 f"Writing the front every {frequency} evaluation(s) can make the run several times "
                 "slower (more than ten times for an algorithm that reports every evaluation)."
-            )
-        if frequency < SLOW_FRONT_FREQUENCY_BELOW:
-            return (
-                "Writing the front costs more than updating the progress: every 100 evaluations "
-                "it added from 12 % to 75 % to the time of the runs measured."
             )
         return None
     if frequency < SLOW_PROGRESS_FREQUENCY_BELOW:
