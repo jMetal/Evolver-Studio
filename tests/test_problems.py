@@ -24,6 +24,7 @@ def resources(tmp_path: Path) -> Path:
         "DTLZ2.8D.csv",
         "DTLZ2.3D.csv",
         "DTLZ2.2D.csv",
+        "LZ09_F1.csv",
     ):
         (root / "referenceFronts" / name).write_text("0,1\n")
     (root / "referenceFrontsTSP" / "KroAB100TSP.csv").write_text("0,1\n")
@@ -58,6 +59,14 @@ class TestReferenceFrontCandidates:
 
         # Assert
         assert candidates == ["resources/referenceFrontsTSP/KroAB100TSP.csv"]
+
+    def test_should_find_the_front_of_an_lz09_problem_named_with_an_underscore(
+        self, resources: Path
+    ):
+        # Act / Assert: the problem is LZ09F1, its front LZ09_F1.csv
+        assert reference_front_candidates("LZ09F1", resources) == [
+            "resources/referenceFronts/LZ09_F1.csv"
+        ]
 
     def test_should_find_nothing_for_an_unknown_problem(self, resources: Path):
         # Act / Assert

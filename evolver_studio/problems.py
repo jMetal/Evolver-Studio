@@ -30,7 +30,10 @@ def reference_front_candidates(
         others by number of objectives.
     """
     simple_name = problem.rsplit(".", 1)[-1]
-    pattern = re.compile(rf"{re.escape(simple_name)}(?:\.(\d+)D)?\.csv")
+    # The fronts of LZ09 are named with an underscore (LZ09_F1.csv), the problems without it.
+    names = {simple_name, re.sub(r"^(LZ09)(F\d+)$", r"\1_\2", simple_name)}
+    alternatives = "|".join(re.escape(name) for name in sorted(names))
+    pattern = re.compile(rf"(?:{alternatives})(?:\.(\d+)D)?\.csv")
     found: list[tuple[int, str]] = []
     for directory in REFERENCE_FRONT_DIRECTORIES:
         folder = resources_directory / directory

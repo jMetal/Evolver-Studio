@@ -38,10 +38,11 @@ def build_front_figure(
 def _scatter_2d(combined: pd.DataFrame, reference_front: pd.DataFrame | None) -> go.Figure:
     figure = px.scatter(combined, x="f1", y="f2", color="Run")
     if reference_front is not None:
+        ordered = reference_front.sort_values("f1")
         figure.add_trace(
             go.Scatter(
-                x=reference_front["f1"],
-                y=reference_front["f2"],
+                x=ordered["f1"],
+                y=ordered["f2"],
                 mode="lines",
                 name="Reference front",
                 line={"color": REFERENCE_FRONT_COLOR},
@@ -135,10 +136,12 @@ def _add_reference(
             )
         )
         return
+    # Some fronts (LZ09) are not sorted: a line through them would zigzag.
+    ordered = reference_front.sort_values("f1")
     figure.add_trace(
         go.Scatter(
-            x=reference_front["f1"],
-            y=reference_front["f2"],
+            x=ordered["f1"],
+            y=ordered["f2"],
             mode="lines",
             name="Reference front",
             line={"color": REFERENCE_FRONT_COLOR},

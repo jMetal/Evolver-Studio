@@ -23,6 +23,16 @@ class TestBuildFrontFigure:
         assert [trace.name for trace in figure.data] == ["Reference front", "1", "2"]
         assert figure.data[0].type == "scatter"
 
+    def test_should_sort_an_unsorted_2d_reference_front_by_the_first_objective(self):
+        # Arrange: as the front of LZ09, whose file is not ordered
+        unsorted = pd.DataFrame({"f1": [1.0, 0.0, 0.5], "f2": [0.0, 1.0, 0.4]})
+
+        # Act
+        figure = build_front_figure({1: _front(2)}, unsorted)
+
+        # Assert
+        assert list(figure.data[0].x) == [0.0, 0.5, 1.0]
+
     def test_should_draw_a_3d_scatter_with_the_reference_front(self):
         # Act
         figure = build_front_figure({1: _front(3)}, _front(3, 10))
