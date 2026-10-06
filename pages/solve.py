@@ -367,7 +367,9 @@ def _render_tracking(max_evaluations: int, runs: int) -> Tracking:
         horizontal=True,
         disabled=not supported,
         help="Silent updates the progress only when each independent run ends. Progress bar "
-        "updates it every N evaluations. Live front also plots the front as it evolves.",
+        "updates it every N evaluations. Live front also plots the front as it evolves. A run "
+        "that lasts a second or two (MOEA/D on a small budget, for instance) ends before there is "
+        "anything to follow: the live view is for the longer ones.",
         key="solve_tracking",
     )
     if not supported:
