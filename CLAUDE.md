@@ -19,7 +19,8 @@ Evolver-Studio serves two purposes, not only meta-optimization:
   Evolver's configurable core is usable on its own, as an alternative to jMetal.
 - **Meta-optimization**: training runs, analysis and validation of the configurations found.
 
-Tutorials for both (interactive, in the app) are catalogued in Evolver's `docs/proposals/tutorials.md`.
+Tutorials for both (interactive, in the app) are catalogued in `evolver_studio/tutorials.py`, each
+paired with the tutorials of Evolver's documentation (`docs/tutorials/`) that cover the same ground.
 
 This file documents the intended architecture agreed on before implementation started. A first,
 deliberately minimal prototype now lives in the repo (`app.py`, `evolver_studio/`): it drives Evolver's

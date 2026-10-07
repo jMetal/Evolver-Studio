@@ -29,6 +29,10 @@ Works with Evolver 2.3.
   writing each front (`frontDelayMillis`; 300 ms by default, with the time it adds), and the page
   looks for a new front every quarter of a second instead of every second. A run of MOEA/D on ZDT1
   with 25000 evaluations, which ended before the first front could be shown, now shows all 25.
+- **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
+  consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
+  configurable algorithm* S2), and the planned ones are listed without one. Each pairs with
+  Evolver's tutorials by their new numbers, and the catalogue links to Evolver's tutorials index.
 
 ### Added
 

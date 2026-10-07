@@ -96,7 +96,7 @@ below; revisit and reorder as real usage surfaces new ones.
   tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
   default configurations of Evolver 2.3 for the binary and permutation encodings (every runnable
   encoding now has one), the Spread and GeneralizedSpread indicators, and classifies the space of
-  the GECCO 2019 study used by Evolver's tutorial E6 (`NSGAIIDoubleGECCO2019.yaml`).
+  the GECCO 2019 study used by Evolver's tutorial E5 (`NSGAIIDoubleGECCO2019.yaml`).
 
 - **Moved to Evolver 2.2 (October 2026)**: the app downloads Evolver 2.2 and its resources come from
   tag `v2.2` (DTLZ2-4 reference fronts regenerated as in jMetal, and DTLZ1Minus-DTLZ4Minus fronts
@@ -137,13 +137,13 @@ below; revisit and reorder as real usage surfaces new ones.
   and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
   cards are built from the same list of pages (`evolver_studio/sections.py`).
 - **Tutorials page with the first interactive tutorial**: the page lists Evolver-Studio's tutorials
-  by level (`evolver_studio/tutorials.py`, mirroring Evolver's `docs/proposals/tutorials.md`) and
-  guides the selected one step by step. **S2, "Exploring a parameter space"**
+  by level (`evolver_studio/tutorials.py`, each paired with tutorials of Evolver's documentation) and
+  guides the selected one step by step. **S1, "Exploring a parameter space"**
   (`evolver_studio/tutorial_parameter_spaces.py`), the companion of Evolver's tutorial E1, is the
   first available: reading the tree view, global and conditional sub-parameters, an interactive
   view of the parameters a configuration activates, and two encodings side by side; its version 1.1
   reads the spaces in the table of the Explore pages and ends with the meta-optimizers and the
-  quality indicators. **S3, "Solving a problem with a configurable algorithm"**
+  quality indicators. **S2, "Solving a problem with a configurable algorithm"**
   (`evolver_studio/tutorial_solving.py`), the companion of E2, is the first of the solving track:
   each step has a prepared run (`PreparedRun`: fixed seed, the values the text announces) that runs
   in the tutorial or opens in Run algorithm. `tests/test_tutorials.py` and
@@ -169,8 +169,9 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
-  documentation counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time
-  (S2 is done).
+  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time (S1 and
+  S2 are done). As in Evolver, only the written ones are numbered, consecutively by level: writing
+  a new one renumbers those after it.
 
 ## Phase 3 — Analysis layer
 
