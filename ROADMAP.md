@@ -88,6 +88,10 @@ below; revisit and reorder as real usage surfaces new ones.
   Training set takes arguments per problem and checks the encodings. With a 2.3 jar, which has no
   catalogue, the pages fall back to the plain list of names.
 
+- **Live front of short runs (same branch)**: Run algorithm sends `frontDelayMillis` (a pause after
+  each front, chosen in the Live front mode) with a jar newer than 2.3, and polls a run that writes
+  its front every 0.25 s instead of every second, so that every front is shown.
+
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
   tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
   default configurations of Evolver 2.3 for the binary and permutation encodings (every runnable

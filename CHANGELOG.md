@@ -25,6 +25,10 @@ Works with Evolver 2.3.
   - *Training*: a problem of the training set can be given its arguments, the curated names
     offered are those of the base algorithm's encoding, and a problem of another encoding is
     reported before launching.
+- **Live front of short runs**: in *Run algorithm*'s *Live front* mode the run can pause after
+  writing each front (`frontDelayMillis`; 300 ms by default, with the time it adds), and the page
+  looks for a new front every quarter of a second instead of every second. A run of MOEA/D on ZDT1
+  with 25000 evaluations, which ended before the first front could be shown, now shows all 25.
 
 ### Added
 
