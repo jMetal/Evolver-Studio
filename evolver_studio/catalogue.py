@@ -2,7 +2,7 @@
 
 Evolver's org.uma.evolver.cli.training.DescribeMain now exposes a machine-readable manifest of
 what BaseAlgorithmRegistry/MetaAlgorithmRegistry actually register (see
-evolver_client.describe() and Evolver's docs/proposals/cli-describe-manifest.md) — the
+evolver_client.describe(), and Evolver's docs/utilities/cli_tools.rst) — the
 `runnable_today`/`wired_into_cli_runner` flags below should match it. What DescribeMain does
 *not* cover is the browsable-but-unregistered set this module also documents (e.g. MOPSO as a base
 algorithm; Async Genetic Algorithm as a meta-optimizer): those exist as

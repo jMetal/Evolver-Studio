@@ -1,7 +1,8 @@
 """A solve request: Evolver's cli.solving request, and its YAML serialization.
 
-Mirrors org.uma.evolver.cli.solving.SolveRequest field for field (see Evolver's
-docs/proposals/cli-solving.md). Unlike a training request it is a single self-contained file.
+Mirrors org.uma.evolver.cli.solving.SolveRequest field for field (see cli.solving in
+Evolver's docs/utilities/cli_tools.rst). Unlike a training request it is a single
+self-contained file.
 """
 
 from dataclasses import dataclass

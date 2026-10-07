@@ -320,7 +320,7 @@ class TestCatalogueMatchesEvolverJar:
 class TestCatalogueMatchesDescribeManifest:
     """Cross-checks the hand-maintained catalogue against Evolver's own introspection manifest.
 
-    See Evolver's docs/proposals/cli-describe-manifest.md: DescribeMain lists exactly what
+    See Evolver's docs/utilities/cli_tools.rst: DescribeMain lists exactly what
     BaseAlgorithmRegistry/MetaAlgorithmRegistry register, generated from their own data, so it
     cannot itself drift — this test instead catches *this* module going stale relative to it.
     Skipped if the app's Evolver jar isn't available.

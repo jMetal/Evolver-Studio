@@ -10,7 +10,7 @@ below; revisit and reorder as real usage surfaces new ones.
   (`evolver_studio/request.py`, `evolver_client.py`, `results.py`) — a full request is three files
   (`request.yaml` referencing a reusable `baseLevel` file and a reusable `metaSearch` file by path,
   `outputDirectory`/`writeFrequency`/`statusFrequency` inline on `request.yaml` itself), matching
-  Evolver's `cli-training-prototype.md`.
+  the contract documented in Evolver's `docs/utilities/cli_tools.rst`.
 - Non-blocking run control: detached subprocess, PID tracking, cancellation, reconnect to an
   in-progress run across page reloads (`evolver_studio/runs.py`, `adaptive_poll.py`).
 - Live indicator-front preview: accumulates checkpoints from `INDICATORS.csv`, deduplicates unchanged
@@ -32,7 +32,7 @@ below; revisit and reorder as real usage surfaces new ones.
   registries (see "Provisional catalogue" below), cross-checked against Evolver's own introspection
   manifest when Evolver's jar is available (`tests/test_catalogue.py::TestCatalogueMatchesDescribeManifest`).
 - **Provisional catalogue → Evolver's own introspection manifest**: Evolver's
-  `org.uma.evolver.cli.training.DescribeMain` (`docs/proposals/cli-describe-manifest.md` in Evolver)
+  `org.uma.evolver.cli.training.DescribeMain` (documented in Evolver's `docs/utilities/cli_tools.rst`)
   now prints a YAML manifest of everything `cli.training` can resolve (registered base/meta
   algorithms, problems, indicators, available resource-directory file names, and the
   `request.yaml`/`baseLevel`/`metaSearch` schema via reflection over Evolver's own records) —
@@ -124,7 +124,8 @@ below; revisit and reorder as real usage surfaces new ones.
   (`evolver_client.start_solve`, whose output goes to a log file) kept under `solve-runs/<id>/`,
   with its phase told by `runs.run_phase`; the fronts are plotted over the reference front (2D, 3D
   or parallel coordinates), with the indicators, a summary over the runs and a zip to download.
-  Previous runs are reopened from a list. See Evolver's `docs/proposals/cli-solving.md`.
+  Previous runs are reopened from a list. See `cli.solving` in Evolver's
+  `docs/utilities/cli_tools.rst`.
   While a run is in progress, a fragment polls its status every second and shows the evaluation it
   is at (`progress.running_label`, from `statusFrequency` with Evolver 2.3 or later).
 

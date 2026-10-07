@@ -2,10 +2,10 @@
 
 Mirrors org.uma.evolver.cli.training.BaseLevelConfig's three parallel fields
 (trainingProblemNames/trainingReferenceFrontFileNames/trainingEvaluations) —
-the CLI does not resolve training sets by name (see Evolver's
-cli-training-prototype.md), so a training set is always spelled out
-explicitly, one row per problem. A problem may be given its constructor's arguments, as a
-comma-separated text, which makes it a `{class, args}` entry of trainingProblemNames.
+the CLI does not resolve training sets by name, so a training set is always
+spelled out explicitly, one row per problem. A problem may be given its constructor's
+arguments, as a comma-separated text, which makes it a `{class, args}` entry of
+trainingProblemNames.
 """
 
 from collections.abc import Mapping

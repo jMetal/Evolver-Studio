@@ -1,11 +1,11 @@
 """Training request data and YAML serialization for Evolver's cli.training.
 
-A full request is three independent files (see Evolver's
-docs/proposals/cli-describe-manifest.md and cli-training-prototype.md):
-request.yaml itself (baseLevel/metaSearch as file names, plus outputDirectory
-and the optional writeFrequency/statusFrequency/frontPlotFrequency, all
-specific to *this* run), the baseLevel file (what is tuned, reusable), and
-the metaSearch file (how the meta-optimizer searches, reusable).
+A full request is three independent files (see cli.training in Evolver's
+docs/utilities/cli_tools.rst): request.yaml itself (baseLevel/metaSearch as file
+names, plus outputDirectory and the optional
+writeFrequency/statusFrequency/frontPlotFrequency, all specific to *this* run),
+the baseLevel file (what is tuned, reusable), and the metaSearch file (how the
+meta-optimizer searches, reusable).
 """
 
 from dataclasses import dataclass

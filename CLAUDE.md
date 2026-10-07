@@ -24,8 +24,8 @@ paired with the tutorials of Evolver's documentation (`docs/tutorials/`) that co
 
 This file documents the intended architecture agreed on before implementation started. A first,
 deliberately minimal prototype now lives in the repo (`app.py`, `evolver_studio/`): it drives Evolver's
-`org.uma.evolver.cli.training.TrainingRunnerMain` (see Evolver's
-`docs/proposals/cli-training-prototype.md`) to run the single ZDT4 training case, as a smoke test of the
+`org.uma.evolver.cli.training.TrainingRunnerMain` (documented in Evolver's
+`docs/utilities/cli_tools.rst`) to run the single ZDT4 training case, as a smoke test of the
 request/status/results contract before building the full MVP surface below. Expect this file's
 architecture sections to be corrected/expanded as more of the real code lands.
 
@@ -55,9 +55,8 @@ may extend into Evolver itself (its `develop` branch) to propose or implement th
 NSGA-II/MOEA-D scope, or wiring additional `Meta*Builder` classes (`MetaSPEA2Builder`,
 `MetaSMPSOBuilder`, `MetaAsyncNSGAIIBuilder`, ...) into `TrainingRunner` so more of them are
 selectable as meta-optimizers, not just usable from `example.training`. Prefer proposing such changes
-as a `docs/proposals/*.md` document in Evolver's repo first (matching the existing
-`cli-training-prototype.md`) before implementing them, consistent with how that design was itself
-introduced.
+to Evolver's maintainers first (an issue or a design note in the pull request) before implementing
+them. Evolver keeps its working notes private, so do not cite them from this repository.
 
 ### Keeping Evolver-Studio's catalogue in sync with Evolver — the drift-detection mechanism
 
