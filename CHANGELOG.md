@@ -25,10 +25,6 @@ Works with Evolver 2.3.
   - *Training*: a problem of the training set can be given its arguments, the curated names
     offered are those of the base algorithm's encoding, and a problem of another encoding is
     reported before launching.
-- **Live front of short runs**: in *Run algorithm*'s *Live front* mode the run can pause after
-  writing each front (`frontDelayMillis`; 300 ms by default, with the time it adds), and the page
-  looks for a new front every quarter of a second instead of every second. A run of MOEA/D on ZDT1
-  with 25000 evaluations, which ended before the first front could be shown, now shows all 25.
 - **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
   consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
   configurable algorithm* S2), and the planned ones are listed without one. Each pairs with
@@ -59,13 +55,10 @@ Works with Evolver 2.3.
   configuration (the adjusted one included) and budget, and "Download request.yaml" gives the file
   to run it outside Evolver-Studio with `SolveRunnerMain`. A *Solutions* tab lists the solutions of
   a run with their objectives and decision variables, filters them by a range for each objective,
-  shows the variables of a selected one (as a permutation when it is one) and downloads the table. With
-  Evolver 2.3 or later the run can be followed while it is in progress, in three modes: *Silent*
-  (the progress changes only when each independent run ends, as with Evolver 2.2), *Progress bar*
-  (evaluations, time elapsed and an estimate of what is left) and *Live front* (the bar and a chart of
-  the front as it evolves over the reference front, optionally with the dominated solutions in
-  grey). A slider sets how often it is refreshed, and the page warns of the cost: updating the
-  progress is cheap, but writing the front often can make the run several times slower.
+  shows the variables of a selected one (as a permutation when it is one) and downloads the table.
+  While a run is in progress the page shows a blinking label with the evaluation it is at (with
+  Evolver 2.3 or later; with an older one, only that it is running) and a button to cancel it, and
+  moves on to its results when it ends.
 - **Tutorials**, with the first one, *Exploring a parameter space*, which pairs with Evolver's
   tutorial E1: it reads a space in the same table the Explore pages show, with its *Active if*
   column and filter, writes the configuration a choice of values gives, and ends with the

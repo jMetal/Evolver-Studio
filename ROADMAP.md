@@ -88,9 +88,12 @@ below; revisit and reorder as real usage surfaces new ones.
   Training set takes arguments per problem and checks the encodings. With a 2.3 jar, which has no
   catalogue, the pages fall back to the plain list of names.
 
-- **Live front of short runs (same branch)**: Run algorithm sends `frontDelayMillis` (a pause after
-  each front, chosen in the Live front mode) with a jar newer than 2.3, and polls a run that writes
-  its front every 0.25 s instead of every second, so that every front is shown.
+- **A running label instead of a live view (same branch)**: Run algorithm no longer offers the
+  progress bar and live front modes, which a benchmark run, over in a second or two, rarely gave
+  time to see. A run in progress shows a blinking label with the evaluation it is at (its status is
+  updated every 1000 evaluations, `pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
+  `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
+  `frontDelayMillis`, unused by the page.
 
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
   tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
@@ -122,12 +125,8 @@ below; revisit and reorder as real usage surfaces new ones.
   with its phase told by `runs.run_phase`; the fronts are plotted over the reference front (2D, 3D
   or parallel coordinates), with the indicators, a summary over the runs and a zip to download.
   Previous runs are reopened from a list. See Evolver's `docs/proposals/cli-solving.md`.
-  The run can be followed while it runs when Evolver can (2.3): three modes (silent, progress bar,
-  live front), a slider for how often, and a warning of the cost measured on NSGA-II. The progress
-  comes from `statusFrequency` (with `progress.estimate_remaining_seconds` for the time left), and
-  the live front from `frontFrequency`/`writePopulation`: Evolver overwrites `CURRENT_FRONT.csv` and
-  the page plots it (`solve_figures.build_live_front_figure`) in the fragment that refreshes the
-  bar.
+  While a run is in progress, a fragment polls its status every second and shows the evaluation it
+  is at (`progress.running_label`, from `statusFrequency` with Evolver 2.3 or later).
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
