@@ -11,7 +11,7 @@ import pytest
 import yaml
 from streamlit.testing.v1 import AppTest
 
-from evolver_studio import catalogue, evolver_client
+from evolver_studio import catalogue, evolver_client, resource_files
 from evolver_studio.catalogue import is_at_least
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path, write_pid_file
 from evolver_studio.problem_catalogue import parse_problem_catalogue
@@ -407,8 +407,28 @@ class TestTrackingControls:
         request = yaml.safe_load((run_dir / "request.yaml").read_text())
         assert request["frontFrequency"] == 500  # the slider's 1000, limited to the 500 evaluations
         assert request["writePopulation"] is True
+        version = jar_evolver_version(jar_path())
+        if version is None or is_at_least(version, "2.4"):
+            assert request["frontDelayMillis"] == 300
+        else:
+            assert "frontDelayMillis" not in request
         assert run_phase(run_dir) is RunPhase.FINISHED
         assert not (run_dir / "output" / "CURRENT_FRONT.csv").exists()
+
+    @pytest.mark.parametrize(("version", "offered"), [("2.3", False), ("3.0", True)])
+    def test_should_offer_the_pause_after_each_front_only_when_the_jar_can_pause(
+        self, app: AppTest, monkeypatch: pytest.MonkeyPatch, version: str, offered: bool
+    ):
+        # Arrange
+        monkeypatch.setattr(resource_files, "jar_evolver_version", lambda jar: version)
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act: 25000 evaluations, a front every 1000
+        app.radio(key="solve_tracking").set_value("Live front").run()
+
+        # Assert
+        assert any(s.key == "solve_front_delay" for s in app.select_slider) is offered
+        assert any("pauses add about 8 s" in c.value for c in app.caption) is offered
 
 
 class TestRunInProgress:

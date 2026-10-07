@@ -173,3 +173,28 @@ class TestProblemArguments:
 
         # Assert
         assert data["problem"] == "ZDT1"
+
+
+class TestFrontDelay:
+    def test_should_write_the_pause_after_each_front_when_set(self):
+        # Act
+        data = yaml.safe_load(
+            solve_request_to_yaml(_request(front_frequency=1000, front_delay_millis=300))
+        )
+
+        # Assert
+        assert data["frontDelayMillis"] == 300
+
+    def test_should_leave_out_the_pause_when_unset(self):
+        # Act
+        data = yaml.safe_load(solve_request_to_yaml(_request(front_frequency=1000)))
+
+        # Assert
+        assert "frontDelayMillis" not in data
+
+    def test_should_need_the_live_front_to_pause_after_it(self):
+        # Act
+        errors = _request(front_frequency=None, front_delay_millis=300).validation_errors()
+
+        # Assert
+        assert errors == ["Pausing after each front needs the live front."]

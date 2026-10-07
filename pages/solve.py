@@ -110,6 +110,8 @@ DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
 DEFAULT_POPULATION_SIZE = 100
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 1
+# A run that writes its front is polled more often, so that every front it pauses on is shown.
+LIVE_FRONT_RUN_EVERY_SECONDS = 0.25
 LOG_LINES_SHOWN = 15
 # The evaluations between two updates of the progress that the slider offers, and the one it starts
 # at. Evolver reports in steps of an algorithm's offspring population (usually 100): updating more
@@ -124,6 +126,13 @@ TRACKING_FRONT = "Live front"
 TRACKING_MODES = (TRACKING_SILENT, TRACKING_PROGRESS, TRACKING_FRONT)
 # The Evolver release from which a run reports its progress while it runs.
 PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
+# The Evolver release from which a run can pause after writing each front (the develop builds after
+# 2.3, 2.4-SNAPSHOT, released as 3.0); 2.3 ignores the pause.
+FRONT_DELAY_SINCE = "2.4"
+# The pauses after each front, in milliseconds, that the slider offers (0 for none), and the one it
+# starts at: a little more than the page's polling interval, so that no front is missed.
+FRONT_DELAYS = (0, 100, 300, 1000)
+DEFAULT_FRONT_DELAY = 300
 
 
 @dataclass(slots=True, frozen=True)
@@ -428,11 +437,14 @@ class Tracking:
         front_frequency: Every how many evaluations the current front is written, or None for none.
         write_population: Whether that file holds the whole population, not only the
             non-dominated solutions.
+        front_delay_millis: How long the run pauses after writing each front, or None for no
+            pause.
     """
 
     status_frequency: int | None = None
     front_frequency: int | None = None
     write_population: bool = False
+    front_delay_millis: int | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -499,7 +511,7 @@ def _render_tracking(max_evaluations: int, runs: int) -> Tracking:
         help="Silent updates the progress only when each independent run ends. Progress bar "
         "updates it every N evaluations. Live front also plots the front as it evolves. A run "
         "that lasts a second or two (MOEA/D on a small budget, for instance) ends before there is "
-        "anything to follow: the live view is for the longer ones.",
+        "anything to follow, unless Live front pauses it after each front.",
         key="solve_tracking",
     )
     if not supported:
@@ -520,7 +532,8 @@ def _render_tracking(max_evaluations: int, runs: int) -> Tracking:
         key=f"solve_update_every_{mode}",
     )
     frequency = min(frequency, max_evaluations)
-    st.caption(f"About {max(runs * max_evaluations // frequency, 1)} updates in all.")
+    updates = max(runs * max_evaluations // frequency, 1)
+    st.caption(f"About {updates} updates in all.")
     warning = _frequency_warning(mode, frequency)
     if warning is not None:
         st.warning(warning)
@@ -533,8 +546,39 @@ def _render_tracking(max_evaluations: int, runs: int) -> Tracking:
         key="solve_whole_population",
     )
     return Tracking(
-        status_frequency=frequency, front_frequency=frequency, write_population=whole_population
+        status_frequency=frequency,
+        front_frequency=frequency,
+        write_population=whole_population,
+        front_delay_millis=_render_front_delay(version, updates),
     )
+
+
+def _render_front_delay(version: str | None, updates: int) -> int | None:
+    """Choose how long the run pauses after each front, when the jar can pause it.
+
+    Args:
+        version: The Evolver version of the jar, or None if it records none.
+        updates: About how many fronts the run writes.
+
+    Returns:
+        The pause in milliseconds, or None for none.
+    """
+    if version is not None and not is_at_least(version, FRONT_DELAY_SINCE):
+        return None
+    delay = st.select_slider(
+        "Pause after each front",
+        options=FRONT_DELAYS,
+        value=DEFAULT_FRONT_DELAY,
+        format_func=lambda millis: f"{millis} ms" if millis else "none",
+        help="The run waits this long after writing each front, so that the page, which looks for "
+        "a new one every quarter of a second, shows every front instead of only the latest. "
+        "Without a pause, a fast run shows few fronts, or only the final one.",
+        key="solve_front_delay",
+    )
+    if not delay:
+        return None
+    st.caption(f"The pauses add about {format_duration(updates * delay / 1000)} to the run.")
+    return delay
 
 
 def _render_budget(has_reference_front: bool, population_sizes: list[int] | None) -> Budget:
@@ -658,6 +702,7 @@ def _render_form(can_run: bool) -> None:
             status_frequency=budget.tracking.status_frequency,
             front_frequency=budget.tracking.front_frequency,
             write_population=budget.tracking.write_population,
+            front_delay_millis=budget.tracking.front_delay_millis,
             output_directory=output_directory,
         )
 
@@ -723,7 +768,13 @@ def _render_run_in_progress(run_dir: Path) -> None:
         _cancel(run_dir)
         st.rerun()
 
-    @st.fragment(run_every=LIVE_FRAGMENT_RUN_EVERY_SECONDS, key=f"solve_poll_{run_dir.name}")
+    run_every = (
+        LIVE_FRONT_RUN_EVERY_SECONDS
+        if "frontFrequency" in request
+        else LIVE_FRAGMENT_RUN_EVERY_SECONDS
+    )
+
+    @st.fragment(run_every=run_every, key=f"solve_poll_{run_dir.name}")
     def _poll() -> None:
         status = read_status(run_dir / "status.yaml")
         if status is not None:

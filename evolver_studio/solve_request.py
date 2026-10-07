@@ -41,6 +41,9 @@ class SolveRequest:
         output_directory: Where the results are written.
         problem_arguments: The problem's constructor arguments, all of them in order, or empty to
             build it with none.
+        front_delay_millis: How long the run pauses after writing each front, so that the page,
+            which polls for it, can show every one; None for no pause. Needs `front_frequency`
+            and an Evolver newer than 2.3 (2.3 ignores it).
     """
 
     algorithm_name: str
@@ -60,6 +63,7 @@ class SolveRequest:
     write_population: bool
     output_directory: str
     problem_arguments: tuple[ArgumentValue, ...] = ()
+    front_delay_millis: int | None = None
 
     def validation_errors(self) -> list[str]:
         """Check what Evolver would reject, to tell the user before launching.
@@ -90,6 +94,14 @@ class SolveRequest:
                 self.write_population and self.front_frequency is None,
                 "Showing the whole population needs the live front.",
             ),
+            (
+                self.front_delay_millis is not None and self.front_frequency is None,
+                "Pausing after each front needs the live front.",
+            ),
+            (
+                self.front_delay_millis is not None and self.front_delay_millis < 1,
+                "The pause after each front must be one millisecond or more.",
+            ),
         ]
         return [message for failed, message in checks if failed]
 
@@ -101,9 +113,10 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
         request: The request.
 
     Returns:
-        The YAML document text. `seed`, `referenceFrontFileName`, `statusFrequency` and
-        `frontFrequency` are left out when unset, so Evolver draws a seed, computes no indicators,
-        updates the status only when a run ends and writes no front meanwhile.
+        The YAML document text. `seed`, `referenceFrontFileName`, `statusFrequency`,
+        `frontFrequency` and `frontDelayMillis` are left out when unset, so Evolver draws a seed,
+        computes no indicators, updates the status only when a run ends, writes no front meanwhile
+        and does not pause after one.
     """
     data: dict = {
         "algorithmName": request.algorithm_name,
@@ -127,5 +140,7 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
         data["frontFrequency"] = request.front_frequency
         if request.write_population:
             data["writePopulation"] = True
+        if request.front_delay_millis is not None:
+            data["frontDelayMillis"] = request.front_delay_millis
     data["outputDirectory"] = request.output_directory
     return yaml.safe_dump(data, sort_keys=False)
