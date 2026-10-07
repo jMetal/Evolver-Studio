@@ -80,6 +80,23 @@ def parse_problem_catalogue(manifest: dict) -> dict[str, Problem] | None:
     return problems
 
 
+def number_of_objectives(problem: Problem, arguments: Sequence[ArgumentValue]) -> int | None:
+    """The number of objectives of a problem built with some arguments.
+
+    Args:
+        problem: The problem.
+        arguments: The arguments it is built with, all of them in order, or empty for none.
+
+    Returns:
+        The `numberOfObjectives` argument when it is given, else the problem's number of
+        objectives built with no arguments (None when unknown).
+    """
+    for argument, value in zip(problem.arguments, arguments, strict=False):
+        if argument.name == "numberOfObjectives":
+            return int(value)
+    return problem.number_of_objectives
+
+
 def problems_with_encoding(problems: dict[str, Problem], encoding: str) -> list[str]:
     """The names of the problems of an encoding, sorted.
 

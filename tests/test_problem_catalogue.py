@@ -7,6 +7,7 @@ from evolver_studio.problem_catalogue import (
     ProblemArgument,
     format_arguments,
     format_problem_spec,
+    number_of_objectives,
     parse_arguments_text,
     parse_problem_catalogue,
     problem_spec,
@@ -180,3 +181,22 @@ class TestFormatArguments:
     def test_should_name_each_argument_with_its_default_when_known(self):
         # Act / Assert
         assert format_arguments(ZCAT1) == "numberOfObjectives=2, complicatedParetoSet=false, scale"
+
+
+class TestNumberOfObjectives:
+    def test_should_take_the_argument_when_the_problem_is_built_with_arguments(self):
+        # Arrange
+        problems = parse_problem_catalogue(MANIFEST)
+        assert problems is not None
+
+        # Act / Assert
+        assert number_of_objectives(problems["DTLZ2"], (12, 5)) == 5
+
+    def test_should_take_the_default_without_arguments(self):
+        # Arrange
+        problems = parse_problem_catalogue(MANIFEST)
+        assert problems is not None
+
+        # Act / Assert
+        assert number_of_objectives(problems["DTLZ2"], ()) == 3
+        assert number_of_objectives(problems["ZDT5"], (11,)) == 2

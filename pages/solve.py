@@ -45,7 +45,7 @@ from evolver_studio.evolver_client import (
 )
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
-from evolver_studio.problem_catalogue import ArgumentValue, Problem
+from evolver_studio.problem_catalogue import ArgumentValue, Problem, number_of_objectives
 from evolver_studio.problems import (
     default_reference_front,
     reference_front_candidates,
@@ -175,7 +175,7 @@ def _render_problem() -> ProblemChoice | None:
     arguments = _render_problem_arguments(described) if described is not None else ()
     if arguments is None:
         return None
-    objectives = _number_of_objectives(described, arguments)
+    objectives = number_of_objectives(described, arguments) if described is not None else None
     encoding = described.encoding if described is not None else None
     candidates = reference_front_candidates(problem)
     if not candidates:
@@ -255,18 +255,6 @@ def _render_problem_arguments(problem: Problem) -> tuple[ArgumentValue, ...] | N
         st.warning("Give every argument a value: Evolver takes all of them, or none.")
         return None
     return tuple(value for value in values if value is not None)
-
-
-def _number_of_objectives(
-    problem: Problem | None, arguments: tuple[ArgumentValue, ...]
-) -> int | None:
-    """The chosen problem's number of objectives, when it is known."""
-    if problem is None:
-        return None
-    for argument, value in zip(problem.arguments, arguments, strict=False):
-        if argument.name == "numberOfObjectives":
-            return int(value)
-    return problem.number_of_objectives
 
 
 def _default_front_index(candidates: list[str], objectives: int | None) -> int | None:
