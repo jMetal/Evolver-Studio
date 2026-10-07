@@ -59,7 +59,7 @@ purpose:
 | Solve | Run algorithm | ✅ | Run an algorithm on a problem from its default configuration, adjusted within its parameter space; inspect the fronts and indicators, download `VAR`/`FUN` |
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Analysis | 🚧 | Statistical comparison of runs and configurations (Wilcoxon tests, tables, plots) |
-| Meta-optimization | Validation | 🚧 | Run a tuned configuration on a validation set and compare it with the default configuration |
+| Meta-optimization | Validation | ✅ | Compare a tuned configuration with the default configurations of other algorithms on a set of problems: many runs, medians, Wilcoxon tests, effect sizes and boxplots |
 | Learn | Tutorials | ✅ | Interactive, step-by-step tutorials that pair with Evolver's documentation |
 
 ✅ available · 🚧 planned

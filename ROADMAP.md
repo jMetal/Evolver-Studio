@@ -131,7 +131,7 @@ below; revisit and reorder as real usage surfaces new ones.
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
-  `pages/tutorials.py`). Analysis and Validation are placeholders.
+  `pages/tutorials.py`). Analysis is a placeholder.
 - **Home page**: the app opens on `pages/home.py`, which presents Evolver-Studio's two uses and
   shows a card for each page (its section, what it does, whether it is available or coming soon,
   and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
@@ -185,10 +185,19 @@ Landing page now exists (`pages/analysis.py`), currently a placeholder pointing 
 
 ## Phase 4 — Validation runs
 
-Landing page now exists (`pages/validation.py`), currently a placeholder pointing back here.
+First version shipped (`pages/validation.py`, same branch as the Evolver 3.0 sync): a study compares a
+tuned configuration, the pivot (from a finished training run's `VAR_CONF.txt`, or pasted), with the
+default configurations of Evolver's algorithms for the encoding of the problems. It needs no change
+in Evolver: a study is a `cli.solving` request per algorithm and problem
+(`evolver_studio/validation.py`), run by a detached worker with a pool of JVMs
+(`validation_worker.py`) that keeps a `status.yaml` in Evolver's format, and its statistics follow
+Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum, A12). Still to do:
 
-- `start_validation(request)`: run the winning configuration against a validation set and compare
-  indicator distributions against a baseline (default, untuned configuration).
+- Friedman test with Holm's procedure over the problems, critical difference plots and the Bayesian
+  sign test (Evolver's scripts use SAES for them), and LaTeX tables.
+- Adjusting an algorithm's configuration for the study (the form of Run algorithm, per contender).
+- An estimate of how long a study takes: an algorithm such as SMS-EMOA with three objectives is
+  orders of magnitude slower than NSGA-II, which one only learns by running it.
 
 ## Phase 5 — Hardening
 

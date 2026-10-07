@@ -25,6 +25,15 @@ Works with Evolver 2.3.
   - *Training*: a problem of the training set can be given its arguments, the curated names
     offered are those of the base algorithm's encoding, and a problem of another encoding is
     reported before launching.
+- **Validation**: compare a tuned configuration (a configuration of a finished training run, or
+  one pasted) with the default configurations of Evolver's algorithms, on problems of one encoding.
+  Every algorithm runs many times on every problem, with the same population size, evaluation
+  budget and seeds, in the background (a blinking label counts the jobs finished, and the study can
+  be cancelled); an algorithm that reads weight vectors is left out of the problems that have no
+  file for the population size. The results show the median of each indicator per problem, a
+  Wilcoxon rank-sum test and the A12 effect size of each algorithm against the tuned one, boxplots
+  per problem and every run, with CSV downloads. Studies are kept under `validation-runs/` and can
+  be reopened. Needs scipy.
 - **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
   consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
   configurable algorithm* S2), and the planned ones are listed without one. Each pairs with
@@ -67,7 +76,7 @@ Works with Evolver 2.3.
   every step has a prepared run (fixed seed, with the values the text announces) that can be run in
   the tutorial or opened in Run algorithm, to repeat it by hand.
 - A **home page** with a card for each part of the app, and a menu grouped by purpose (Explore,
-  Solve, Meta-optimization, Learn). *Analysis* and *Validation* are placeholders.
+  Solve, Meta-optimization, Learn). *Analysis* is a placeholder.
 - No Evolver checkout and no Maven needed: the app downloads Evolver's release jar from Maven Central
   (checksum-verified) and copies the reference fronts, weight vectors and TSP instances it needs from
   the release's tag (`make sync-resources`). `EVOLVER_JAR` runs it against another build.
