@@ -20,8 +20,9 @@ It serves two purposes:
   configurations they find.
 
 > **Status:** early development, heading to 0.1.0 (see [CHANGELOG.md](CHANGELOG.md)). Exploring
-> parameter spaces, launching and monitoring training runs, and the first tutorial are available; the
-> solving, analysis and validation pages are planned. See [ROADMAP.md](ROADMAP.md).
+> parameter spaces, launching and monitoring training runs, running an algorithm on a problem,
+> validating a tuned configuration, and three tutorials are available; the analysis page is planned.
+> See [ROADMAP.md](ROADMAP.md).
 
 ## How it works
 

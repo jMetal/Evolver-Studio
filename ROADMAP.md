@@ -146,8 +146,12 @@ below; revisit and reorder as real usage surfaces new ones.
   quality indicators. **S2, "Solving a problem with a configurable algorithm"**
   (`evolver_studio/tutorial_solving.py`), the companion of E2, is the first of the solving track:
   each step has a prepared run (`PreparedRun`: fixed seed, the values the text announces) that runs
-  in the tutorial or opens in Run algorithm. `tests/test_tutorials.py` and
-  `tests/test_tutorial_solving.py` walk through them with Streamlit's `AppTest`.
+  in the tutorial or opens in Run algorithm. **S3, "Validating a configuration"**
+  (`evolver_studio/tutorial_validation.py`), the companion of E8, runs one validation study in the
+  background (kept as `validation-runs/tutorial-validation`, reused while it is current) and reads
+  its results; the text about them is computed from the data. `tests/test_tutorials.py`,
+  `tests/test_tutorial_solving.py` and `tests/test_tutorial_validation.py` walk through them with
+  Streamlit's `AppTest`.
 - **No Evolver checkout needed to use the app**: the sidebar downloads the Evolver release's jar
   from Maven Central (checksum-verified) into `lib/`; parameter spaces and meta-optimizer
   configurations are read from the jar (`evolver_studio/resource_files.py`), and the reference
@@ -169,8 +173,8 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
-  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time (S1 and
-  S2 are done). As in Evolver, only the written ones are numbered, consecutively by level: writing
+  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time (S1, S2
+  and S3 are done). As in Evolver, only the written ones are numbered, consecutively by level: writing
   a new one renumbers those after it.
 
 ## Phase 3 — Analysis layer

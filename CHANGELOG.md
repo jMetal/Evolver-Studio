@@ -34,6 +34,15 @@ Works with Evolver 2.3.
   Wilcoxon rank-sum test and the A12 effect size of each algorithm against the tuned one, boxplots
   per problem and every run, with CSV downloads. Studies are kept under `validation-runs/` and can
   be reopened. Needs scipy.
+- **Tutorial S3, *Validating a configuration*** (pairs with E8): it runs a small validation study
+  in the background and reads it step by step. The pivot is the NSGA-II that Evolver's tutorial E8
+  tuned for the nine bi-objective WFG problems (bundled in Evolver's jar), against the default
+  NSGA-II, MOEA/D and RVEA, on two WFG problems it was tuned for and on ZDT1 and DTLZ2 with two
+  objectives, which it never saw. The steps read the medians, the Wilcoxon test and the A12 effect
+  size, what the same comparison says with 5 to 15 runs, and the problems seen and not seen in the
+  tuning; what the text says about the results is read from them, and one comparison that the test
+  cannot settle is used as the example. "Open in Validation" fills Validation's form with the study.
+  It needs an Evolver newer than 2.3.
 - **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
   consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
   configurable algorithm* S2), and the planned ones are listed without one. Each pairs with
