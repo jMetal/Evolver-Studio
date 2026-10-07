@@ -75,6 +75,12 @@ below; revisit and reorder as real usage surfaces new ones.
   mirrors (`CATALOGUE_EVOLVER_VERSION`), and Explore and Training warn when the jar in use (its
   `pom.properties` version) is older.
 
+- **Catalogue synced with Evolver `develop` (2.4-SNAPSHOT, work towards Evolver 3.0)**: every base
+  algorithm `DescribeMain` registers is runnable (NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and
+  SSMOEA join NSGA-II, MOEA/D and RVEA, MOEA/D gaining its Binary and Permutation encodings), with
+  the default configurations the jar ships; MOPSO stays browsable only. Done on
+  `experiment/evolver-3-sync`, to land with the release (`/bump-evolver 3.0`).
+
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
   tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
   default configurations of Evolver 2.3 for the binary and permutation encodings (every runnable

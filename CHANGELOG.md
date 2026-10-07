@@ -8,6 +8,13 @@ version works with.
 
 Works with Evolver 2.3.
 
+### Evolver 3.0 sync (in progress, on `experiment/evolver-3-sync`; needs a newer jar than 2.3)
+
+- **Base algorithms**: NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and SSMOEA can be launched from
+  Training and Run algorithm, and MOEA/D also with its Binary and Permutation encodings, as
+  Evolver's `DescribeMain` registers them. Run algorithm starts from the default configuration the
+  jar ships for each, where there is one. MOPSO is still browsable only.
+
 ### Added
 
 - **Explore**, four read-only pages: *Base algorithms* and *Meta-optimizers* show the parameter space

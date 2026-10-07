@@ -80,11 +80,10 @@ that can be launched from the app today are:
 
 | Level | Algorithms |
 |---|---|
-| Base level | NSGA-II (Double, Binary, Permutation), MOEA/D (Double), RVEA (Double) |
+| Base level | NSGA-II, MOEA/D, SMS-EMOA, PAES (Double, Binary, Permutation); RDE-MOEA (Double, Permutation); NSGA-III, AGE-MOEA, RVEA, SSMOEA (Double) |
 | Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding); NSGA-II, AGE-MOEA, Async NSGA-II, Random Search (tree encoding) |
 
-The other base-level algorithms (SMS-EMOA, RDE-MOEA, AGE-MOEA, MOPSO, NSGA-III, PAES, SSMOEA) are
-browsable only, until Evolver's command-line runner supports them. See Evolver's
+MOPSO is browsable only, until Evolver's command-line runner supports it. See Evolver's
 [supported algorithms](https://github.com/jMetal/Evolver#supported-algorithms) for the full list.
 
 ## Requirements
