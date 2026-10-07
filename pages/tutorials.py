@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio import tutorial_parameter_spaces, tutorial_solving
+from evolver_studio import tutorial_parameter_spaces, tutorial_solving, tutorial_validation
 from evolver_studio.app_state import render_sidebar, require_evolver_jar
 from evolver_studio.tutorial_navigation import (
     SELECTED_KEY,
@@ -24,6 +24,7 @@ from evolver_studio.tutorials import (
 TUTORIAL_STEPS = {
     "parameter_spaces": tutorial_parameter_spaces.STEPS,
     "solving": tutorial_solving.STEPS,
+    "validating_a_configuration": tutorial_validation.STEPS,
 }
 
 

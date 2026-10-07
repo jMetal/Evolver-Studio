@@ -539,10 +539,10 @@ def _render_other_configuration(jar: Path) -> None:
             "solutions much more evenly along it: that is the effect of its **crowding-distance "
             "archive**, which keeps the solutions that are farthest apart from each other. In this "
             "run it also gets better values of both indicators. One run is not enough to conclude "
-            "that it is better, though; that needs several runs and a statistical test (the "
-            "coming tutorials *Comparing configurations on a problem* and *Validating a "
-            "configuration*), but it shows how much the configuration matters, and why finding "
-            "good ones automatically, which is what meta-optimization does, is worthwhile."
+            "that it is better, though; that needs several runs and a statistical test "
+            "(tutorial **S3** does it), but it shows how much the configuration matters, and why "
+            "finding good ones automatically, which is what meta-optimization does, is "
+            "worthwhile."
         )
     elif standard is None:
         st.info("Run the first step too, to compare the two.")
@@ -565,8 +565,8 @@ def _render_more_runs(jar: Path) -> None:
         "mean, the standard deviation, the minimum and the maximum over the runs. The values "
         "change from run to run: the spread says how much of a difference between two "
         "configurations may be luck. Comparing configurations with several runs and a test is the "
-        "subject of the coming tutorials *Comparing configurations on a problem* and "
-        "*Validating a configuration*."
+        "subject of tutorial **S3** and of the coming tutorial *Comparing configurations on a "
+        "problem*."
     )
 
 

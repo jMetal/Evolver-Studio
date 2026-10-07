@@ -149,11 +149,12 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "validating_a_configuration",
-        None,
+        "S3",
         "Validating a configuration",
         _MID,
         "Meta-optimization",
-        "Statistical comparison of a tuned configuration.",
+        "Run a tuned configuration many times next to other algorithms, and compare them with "
+        "medians, a Wilcoxon test and an effect size.",
         ("E8",),
     ),
     Tutorial(

@@ -19,6 +19,7 @@ from evolver_studio.tutorial_solving import (
     RVEA_VARIANTS,
     prepared_request,
 )
+from evolver_studio.tutorials import TUTORIALS
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
@@ -209,4 +210,5 @@ class TestTutorialS2WalkThrough:
         # Assert
         assert not app.exception
         assert [header.value for header in app.subheader][:1] == ["Introductory"]
-        assert len([button for button in app.button if button.label == "Start"]) == 2
+        available = sum(tutorial.available for tutorial in TUTORIALS)
+        assert len([button for button in app.button if button.label == "Start"]) == available

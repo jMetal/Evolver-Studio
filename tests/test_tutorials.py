@@ -21,12 +21,12 @@ class TestTutorialsCatalogue:
         # Assert
         assert numbers == [f"S{index}" for index in range(1, len(numbers) + 1)]
 
-    def test_should_have_the_two_written_tutorials_available(self):
+    def test_should_have_the_written_tutorials_available(self):
         # Act
         available = [tutorial.slug for tutorial in TUTORIALS if tutorial.available]
 
         # Assert
-        assert available == ["parameter_spaces", "solving"]
+        assert available == ["parameter_spaces", "solving", "validating_a_configuration"]
 
     def test_should_identify_every_tutorial_by_a_distinct_topic(self):
         # Act
