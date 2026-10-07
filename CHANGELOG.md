@@ -49,9 +49,9 @@ Works with Evolver 2.3.
 - **Training**: configure, launch, monitor and cancel a meta-optimization run, with a live view of
   the front of configurations found. NSGA-II (Double, Binary and Permutation), MOEA/D and RVEA as base
   algorithms; NSGA-II, AGE-MOEA, SPEA2, SMPSO, AsyncNSGA-II and Random Search as meta-optimizers,
-  with the flat encoding and, for NSGA-II, AGE-MOEA, AsyncNSGA-II and Random Search, the tree
-  encoding. Arbitrary multi-problem training sets, and a guided or expert editor of the base
-  algorithm's parameter space.
+  with the flat encoding (the tree encoding is browsable in Explore but cannot be launched yet).
+  Arbitrary multi-problem training sets, and a guided or expert editor of the base algorithm's
+  parameter space.
 - **Run algorithm**: run one of Evolver's configurable algorithms (NSGA-II, MOEA/D, RVEA) on a
   problem, through `cli.solving`. The configuration starts from the algorithm's default one and can
   be adjusted within its parameter space (a widget per active parameter, limited to what the space
