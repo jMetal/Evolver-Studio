@@ -1,4 +1,4 @@
-"""Tests for the tutorials catalogue and tutorial S2's walk-through in the app."""
+"""Tests for the tutorials catalogue and tutorial S1's walk-through in the app."""
 
 from pathlib import Path
 
@@ -10,23 +10,38 @@ from evolver_studio.evolver_client import jar_path
 from evolver_studio.tutorials import TUTORIALS, TutorialLevel, tutorials_by_level
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
-EVOLVER_STUDIO_TUTORIAL_IDS = [f"S{number}" for number in range(1, 13)]
 
 
 class TestTutorialsCatalogue:
-    def test_should_list_the_twelve_studio_tutorials_of_the_catalogue(self):
+    def test_should_number_the_written_tutorials_consecutively_in_catalogue_order(self):
+        """As Evolver numbers its own: S1, S2... for the written ones, none for the planned."""
         # Act
-        ids = [tutorial.tutorial_id for tutorial in TUTORIALS]
+        numbers = [tutorial.number for tutorial in TUTORIALS if tutorial.number is not None]
 
         # Assert
-        assert ids == EVOLVER_STUDIO_TUTORIAL_IDS
+        assert numbers == [f"S{index}" for index in range(1, len(numbers) + 1)]
 
-    def test_should_mark_only_s2_and_s3_as_available(self):
+    def test_should_have_the_two_written_tutorials_available(self):
         # Act
-        available = [tutorial.tutorial_id for tutorial in TUTORIALS if tutorial.available]
+        available = [tutorial.slug for tutorial in TUTORIALS if tutorial.available]
 
         # Assert
-        assert available == ["S2", "S3"]
+        assert available == ["parameter_spaces", "solving"]
+
+    def test_should_identify_every_tutorial_by_a_distinct_topic(self):
+        # Act
+        slugs = [tutorial.slug for tutorial in TUTORIALS]
+
+        # Assert
+        assert len(slugs) == len(set(slugs))
+
+    def test_should_pair_only_with_tutorials_evolver_has(self):
+        """Evolver's documentation has tutorials E1 to E17."""
+        # Act
+        paired = {number for tutorial in TUTORIALS for number in tutorial.pairs_with}
+
+        # Assert
+        assert paired <= {f"E{index}" for index in range(1, 18)}
 
     @pytest.mark.parametrize("level", list(TutorialLevel))
     def test_should_group_every_tutorial_under_its_level(self, level: TutorialLevel):
@@ -37,7 +52,7 @@ class TestTutorialsCatalogue:
         assert grouped
         assert all(tutorial.level is level for tutorial in grouped)
 
-    def test_should_give_tutorial_s2_its_steps(self):
+    def test_should_give_tutorial_s1_its_steps(self):
         # Act
         titles = [step.title for step in tutorial_parameter_spaces.STEPS]
 
@@ -47,8 +62,8 @@ class TestTutorialsCatalogue:
         assert len(titles) == 7
 
 
-class TestTutorialS2WalkThrough:
-    """Runs the real app (app.py, so st.page_link resolves) through every step of S2."""
+class TestTutorialS1WalkThrough:
+    """Runs the real app (app.py, so st.page_link resolves) through every step of S1."""
 
     @pytest.fixture
     def app(self) -> AppTest:
@@ -80,7 +95,9 @@ class TestTutorialS2WalkThrough:
             next(button for button in app.button if button.label == "Next →").click().run()
 
         # Act
-        app.selectbox(key="tutorial_s2_choice_algorithmResult").set_value("externalArchive").run()
+        app.selectbox(key="tutorial_parameter_spaces_choice_algorithmResult").set_value(
+            "externalArchive"
+        ).run()
 
         # Assert
         assert app.metric[0].value == "16 of 34"
@@ -104,7 +121,7 @@ class TestTutorialS2WalkThrough:
         self._go_to_step(app, "Reading a parameter space")
 
         # Act
-        app.radio(key="tutorial_s2_top_level_quiz").set_value("5").run()
+        app.radio(key="tutorial_parameter_spaces_top_level_quiz").set_value("5").run()
 
         # Assert
         assert any("Right" in success.value for success in app.success)
@@ -114,7 +131,9 @@ class TestTutorialS2WalkThrough:
         self._go_to_step(app, "Active parameters")
 
         # Act
-        app.selectbox(key="tutorial_s2_choice_algorithmResult").set_value("externalArchive").run()
+        app.selectbox(key="tutorial_parameter_spaces_choice_algorithmResult").set_value(
+            "externalArchive"
+        ).run()
 
         # Assert
         configuration = app.code[0].value
@@ -132,7 +151,7 @@ class TestTutorialS2WalkThrough:
         ]
         assert len(app.dataframe) == 2
         assert any("Normalized hypervolume" in markdown.value for markdown in app.markdown)
-        app.radio(key="tutorial_s2_tree_quiz").set_value("subtree").run()
+        app.radio(key="tutorial_parameter_spaces_tree_quiz").set_value("subtree").run()
         assert any("Right" in success.value for success in app.success)
 
     def test_should_go_back_to_the_list_of_tutorials_from_the_last_step(self, app: AppTest):
@@ -141,7 +160,7 @@ class TestTutorialS2WalkThrough:
         self._go_to_step(app, "Explore on your own")
 
         # Act
-        app.button(key="tutorial_s2_all_tutorials").click().run()
+        app.button(key="tutorial_parameter_spaces_all_tutorials").click().run()
 
         # Assert
         assert not app.exception

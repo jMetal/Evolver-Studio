@@ -1,4 +1,4 @@
-"""Tutorial S3, "Solving a problem with a configurable algorithm": its steps.
+"""Tutorial S2, "Solving a problem with a configurable algorithm": its steps.
 
 The interactive counterpart of Evolver's tutorial E2 (docs/tutorials/base_level_algorithms.rst): the
 same story (configure an algorithm, run it, read its results, change its configuration, run it on
@@ -46,7 +46,7 @@ E2_TUTORIAL_URL = (
     "https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/base_level_algorithms.rst"
 )
 CLI_SOLVING_URL = "https://github.com/jMetal/Evolver/blob/develop/docs/utilities/cli_tools.rst"
-KEY_PREFIX = "tutorial_s3"
+KEY_PREFIX = "tutorial_solving"
 TIMINGS_MEASURED_ON = (
     "Apple M5 Pro (18 cores), 64 GB of RAM, macOS 26.6.2, Java 21.0.12 (Oracle JDK)"
 )
@@ -385,14 +385,15 @@ def _render_introduction(jar: Path) -> None:
         "front and the indicators it gives;\n"
         "- see what else a run leaves: the solutions with their variables, and the files;\n"
         "- run it again with a very different configuration, adjusting the parameters you "
-        "learned to read in tutorial S2;\n"
+        "learned to read in tutorial S1;\n"
         "- repeat a run several times, and try a problem with three objectives and other "
         "algorithms;\n"
         "- take a run out of the app, to run it from a terminal.\n\n"
         "It is the interactive companion of Evolver's tutorial "
         f"[E2. Base-level algorithms]({E2_TUTORIAL_URL}), which does the same with Java code. "
         "This is **solving**: the configuration is something *you choose*. In a **training** "
-        "(tutorial S4) it is something Evolver *searches for*."
+        "(the subject of the coming tutorial *Your first guided training*) it is something "
+        "Evolver *searches for*."
     )
     st.markdown(
         "Every run of this tutorial is prepared: **Run it here** runs it and shows the result, "
@@ -429,7 +430,7 @@ def _render_default_run(jar: Path) -> None:
         "one row per run with two indicators, **both to be minimized**: **EP** (Epsilon), how far "
         "the front is from the reference front, and **NHV** (normalized hypervolume), the fraction "
         "of the reference front's hypervolume that the front fails to cover. They are the same "
-        "two that a training uses as objectives (tutorial S4)."
+        "two that a training uses as its objectives."
     )
     answer = st.radio(
         "Quick check: which crossover does this configuration use?",
@@ -514,7 +515,7 @@ def _render_other_configuration(jar: Path) -> None:
         "| `crossover` | `blxAlpha` (`sbxDistributionIndex` disappears and "
         "`blxAlphaCrossoverAlpha` 0.5 appears) |\n"
         "| `mutation` | `uniform` (`uniformMutationPerturbation` 0.5) |\n\n"
-        "Notice how the parameters appear and disappear (the *active* parameters of tutorial S2), "
+        "Notice how the parameters appear and disappear (the *active* parameters of tutorial S1), "
         "the ✏️ that marks each changed parameter and the count of parameters changed. "
         "**Reset to the default configuration** undoes everything."
     )
@@ -538,9 +539,10 @@ def _render_other_configuration(jar: Path) -> None:
             "solutions much more evenly along it: that is the effect of its **crowding-distance "
             "archive**, which keeps the solutions that are farthest apart from each other. In this "
             "run it also gets better values of both indicators. One run is not enough to conclude "
-            "that it is better, though; that needs several runs and a statistical test (tutorials "
-            "S5 and S9), but it shows how much the configuration matters, and why finding good "
-            "ones automatically, which is what meta-optimization does, is worthwhile."
+            "that it is better, though; that needs several runs and a statistical test (the "
+            "coming tutorials *Comparing configurations on a problem* and *Validating a "
+            "configuration*), but it shows how much the configuration matters, and why finding "
+            "good ones automatically, which is what meta-optimization does, is worthwhile."
         )
     elif standard is None:
         st.info("Run the first step too, to compare the two.")
@@ -563,7 +565,8 @@ def _render_more_runs(jar: Path) -> None:
         "mean, the standard deviation, the minimum and the maximum over the runs. The values "
         "change from run to run: the spread says how much of a difference between two "
         "configurations may be luck. Comparing configurations with several runs and a test is the "
-        "subject of tutorials S5 and S9."
+        "subject of the coming tutorials *Comparing configurations on a problem* and "
+        "*Validating a configuration*."
     )
 
 
@@ -636,8 +639,8 @@ def _render_next_steps(jar: Path) -> None:
         "time (the crossover probability, the mutation distribution index). Which one moves the "
         "indicators the most? Use five runs, and *Use this configuration for a new run* to vary "
         "a past run.\n\n"
-        "**What's next.** To find configurations like these automatically, tutorial **S4** "
-        "launches a first training. Evolver's tutorial "
+        "**What's next.** To find configurations like these automatically, the coming tutorial "
+        "**Your first guided training** launches a first training. Evolver's tutorial "
         f"[E2]({E2_TUTORIAL_URL}) does what this one did with Java code, including a binary "
         "problem; running your own problem and comparing configurations rigorously come in "
         "later tutorials."

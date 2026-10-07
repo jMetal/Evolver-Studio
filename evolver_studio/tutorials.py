@@ -1,8 +1,10 @@
 """Catalogue of Evolver-Studio's interactive tutorials.
 
-Mirrors the Evolver-Studio part of Evolver's docs/proposals/tutorials.md (ids, levels, tracks and
-the Evolver documentation tutorial each one pairs with). Only tutorials marked `available` have
-content in this app; the rest are listed as coming soon.
+Numbered as Evolver numbers its own (docs/tutorials/index.rst): only the tutorials that are written
+have a number, S1, S2..., consecutive in the order of the catalogue (by level), and the planned
+ones are listed without one. A tutorial is identified by its topic (`slug`), which does not change
+when the tutorials are renumbered. Each one pairs with the tutorials of Evolver's documentation
+that cover the same ground with Java code (E1, E2..., Evolver's own numbers).
 """
 
 from collections.abc import Callable
@@ -10,9 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-TUTORIALS_CATALOGUE_URL = (
-    "https://github.com/jMetal/Evolver/blob/develop/docs/proposals/tutorials.md"
-)
+EVOLVER_TUTORIALS_URL = "https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/index.rst"
 
 
 class TutorialLevel(Enum):
@@ -28,22 +28,32 @@ class Tutorial:
     """An interactive tutorial of Evolver-Studio.
 
     Attributes:
-        tutorial_id: Its id in the tutorials catalogue (e.g. "S2").
+        slug: Its topic, which identifies it (e.g. "solving").
+        number: Its number (e.g. "S2") when it is written, None while it is only planned.
         title: Its title.
         level: Its level.
         track: "Solving", "Meta-optimization" or "Both".
         summary: One-sentence description of what it teaches.
-        pairs_with: Ids of the Evolver documentation tutorials it pairs with.
-        available: Whether its content exists in this app yet.
+        pairs_with: Numbers of the Evolver documentation tutorials it pairs with.
     """
 
-    tutorial_id: str
+    slug: str
+    number: str | None
     title: str
     level: TutorialLevel
     track: str
     summary: str
     pairs_with: tuple[str, ...] = ()
-    available: bool = False
+
+    @property
+    def available(self) -> bool:
+        """Whether its content exists in this app: only a written tutorial has a number."""
+        return self.number is not None
+
+    @property
+    def label(self) -> str:
+        """Its number and title (e.g. "S2. Solving a problem..."), or the title alone."""
+        return f"{self.number}. {self.title}" if self.number else self.title
 
 
 @dataclass(slots=True, frozen=True)
@@ -65,7 +75,8 @@ _ADVANCED = TutorialLevel.ADVANCED
 
 TUTORIALS: tuple[Tutorial, ...] = (
     Tutorial(
-        "S1",
+        "tour",
+        None,
         "A tour of Evolver-Studio",
         _INTRO,
         "Both",
@@ -73,26 +84,27 @@ TUTORIALS: tuple[Tutorial, ...] = (
         ("E4",),
     ),
     Tutorial(
-        "S2",
+        "parameter_spaces",
+        "S1",
         "Exploring a parameter space",
         _INTRO,
         "Both",
         "Read a parameter space: its types of parameters, how they depend on each other, and "
         "which ones a configuration activates.",
         ("E1",),
-        available=True,
     ),
     Tutorial(
-        "S3",
+        "solving",
+        "S2",
         "Solving a problem with a configurable algorithm",
         _INTRO,
         "Solving",
         "Pick a problem, an algorithm and a configuration, run it and inspect the front.",
         ("E2",),
-        available=True,
     ),
     Tutorial(
-        "S4",
+        "first_training",
+        None,
         "Your first guided training",
         _INTRO,
         "Meta-optimization",
@@ -100,67 +112,76 @@ TUTORIALS: tuple[Tutorial, ...] = (
         ("E3",),
     ),
     Tutorial(
-        "S5",
+        "comparing_configurations",
+        None,
         "Comparing configurations on a problem",
         _MID,
         "Solving",
         "Several configurations, several runs each, and their comparison.",
-        ("E5", "E9"),
+        ("E8", "E12"),
     ),
     Tutorial(
-        "S6",
+        "using_a_tuned_configuration",
+        None,
         "Using a tuned configuration",
         _MID,
         "Solving",
         "Solve a new problem with a configuration found in a training run.",
-        ("E8",),
+        ("E7",),
     ),
     Tutorial(
-        "S7",
+        "customizing_a_training",
+        None,
         "Customizing a training run",
         _MID,
         "Meta-optimization",
         "Algorithm, encoding, training set, meta-optimizer and parameter space editing.",
-        ("E6", "E7", "E11"),
+        ("E5", "E6", "E10"),
     ),
     Tutorial(
-        "S8",
+        "analyzing_training_results",
+        None,
         "Analyzing training results",
         _MID,
         "Meta-optimization",
         "Checkpoints, fronts and choosing a configuration.",
-        ("E8",),
+        ("E7",),
     ),
     Tutorial(
-        "S9",
+        "validating_a_configuration",
+        None,
         "Validating a configuration",
         _MID,
         "Meta-optimization",
         "Statistical comparison of a tuned configuration.",
-        ("E9",),
+        ("E8",),
     ),
     Tutorial(
-        "S10",
+        "your_own_problem",
+        None,
         "Solving your own problem",
         _ADVANCED,
         "Solving",
         "Run an algorithm on a user-defined jMetal problem.",
-        ("E2",),
+        ("E2", "E17"),
     ),
     Tutorial(
-        "S11",
+        "meta_optimizers_and_encodings",
+        None,
         "Comparing meta-optimizers and encodings",
         _ADVANCED,
         "Meta-optimization",
         "Training runs with different meta-optimizers or encodings, and their comparison.",
-        ("E12", "E13"),
+        ("E13", "E14"),
     ),
     Tutorial(
-        "S12",
+        "long_running_jobs",
+        None,
         "Long-running jobs",
         _ADVANCED,
         "Both",
         "Background runs: cancelling, reconnecting and resuming the analysis.",
+        ("E16",),
     ),
 )
 

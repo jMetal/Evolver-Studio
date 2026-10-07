@@ -1,4 +1,4 @@
-"""Tests for tutorial S3, "Solving a problem with a configurable algorithm"."""
+"""Tests for tutorial S2, "Solving a problem with a configurable algorithm"."""
 
 from pathlib import Path
 
@@ -86,8 +86,8 @@ class TestPreparedRuns:
         assert "--replacement iRVEA" in configurations["iRVEA"]
 
 
-class TestTutorialS3WalkThrough:
-    """Runs the real app through S3, with its runs in a temporary working directory."""
+class TestTutorialS2WalkThrough:
+    """Runs the real app through S2, with its runs in a temporary working directory."""
 
     @pytest.fixture
     def app(self, jar: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
@@ -95,7 +95,7 @@ class TestTutorialS3WalkThrough:
         monkeypatch.setattr(evolver_client, "WORKING_DIRECTORY", tmp_path)
         app = AppTest.from_file(str(APP_SCRIPT), default_timeout=120).run()
         app.switch_page("pages/tutorials.py").run()
-        app.button(key="tutorial_open_S3").click().run()
+        app.button(key="tutorial_open_solving").click().run()
         return app
 
     @staticmethod
@@ -105,7 +105,7 @@ class TestTutorialS3WalkThrough:
 
     @staticmethod
     def _run(app: AppTest, key: str) -> None:
-        app.button(key=f"tutorial_s3_button_{key}").click().run()
+        app.button(key=f"tutorial_solving_button_{key}").click().run()
 
     def test_should_render_every_step_without_exceptions(self, app: AppTest):
         # Act
@@ -137,7 +137,7 @@ class TestTutorialS3WalkThrough:
         self._go_to_step(app, "Step 1: the default NSGA-II on ZDT1")
 
         # Act
-        app.radio(key="tutorial_s3_crossover_quiz").set_value("SBX").run()
+        app.radio(key="tutorial_solving_crossover_quiz").set_value("SBX").run()
 
         # Assert
         assert any("Right" in success.value for success in app.success)
@@ -149,7 +149,7 @@ class TestTutorialS3WalkThrough:
         next(button for button in app.button if button.label == "Next →").click().run()
 
         # Act
-        slider = app.slider(key="tutorial_s3_f1_range")
+        slider = app.slider(key="tutorial_solving_f1_range")
         low, high = slider.value
         slider.set_value((low, (low + high) / 2)).run()
 
@@ -191,7 +191,7 @@ class TestTutorialS3WalkThrough:
 
         # Act
         self._run(app, "moead")
-        app.radio(key="tutorial_s3_rvea_variant").set_value("iRVEA").run()
+        app.radio(key="tutorial_solving_rvea_variant").set_value("iRVEA").run()
         self._run(app, "irvea")
 
         # Assert
@@ -204,7 +204,7 @@ class TestTutorialS3WalkThrough:
         self._go_to_step(app, "Try it yourself")
 
         # Act
-        app.button(key="tutorial_s3_all_tutorials").click().run()
+        app.button(key="tutorial_solving_all_tutorials").click().run()
 
         # Assert
         assert not app.exception

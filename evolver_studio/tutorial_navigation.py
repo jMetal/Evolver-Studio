@@ -11,13 +11,13 @@ SELECTED_KEY = "tutorial_selected"
 STEP_KEY = "tutorial_step"
 
 
-def open_tutorial(tutorial_id: str | None) -> None:
+def open_tutorial(slug: str | None) -> None:
     """Open a tutorial at its first step, or the catalogue when None (a button's callback).
 
     Args:
-        tutorial_id: The tutorial's id (e.g. "S2"), or None for the list of tutorials.
+        slug: The tutorial's topic (e.g. "solving"), or None for the list of tutorials.
     """
-    st.session_state[SELECTED_KEY] = tutorial_id
+    st.session_state[SELECTED_KEY] = slug
     st.session_state[STEP_KEY] = 0
 
 

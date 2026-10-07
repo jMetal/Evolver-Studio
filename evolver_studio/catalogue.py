@@ -239,7 +239,7 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         # passed as metaYamlParameterSpaceFile — smaller companions to a same-named file above).
         "NSGAIIDoubleReduced.yaml",
         # An alternative base-level space of NSGA-II, the one of Nebro et al. (GECCO 2019), used by
-        # Evolver's tutorial E6: a smaller companion of NSGAIIDouble.yaml, not the algorithm's own.
+        # Evolver's tutorial E5: a smaller companion of NSGAIIDouble.yaml, not the algorithm's own.
         "NSGAIIDoubleGECCO2019.yaml",
         "MOEADDoubleReduced.yaml",
         "RDEMOEADoubleReduced.yaml",
