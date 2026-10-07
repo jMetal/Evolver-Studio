@@ -12,6 +12,7 @@ dependencies = [
     "pyyaml",
     "pandas",
     "plotly",
+    "scipy",
 ]
 
 [project.optional-dependencies]
