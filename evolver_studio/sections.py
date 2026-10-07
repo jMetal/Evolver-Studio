@@ -73,8 +73,8 @@ SECTIONS = (
                 "Problems",
                 "🧩",
                 "The benchmark and real-world problems available for training and solving, with "
-                "their objectives, variables and reference fronts.",
-                available=False,
+                "their encoding, objectives, variables, arguments and reference fronts.",
+                available=True,
             ),
         ),
     ),
