@@ -34,7 +34,8 @@ class BaseLevelConfig:
         number_of_independent_runs: Independent runs per training evaluation.
         yaml_parameter_space_file: Base-level algorithm parameter space YAML.
         extra_config: Algorithm-specific extra settings, or None.
-        training_problem_names: Training problem names.
+        training_problem_names: Training problems: a name, or a `{class, args}` map for a
+            problem built with arguments.
         training_reference_front_file_names: Reference front file per problem.
         training_evaluations: Base-level evaluation budget per problem.
         indicator_names: Quality indicator names.
@@ -50,7 +51,7 @@ class BaseLevelConfig:
     number_of_independent_runs: int
     yaml_parameter_space_file: str
     extra_config: dict[str, str] | None
-    training_problem_names: list[str]
+    training_problem_names: list[str | dict]
     training_reference_front_file_names: list[str]
     training_evaluations: list[int]
     indicator_names: list[str]

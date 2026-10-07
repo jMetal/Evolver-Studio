@@ -20,6 +20,7 @@ import yaml
 from evolver_studio.adaptive_poll import AdaptivePollInterval
 from evolver_studio.app_state import (
     registered_problem_names,
+    registered_problems,
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
@@ -37,6 +38,7 @@ from evolver_studio.evolver_client import (
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
+from evolver_studio.problem_catalogue import problems_with_encoding
 from evolver_studio.request import (
     FLAT_META_SEARCH_SCALAR_KEYS,
     BaseLevelConfig,
@@ -61,6 +63,7 @@ from evolver_studio.training_set import (
     TrainingSet,
     default_training_set_table,
     parse_training_set,
+    training_problem_specs,
 )
 
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
@@ -73,6 +76,7 @@ def _base_level_config(
     yaml_parameter_space_file: str,
     extra_config: dict[str, str] | None,
     training_set: TrainingSet,
+    problem_specs: list[str | dict],
 ) -> BaseLevelConfig:
     """Build the base-level config for the selected algorithm and training set.
 
@@ -90,6 +94,9 @@ def _base_level_config(
             weightVectorFilesDirectory), or None when the algorithm needs none.
         training_set: The problems to train on, with their reference fronts
             and evaluation budgets (BaseLevelConfig's three parallel lists).
+        problem_specs: The training set's problems as trainingProblemNames'
+            entries (a name, or a `{class, args}` map), see
+            training_set.training_problem_specs.
 
     Returns:
         The base-level config for the selected algorithm and training set.
@@ -101,7 +108,7 @@ def _base_level_config(
         number_of_independent_runs=1,
         yaml_parameter_space_file=yaml_parameter_space_file,
         extra_config=extra_config,
-        training_problem_names=training_set.problem_names,
+        training_problem_names=problem_specs,
         training_reference_front_file_names=training_set.reference_front_file_names,
         training_evaluations=training_set.evaluations,
         indicator_names=["Epsilon", "NormalizedHypervolume"],
@@ -149,6 +156,7 @@ def _launch_run(
     parameter_space_text_: str,
     extra_config: dict[str, str] | None,
     training_set: TrainingSet,
+    problem_specs: list[str | dict],
     operator_flags: dict[str, object],
     meta_max_evaluations: int,
     number_of_cores: int,
@@ -179,6 +187,8 @@ def _launch_run(
             weightVectorFilesDirectory), or None.
         training_set: The problems to train on, with their reference fronts
             and evaluation budgets.
+        problem_specs: The training set's problems as trainingProblemNames'
+            entries.
         operator_flags: The (possibly user-edited) meta-optimizer operator
             configuration, as plain key/value pairs.
         meta_max_evaluations: Meta-level evaluation budget.
@@ -193,7 +203,12 @@ def _launch_run(
     parameter_space_file.write_text(parameter_space_text_)
 
     base_level = _base_level_config(
-        algorithm_name, encoding, str(parameter_space_file), extra_config, training_set
+        algorithm_name,
+        encoding,
+        str(parameter_space_file),
+        extra_config,
+        training_set,
+        problem_specs,
     )
     base_level_file = run_dir / "base_level.yaml"
     base_level_file.write_text(base_level_to_yaml(base_level))
@@ -484,7 +499,7 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
         return _render_guided_editor(default_text, f"{key_prefix}_form")
 
 
-def _render_training_set_editor(jar: Path) -> pd.DataFrame:
+def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
     """Let the user define the training set as an editable table of rows.
 
     Each row is one training problem, its reference front file, and its
@@ -494,11 +509,18 @@ def _render_training_set_editor(jar: Path) -> pd.DataFrame:
     Args:
         jar: Path to Evolver's jar, to look up valid problem names from
             DescribeMain's manifest.
+        encoding: The base algorithm's encoding: the curated names offered
+            are those of its problems, when the jar describes them.
 
     Returns:
         The current (possibly user-edited) training set table.
     """
-    problem_names = registered_problem_names(str(jar))
+    problems = registered_problems(str(jar))
+    problem_names = (
+        problems_with_encoding(problems, encoding)
+        if problems is not None
+        else registered_problem_names(str(jar))
+    )
     problem_help = (
         "A curated name (e.g. ZDT4, DTLZ3) or a fully-qualified jMetal class name for any "
         "other Problem<S> on the classpath (e.g. "
@@ -506,7 +528,8 @@ def _render_training_set_editor(jar: Path) -> pd.DataFrame:
         "resolved by reflection."
     )
     if problem_names is not None:
-        problem_help += " Curated names: " + ", ".join(sorted(problem_names))
+        label = f"Curated {encoding} problems" if problems is not None else "Curated names"
+        problem_help += f" {label}: " + ", ".join(sorted(problem_names))
     else:
         st.warning("Could not list registered problems (is Java installed?).")
     st.caption(
@@ -518,6 +541,12 @@ def _render_training_set_editor(jar: Path) -> pd.DataFrame:
         st.session_state.get("training_set_table", default_training_set_table()),
         column_config={
             "problem": st.column_config.TextColumn("Problem", required=True, help=problem_help),
+            "arguments": st.column_config.TextColumn(
+                "Arguments",
+                help="Optional: the problem's constructor arguments, all of them or none, "
+                "comma-separated (e.g. 12, 2 for DTLZ2 with 12 variables and 2 objectives). "
+                "Explore › Problems lists each problem's arguments.",
+            ),
             "reference_front": st.column_config.TextColumn("Reference front file", required=True),
             "evaluations": st.column_config.NumberColumn(
                 "Evaluations", min_value=1, step=100, required=True
@@ -621,15 +650,24 @@ else:
         )
 
     with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
-        training_set_table = _render_training_set_editor(jar)
+        training_set_table = _render_training_set_editor(jar, encoding)
     training_set = parse_training_set(training_set_table)
+    problem_specs: list[str | dict] = []
+    problem_errors: list[str] = []
     if training_set is None:
         st.error("Every row needs a problem, a reference front file, and evaluations > 0.")
+    else:
+        problem_specs, problem_errors = training_problem_specs(
+            training_set, registered_problems(str(jar)), encoding
+        )
+        for error in problem_errors:
+            st.error(error)
 
     can_launch = (
         parameter_space_text_value is not None
         and operator_flags is not None
         and training_set is not None
+        and not problem_errors
     )
     if can_launch:
         base_level = _base_level_config(
@@ -638,6 +676,7 @@ else:
             "<written to disk at launch>",
             extra_config,
             training_set,
+            problem_specs,
         )
         meta_search = _meta_search_config(
             meta_algorithm.name,
@@ -660,6 +699,7 @@ else:
             parameter_space_text_value,
             extra_config,
             training_set,
+            problem_specs,
             operator_flags,
             int(meta_max_evaluations),
             int(number_of_cores),

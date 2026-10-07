@@ -93,13 +93,13 @@ def problems_with_encoding(problems: dict[str, Problem], encoding: str) -> list[
     return sorted(name for name, problem in problems.items() if problem.encoding == encoding)
 
 
-def problem_spec(name: str, arguments: Sequence[ArgumentValue] | None) -> str | dict:
+def problem_spec(name: str, arguments: Sequence[ArgumentValue | str] | None) -> str | dict:
     """The value of a request's `problem` (or of an entry of `trainingProblemNames`).
 
     Args:
         name: The problem's name.
-        arguments: Its constructor's arguments, in order, or None (or empty) to build it with
-            none.
+        arguments: Its constructor's arguments, in order (a string for one of a class outside the
+            catalogue, such as a file name), or None (or empty) to build it with none.
 
     Returns:
         The name alone, or a `{class, args}` map.
