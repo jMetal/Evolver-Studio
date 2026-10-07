@@ -37,7 +37,6 @@ from evolver_studio.configuration import (
 from evolver_studio.evolver_client import (
     EVOLVER_VERSION,
     WORKING_DIRECTORY,
-    RunStatus,
     cancel_training,
     read_pid,
     read_status,
@@ -53,7 +52,7 @@ from evolver_studio.problems import (
     reference_front_dimension,
     reference_front_for_objectives,
 )
-from evolver_studio.progress import estimate_remaining_seconds, format_duration
+from evolver_studio.progress import running_label
 from evolver_studio.resource_files import (
     default_configuration_text,
     jar_evolver_version,
@@ -66,7 +65,7 @@ from evolver_studio.runs import (
     mark_cancelled,
     run_phase,
 )
-from evolver_studio.solve_figures import build_front_figure, build_live_front_figure
+from evolver_studio.solve_figures import build_front_figure
 from evolver_studio.solve_form import (
     ALGORITHM_KEY,
     CONFIGURATION_VERSION_KEY,
@@ -95,7 +94,6 @@ from evolver_studio.solve_results import (
     is_permutation,
     list_solve_runs,
     objective_columns,
-    read_current_front,
     read_front,
     read_indicators,
     read_request,
@@ -109,30 +107,28 @@ RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
 DEFAULT_POPULATION_SIZE = 100
-LIVE_FRAGMENT_RUN_EVERY_SECONDS = 1
-# A run that writes its front is polled more often, so that every front it pauses on is shown.
-LIVE_FRONT_RUN_EVERY_SECONDS = 0.25
+POLL_EVERY_SECONDS = 1
 LOG_LINES_SHOWN = 15
-# The evaluations between two updates of the progress that the slider offers, and the one it starts
-# at. Evolver reports in steps of an algorithm's offspring population (usually 100): updating more
-# often than that costs time and shows nothing more, except for a steady-state algorithm.
-PROGRESS_FREQUENCIES = (1, 10, 100, 500, 1000, 5000, 10000, 50000)
-DEFAULT_PROGRESS_FREQUENCY = 500
-SLOW_PROGRESS_FREQUENCY_BELOW = 100
-DEFAULT_FRONT_FREQUENCY = 1000
-TRACKING_SILENT = "Silent"
-TRACKING_PROGRESS = "Progress bar"
-TRACKING_FRONT = "Live front"
-TRACKING_MODES = (TRACKING_SILENT, TRACKING_PROGRESS, TRACKING_FRONT)
+# Every how many evaluations a run updates its status, for the page to show the evaluation it is
+# at: often enough to follow it, and seldom enough to cost little (a few percent at most).
+STATUS_FREQUENCY = 1000
 # The Evolver release from which a run reports its progress while it runs.
 PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
-# The Evolver release from which a run can pause after writing each front (the develop builds after
-# 2.3, 2.4-SNAPSHOT, released as 3.0); 2.3 ignores the pause.
-FRONT_DELAY_SINCE = "2.4"
-# The pauses after each front, in milliseconds, that the slider offers (0 for none), and the one it
-# starts at: a little more than the page's polling interval, so that no front is missed.
-FRONT_DELAYS = (0, 100, 300, 1000)
-DEFAULT_FRONT_DELAY = 300
+# A blinking label while a run is in progress (Streamlit has no such element).
+RUNNING_STYLE = """
+<style>
+@keyframes solve-running-blink { 50% { opacity: 0.35; } }
+.solve-running {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 75, 75, 0.7);
+  background: rgba(255, 75, 75, 0.15);
+  font-weight: 600;
+  animation: solve-running-blink 1s ease-in-out infinite;
+}
+</style>
+"""
 
 
 @dataclass(slots=True, frozen=True)
@@ -428,26 +424,6 @@ def _render_population_size(column, population_sizes: list[int] | None) -> int:
 
 
 @dataclass(slots=True, frozen=True)
-class Tracking:
-    """What section 4 chooses about following a run while it runs.
-
-    Attributes:
-        status_frequency: Every how many evaluations the progress is updated, or None to update it
-            only when each independent run ends.
-        front_frequency: Every how many evaluations the current front is written, or None for none.
-        write_population: Whether that file holds the whole population, not only the
-            non-dominated solutions.
-        front_delay_millis: How long the run pauses after writing each front, or None for no
-            pause.
-    """
-
-    status_frequency: int | None = None
-    front_frequency: int | None = None
-    write_population: bool = False
-    front_delay_millis: int | None = None
-
-
-@dataclass(slots=True, frozen=True)
 class Budget:
     """What section 4 chooses.
 
@@ -457,7 +433,6 @@ class Budget:
         runs: The number of independent runs.
         seed: The seed of the first run, or None to draw one.
         indicators: The quality indicators to compute.
-        tracking: How the run is followed while it is in progress.
     """
 
     population_size: int
@@ -465,124 +440,10 @@ class Budget:
     runs: int
     seed: int | None
     indicators: list[str]
-    tracking: Tracking
-
-
-def _frequency_warning(mode: str, frequency: int) -> str | None:
-    """Say what updating this often costs, from what was measured on NSGA-II (see Evolver's
-    docs/utilities/cli_tools.rst), or None when it costs little. Showing the front is expected to
-    slow the run down, so only an excessive frequency is warned about."""
-    if mode == TRACKING_FRONT:
-        if frequency < SLOW_PROGRESS_FREQUENCY_BELOW:
-            return (
-                f"Writing the front every {frequency} evaluation(s) can make the run several times "
-                "slower (more than ten times for an algorithm that reports every evaluation)."
-            )
-        return None
-    if frequency < SLOW_PROGRESS_FREQUENCY_BELOW:
-        return (
-            f"Updating every {frequency} evaluation(s) can slow the run down a lot: up to about "
-            "twice as long in the cases measured. From 100 evaluations on, the cost is a few "
-            "percent."
-        )
-    return None
-
-
-def _render_tracking(max_evaluations: int, runs: int) -> Tracking:
-    """Choose how the run is followed while it is in progress, and how often it is refreshed.
-
-    Args:
-        max_evaluations: The evaluations of each run.
-        runs: The number of independent runs.
-
-    Returns:
-        What was chosen: nothing (silent, or an Evolver that cannot do more), the progress, or the
-        progress and the front.
-    """
-    version = jar_evolver_version(jar)
-    supported = version is None or is_at_least(version, PROGRESS_WITHIN_A_RUN_SINCE)
-    modes = TRACKING_MODES if supported else (TRACKING_SILENT,)
-    mode = st.radio(
-        "While the run is in progress",
-        modes,
-        index=modes.index(TRACKING_PROGRESS) if supported else 0,
-        horizontal=True,
-        disabled=not supported,
-        help="Silent updates the progress only when each independent run ends. Progress bar "
-        "updates it every N evaluations. Live front also plots the front as it evolves. A run "
-        "that lasts a second or two (MOEA/D on a small budget, for instance) ends before there is "
-        "anything to follow, unless Live front pauses it after each front.",
-        key="solve_tracking",
-    )
-    if not supported:
-        st.caption(
-            f"Evolver {version} updates the progress only when each run ends; Evolver "
-            f"{PROGRESS_WITHIN_A_RUN_SINCE} or later does it while the run is in progress."
-        )
-        return Tracking()
-    if mode == TRACKING_SILENT:
-        st.caption("The progress changes only when each independent run ends.")
-        return Tracking()
-    frequency = st.select_slider(
-        "Update every N evaluations",
-        options=PROGRESS_FREQUENCIES,
-        value=DEFAULT_FRONT_FREQUENCY if mode == TRACKING_FRONT else DEFAULT_PROGRESS_FREQUENCY,
-        help="How often it is refreshed. Each update costs time: the more often, the longer the "
-        "run takes, and plotting the front costs much more than the progress bar.",
-        key=f"solve_update_every_{mode}",
-    )
-    frequency = min(frequency, max_evaluations)
-    updates = max(runs * max_evaluations // frequency, 1)
-    st.caption(f"About {updates} updates in all.")
-    warning = _frequency_warning(mode, frequency)
-    if warning is not None:
-        st.warning(warning)
-    if mode == TRACKING_PROGRESS:
-        return Tracking(status_frequency=frequency)
-    whole_population = st.checkbox(
-        "Show the dominated solutions too",
-        help="Plots the whole population, the non-dominated solutions in color and the dominated "
-        "ones in grey. It is a larger file to write each time.",
-        key="solve_whole_population",
-    )
-    return Tracking(
-        status_frequency=frequency,
-        front_frequency=frequency,
-        write_population=whole_population,
-        front_delay_millis=_render_front_delay(version, updates),
-    )
-
-
-def _render_front_delay(version: str | None, updates: int) -> int | None:
-    """Choose how long the run pauses after each front, when the jar can pause it.
-
-    Args:
-        version: The Evolver version of the jar, or None if it records none.
-        updates: About how many fronts the run writes.
-
-    Returns:
-        The pause in milliseconds, or None for none.
-    """
-    if version is not None and not is_at_least(version, FRONT_DELAY_SINCE):
-        return None
-    delay = st.select_slider(
-        "Pause after each front",
-        options=FRONT_DELAYS,
-        value=DEFAULT_FRONT_DELAY,
-        format_func=lambda millis: f"{millis} ms" if millis else "none",
-        help="The run waits this long after writing each front, so that the page, which looks for "
-        "a new one every quarter of a second, shows every front instead of only the latest. "
-        "Without a pause, a fast run shows few fronts, or only the final one.",
-        key="solve_front_delay",
-    )
-    if not delay:
-        return None
-    st.caption(f"The pauses add about {format_duration(updates * delay / 1000)} to the run.")
-    return delay
 
 
 def _render_budget(has_reference_front: bool, population_sizes: list[int] | None) -> Budget:
-    """Section 4: the population, the budget, the runs, the seed, the indicators and the progress.
+    """Section 4: the population, the budget, the runs, the seed and the indicators.
 
     Args:
         has_reference_front: Whether the problem has a reference front (indicators need one).
@@ -611,14 +472,12 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
         "the seed + i - 1.",
         key=indicators_key(has_reference_front),
     )
-    tracking = _render_tracking(int(max_evaluations), int(runs))
     return Budget(
         population_size=int(population_size),
         max_evaluations=int(max_evaluations),
         runs=int(runs),
         seed=int(seed) if fix_seed else None,
         indicators=indicators,
-        tracking=tracking,
     )
 
 
@@ -699,10 +558,9 @@ def _render_form(can_run: bool) -> None:
             number_of_independent_runs=budget.runs,
             seed=budget.seed,
             indicator_names=budget.indicators,
-            status_frequency=budget.tracking.status_frequency,
-            front_frequency=budget.tracking.front_frequency,
-            write_population=budget.tracking.write_population,
-            front_delay_millis=budget.tracking.front_delay_millis,
+            status_frequency=_status_frequency(),
+            front_frequency=None,
+            write_population=False,
             output_directory=output_directory,
         )
 
@@ -714,6 +572,14 @@ def _render_form(can_run: bool) -> None:
         st.rerun()
 
 
+def _status_frequency() -> int | None:
+    """How often a run updates its status, when the jar can do it while a run is in progress."""
+    version = jar_evolver_version(jar)
+    if version is not None and not is_at_least(version, PROGRESS_WITHIN_A_RUN_SINCE):
+        return None
+    return STATUS_FREQUENCY
+
+
 def _cancel(run_dir: Path) -> None:
     """Stop a run's process and mark it cancelled."""
     pid = read_pid(run_dir / "pid.txt")
@@ -722,73 +588,25 @@ def _cancel(run_dir: Path) -> None:
     mark_cancelled(run_dir)
 
 
-def _progress_text(run_dir: Path, status: RunStatus) -> str:
-    """Write a run's progress: the evaluations, the time elapsed and the time left."""
-    text = f"{status.evaluations_done}/{status.max_evaluations} evaluations"
-    try:
-        started = dt.datetime.strptime(run_dir.name, "%Y%m%d-%H%M%S")
-    except ValueError:
-        return text
-    elapsed = (dt.datetime.now() - started).total_seconds()
-    text += f" · {format_duration(elapsed)} elapsed"
-    remaining = estimate_remaining_seconds(elapsed, status.evaluations_done, status.max_evaluations)
-    if remaining is not None:
-        text += f" · about {format_duration(remaining)} left"
-    return text
-
-
-@st.cache_data(show_spinner=False)
-def _reference_front(file_name: str) -> pd.DataFrame:
-    """Read a problem's reference front, once: it can be large and the live chart redraws often."""
-    return read_front(WORKING_DIRECTORY / file_name)
-
-
-def _render_live_front(run_dir: Path, request: dict) -> None:
-    """Plot the front of the run in progress, as Evolver last wrote it."""
-    solutions = read_current_front(WORKING_DIRECTORY / request["outputDirectory"])
-    if solutions is None:
-        st.caption("Waiting for the first front…")
-        return
-    reference_file = request.get("referenceFrontFileName")
-    reference = _reference_front(reference_file) if reference_file else None
-    st.plotly_chart(
-        build_live_front_figure(solutions, reference),
-        width="stretch",
-        key=f"solve_live_front_{run_dir.name}",
-    )
-
-
 def _render_run_in_progress(run_dir: Path) -> None:
-    """Show the progress of the run in progress, and move on to its results when it ends."""
-    st.info(f"Running ({run_dir.name}).")
+    """Show that a run is in progress, at which evaluation, and move on to its results when it
+    ends."""
     request = read_request(run_dir) or {}
-    if "statusFrequency" not in request:
-        st.caption("This run reports its progress only when each of its independent runs ends.")
-    if st.button("Cancel"):
-        _cancel(run_dir)
-        st.rerun()
+    runs = int(request.get("numberOfIndependentRuns", 1))
+    st.markdown(RUNNING_STYLE, unsafe_allow_html=True)
 
-    run_every = (
-        LIVE_FRONT_RUN_EVERY_SECONDS
-        if "frontFrequency" in request
-        else LIVE_FRAGMENT_RUN_EVERY_SECONDS
-    )
-
-    @st.fragment(run_every=run_every, key=f"solve_poll_{run_dir.name}")
+    @st.fragment(run_every=POLL_EVERY_SECONDS, key=f"solve_poll_{run_dir.name}")
     def _poll() -> None:
-        status = read_status(run_dir / "status.yaml")
-        if status is not None:
-            fraction = min(status.evaluations_done / max(status.max_evaluations, 1), 1.0)
-            st.progress(fraction, text=_progress_text(run_dir, status))
-        else:
-            st.progress(0.0, text="Starting…")
-        if "frontFrequency" in request:
-            _render_live_front(run_dir, request)
+        label = running_label(read_status(run_dir / "status.yaml"), runs)
+        st.markdown(f'<span class="solve-running">⏳ {label}</span>', unsafe_allow_html=True)
         if run_phase(run_dir) not in (RunPhase.STARTING, RunPhase.RUNNING):
             st.session_state["solve_history"] = run_dir.name
             st.rerun()
 
     _poll()
+    if st.button("Cancel"):
+        _cancel(run_dir)
+        st.rerun()
 
 
 def _render_results(run: SolveRunInfo) -> None:

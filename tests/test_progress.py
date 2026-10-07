@@ -1,41 +1,31 @@
-"""Tests for estimating the time a run has left."""
+"""Tests for describing a run in progress."""
 
-import pytest
+from evolver_studio.evolver_client import RunState, RunStatus
+from evolver_studio.progress import running_label
 
-from evolver_studio.progress import estimate_remaining_seconds, format_duration
+
+def _status(done: int, total: int) -> RunStatus:
+    return RunStatus(RunState.RUNNING, done, total, "2026-10-07T12:00:00")
 
 
-class TestEstimateRemainingSeconds:
-    def test_should_extrapolate_the_pace_so_far(self):
-        # Act: a quarter done in 10 s
-        remaining = estimate_remaining_seconds(10.0, 2500, 10000)
+class TestRunningLabel:
+    def test_should_say_only_running_before_the_first_status(self):
+        # Act / Assert
+        assert running_label(None, 1) == "Running…"
+        assert running_label(_status(0, 25000), 1) == "Running…"
+
+    def test_should_give_the_evaluation_of_a_single_run(self):
+        # Act / Assert
+        assert running_label(_status(12000, 25000), 1) == "Running · evaluation 12,000 of 25,000"
+
+    def test_should_say_which_run_is_in_progress_with_several(self):
+        """Evolver counts the evaluations over all the runs: 3 runs of 1000 make 3000."""
+        # Act
+        label = running_label(_status(1500, 3000), 3)
 
         # Assert
-        assert remaining == pytest.approx(30.0)
+        assert label == "Running · evaluation 1,500 of 3,000 · run 2 of 3"
 
-    def test_should_have_no_estimate_before_anything_is_done(self):
+    def test_should_not_go_past_the_last_run_when_all_are_done(self):
         # Act / Assert
-        assert estimate_remaining_seconds(5.0, 0, 10000) is None
-        assert estimate_remaining_seconds(0.0, 100, 10000) is None
-
-    def test_should_have_nothing_left_when_the_evaluations_are_done(self):
-        # Act / Assert
-        assert estimate_remaining_seconds(10.0, 10000, 10000) == 0.0
-
-
-class TestFormatDuration:
-    @pytest.mark.parametrize(
-        ("seconds", "text"),
-        [
-            (0, "0 s"),
-            (7.4, "7 s"),
-            (59.6, "1 min"),
-            (60, "1 min"),
-            (125, "2 min 5 s"),
-            (3600, "1 h"),
-            (3780, "1 h 3 min"),
-        ],
-    )
-    def test_should_write_the_largest_units(self, seconds: float, text: str):
-        # Act / Assert
-        assert format_duration(seconds) == text
+        assert running_label(_status(3000, 3000), 3).endswith("run 3 of 3")

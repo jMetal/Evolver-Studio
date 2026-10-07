@@ -1,39 +1,27 @@
-"""Estimating how far a run is: the time left, and how to write a duration."""
+"""How a run in progress is described: which evaluation it is at, of how many."""
+
+from evolver_studio.evolver_client import RunStatus
 
 
-def estimate_remaining_seconds(
-    elapsed_seconds: float, evaluations_done: int, evaluations_total: int
-) -> float | None:
-    """Estimate the time a run still needs, assuming it keeps its pace.
+def running_label(status: RunStatus | None, runs: int) -> str:
+    """Describe a run in progress in one line, e.g. "Running · evaluation 12,000 of 25,000".
 
-    Args:
-        elapsed_seconds: The time since the run started.
-        evaluations_done: The evaluations performed so far.
-        evaluations_total: The evaluations of the whole run.
-
-    Returns:
-        The seconds left, or None while nothing is done yet (there is no pace to extrapolate).
-    """
-    if evaluations_done <= 0 or elapsed_seconds <= 0:
-        return None
-    remaining = max(evaluations_total - evaluations_done, 0)
-    return elapsed_seconds * remaining / evaluations_done
-
-
-def format_duration(seconds: float) -> str:
-    """Write a duration in the largest units that read well: "8 s", "2 min 5 s", "1 h 3 min".
+    Evolver counts the evaluations over all the independent runs, so with several runs the label
+    also says which one is in progress.
 
     Args:
-        seconds: The duration.
+        status: The run's status, or None while it has written none.
+        runs: The number of independent runs of the request.
 
     Returns:
-        The text, rounded to the second (to the minute from an hour on).
+        The label; "Running…" alone while the status says nothing yet.
     """
-    total = round(seconds)
-    if total < 60:
-        return f"{total} s"
-    minutes, rest = divmod(total, 60)
-    if minutes < 60:
-        return f"{minutes} min {rest} s" if rest else f"{minutes} min"
-    hours, minutes = divmod(minutes, 60)
-    return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+    if status is None or status.evaluations_done <= 0 or status.max_evaluations <= 0:
+        return "Running…"
+    done = min(status.evaluations_done, status.max_evaluations)
+    label = f"Running · evaluation {done:,} of {status.max_evaluations:,}"
+    if runs > 1:
+        per_run = status.max_evaluations // runs
+        current = min(done // max(per_run, 1) + 1, runs)
+        label += f" · run {current} of {runs}"
+    return label
