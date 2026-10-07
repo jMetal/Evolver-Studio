@@ -14,6 +14,17 @@ Works with Evolver 2.3.
   Training and Run algorithm, and MOEA/D also with its Binary and Permutation encodings, as
   Evolver's `DescribeMain` registers them. Run algorithm starts from the default configuration the
   jar ships for each, where there is one. MOPSO is still browsable only.
+- **Problems**, from the problem catalogue of Evolver's `DescribeMain`:
+  - *Explore › Problems* lists every problem with its family, encoding, number of objectives and
+    variables, constructor arguments and reference fronts, filtered by encoding, family and name.
+  - *Run algorithm* offers binary and permutation problems (ZDT5, OneZeroMax, the TSP instances),
+    shows only the algorithms that solve the chosen problem's encoding, lets its arguments be set
+    (the number of objectives and variables of DTLZ, WFG or ZCAT, for instance), picks the
+    reference front with its number of objectives and warns when the chosen one has another. A
+    past run's arguments are restored with it.
+  - *Training*: a problem of the training set can be given its arguments, the curated names
+    offered are those of the base algorithm's encoding, and a problem of another encoding is
+    reported before launching.
 
 ### Added
 

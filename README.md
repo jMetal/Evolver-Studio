@@ -55,7 +55,7 @@ purpose:
 | Explore | Base algorithms | ✅ | Browse an algorithm's parameter space, per encoding, as a filterable table (one row per parameter, with the condition that activates it) |
 | Explore | Meta-optimizers | ✅ | See each meta-optimizer's encodings and the operators it can be configured with |
 | Explore | Quality indicators | ✅ | The indicators a training run can minimize, and what each one measures |
-| Explore | Problems | 🚧 | Browse the problems available for training and solving |
+| Explore | Problems | ✅ | The problems available for training and solving: encoding, objectives, variables, arguments and reference fronts |
 | Solve | Run algorithm | ✅ | Run an algorithm on a problem from its default configuration, adjusted within its parameter space; inspect the fronts and indicators, download `VAR`/`FUN` |
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Analysis | 🚧 | Statistical comparison of runs and configurations (Wilcoxon tests, tables, plots) |
@@ -69,7 +69,9 @@ The Training page provides:
 - A parameter editor for the base-level algorithm, with a **guided** mode (forms, valid by
   construction) and an **expert** mode (raw YAML, validated on every change).
 - Training sets of one or more problems, each with its reference front and evaluation budget.
-  Problems can be any jMetal problem, given by class name.
+  Problems can be any jMetal problem, given by class name, optionally with its constructor's
+  arguments (e.g. DTLZ2 with 2 objectives); a problem of another encoding than the base
+  algorithm's is reported before launching.
 - A choice of meta-optimizer, with its operator settings pre-filled from Evolver's example files.
 - A live plot of the indicator front as the run progresses.
 

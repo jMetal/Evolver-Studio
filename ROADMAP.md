@@ -81,6 +81,13 @@ below; revisit and reorder as real usage surfaces new ones.
   the default configurations the jar ships; MOPSO stays browsable only. Done on
   `experiment/evolver-3-sync`, to land with the release (`/bump-evolver 3.0`).
 
+- **Problem catalogue (same branch)**: `DescribeMain`'s `problemCatalogue`
+  (`evolver_studio/problem_catalogue.py`) gives each problem's encoding, dimensions and constructor
+  arguments. Explore › Problems lists them; Run algorithm offers only the algorithms of the
+  problem's encoding and lets its arguments be set (a `{class, args}` problem in the request); the
+  Training set takes arguments per problem and checks the encodings. With a 2.3 jar, which has no
+  catalogue, the pages fall back to the plain list of names.
+
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
   tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
   default configurations of Evolver 2.3 for the binary and permutation encodings (every runnable
@@ -156,9 +163,7 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   the selection); the Training page only builds flat requests today.
 - **Solving track, next steps** (the first version of Run algorithm is done): start from a
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
-  configurations on a problem; problem arguments (number of objectives and variables of DTLZ, WFG,
-  ZCAT), which need the Problems page of Explore. Binary and permutation problems cannot be chosen
-  yet: `DescribeMain` lists the problems without their encoding.
+  configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
   documentation counterparts) in Evolver's `docs/proposals/tutorials.md` and developed one at a time
   (S2 is done).
@@ -235,8 +240,7 @@ phase currently plans for it.
 **F. Onboarding / new users**
 14. "Try Evolver" on a bundled example with sensible defaults, minimal setup — *shipped* (the ZDT4
     quick-start).
-15. Discover which algorithms/problems/indicators exist — *shipped* for algorithms and indicators
-    (Explore pages); problems still a placeholder.
+15. Discover which algorithms/problems/indicators exist — *shipped* (Explore pages).
 
 **G. Reproducibility**
 16. Recover a run's exact `request.yaml` to reproduce or cite it — *shipped* (already persisted per run
