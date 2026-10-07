@@ -4,9 +4,9 @@ Evolver's org.uma.evolver.cli.training.DescribeMain now exposes a machine-readab
 what BaseAlgorithmRegistry/MetaAlgorithmRegistry actually register (see
 evolver_client.describe() and Evolver's docs/proposals/cli-describe-manifest.md) — the
 `runnable_today`/`wired_into_cli_runner` flags below should match it. What DescribeMain does
-*not* cover is the broader, browsable-but-unregistered set this module also documents (e.g.
-SMS-EMOA, RDE-MOEA as base algorithms; Async Genetic Algorithm as a meta-optimizer): those exist
-as org.uma.evolver.algorithm.*/org.uma.evolver.meta.{algorithm,builder}.* Java classes, usable from
+*not* cover is the browsable-but-unregistered set this module also documents (e.g. MOPSO as a base
+algorithm; Async Genetic Algorithm as a meta-optimizer): those exist as
+org.uma.evolver.algorithm.*/org.uma.evolver.meta.{algorithm,builder}.* Java classes, usable from
 org.uma.evolver.example.*, but never registered for cli.training — there is no registry to
 introspect for them, so this module still mirrors them by hand and must be kept in sync manually
 if Evolver's algorithm set changes there — see tests/test_catalogue.py for a check against the
@@ -15,8 +15,9 @@ parameter spaces packaged in Evolver's jar.
 `runnable_today`/`wired_into_cli_runner` distinguish "Evolver-Studio can browse this algorithm's
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can
 actually launch a training run with it" (true only where org.uma.evolver.cli.training already
-supports it: NSGA-II/MOEA-D/RVEA as base algorithms; NSGA-II/AGE-MOEA/SPEA2/SMPSO/AsyncNSGA-II/
-RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/RandomSearch for tree).
+supports it: every base algorithm but MOPSO (not registered); NSGA-II/AGE-MOEA/SPEA2/SMPSO/
+AsyncNSGA-II/RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/
+RandomSearch for tree).
 """
 
 from dataclasses import dataclass, field
@@ -138,8 +139,9 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         },
         runnable_today=True,
         registry_name="MOEAD",
-        runnable_encodings=("Double",),
+        runnable_encodings=("Double", "Binary", "Permutation"),
         required_extra_config_keys=("weightVectorFilesDirectory",),
+        # No default configuration for Binary and Permutation: the form starts from the space.
         default_configurations={"Double": (("Default", "MOEADDoubleDefault.txt"),)},
     ),
     # org.uma.evolver.algorithm.smsemoa.{Double,Binary,Permutation}SMSEMOA
@@ -150,17 +152,27 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
             "Binary": "SMSEMOABinary.yaml",
             "Permutation": "SMSEMOAPermutation.yaml",
         },
-        runnable_today=False,
+        runnable_today=True,
+        registry_name="SMS-EMOA",
+        runnable_encodings=("Double", "Binary", "Permutation"),
+        default_configurations={"Double": (("Default", "SMSEMOADoubleDefault.txt"),)},
     ),
     # org.uma.evolver.algorithm.rdemoea.{Double,Permutation}RDEMOEA (no Binary variant)
     BaseAlgorithm(
         name="RDE-MOEA",
         encodings={"Double": "RDEMOEADouble.yaml", "Permutation": "RDEMOEAPermutation.yaml"},
-        runnable_today=False,
+        runnable_today=True,
+        registry_name="RDEMOEA",
+        runnable_encodings=("Double", "Permutation"),
     ),
     # org.uma.evolver.algorithm.agemoea.DoubleAGEMOEA (Double only)
     BaseAlgorithm(
-        name="AGE-MOEA", encodings={"Double": "AGEMOEADouble.yaml"}, runnable_today=False
+        name="AGE-MOEA",
+        encodings={"Double": "AGEMOEADouble.yaml"},
+        runnable_today=True,
+        registry_name="AGE-MOEA",
+        runnable_encodings=("Double",),
+        default_configurations={"Double": (("Default", "AGEMOEADoubleDefault.txt"),)},
     ),
     # org.uma.evolver.algorithm.rvea.DoubleRVEA (Double only)
     BaseAlgorithm(
@@ -183,7 +195,12 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
     BaseAlgorithm(name="MOPSO", encodings={"Double": "MOPSO.yaml"}, runnable_today=False),
     # org.uma.evolver.algorithm.nsgaiii.DoubleNSGAIII (Double only)
     BaseAlgorithm(
-        name="NSGA-III", encodings={"Double": "NSGAIIIDouble.yaml"}, runnable_today=False
+        name="NSGA-III",
+        encodings={"Double": "NSGAIIIDouble.yaml"},
+        runnable_today=True,
+        registry_name="NSGA-III",
+        runnable_encodings=("Double",),
+        default_configurations={"Double": (("Default", "NSGAIIIDoubleDefault.txt"),)},
     ),
     # org.uma.evolver.algorithm.paes.{Double,Binary,Permutation}PAES
     BaseAlgorithm(
@@ -193,10 +210,24 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
             "Binary": "PAESBinary.yaml",
             "Permutation": "PAESPermutation.yaml",
         },
-        runnable_today=False,
+        runnable_today=True,
+        registry_name="PAES",
+        runnable_encodings=("Double", "Binary", "Permutation"),
+        default_configurations={
+            "Double": (("Default", "PAESDoubleDefault.txt"),),
+            "Binary": (("Default", "PAESBinaryDefault.txt"),),
+            "Permutation": (("Default", "PAESPermutationDefault.txt"),),
+        },
     ),
     # org.uma.evolver.algorithm.ssmoea.DoubleSSMOEA (Double only)
-    BaseAlgorithm(name="SSMOEA", encodings={"Double": "SSMOEADouble.yaml"}, runnable_today=False),
+    BaseAlgorithm(
+        name="SSMOEA",
+        encodings={"Double": "SSMOEADouble.yaml"},
+        runnable_today=True,
+        registry_name="SSMOEA",
+        runnable_encodings=("Double",),
+        default_configurations={"Double": (("Default", "SSMOEADoubleDefault.txt"),)},
+    ),
 )
 
 # Every other file under parameterSpaces/ as of this writing, explicitly triaged as NOT a base

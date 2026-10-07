@@ -45,13 +45,13 @@ class TestBaseAlgorithms:
         # Act / Assert
         assert all(algorithm.encodings for algorithm in BASE_ALGORITHMS)
 
-    def test_should_mark_only_nsgaii_moead_and_rvea_as_runnable_today(self):
-        """BaseAlgorithmRegistry in cli.training only resolves these three names."""
+    def test_should_mark_every_algorithm_but_mopso_as_runnable_today(self):
+        """BaseAlgorithmRegistry in cli.training registers all of them except MOPSO."""
         # Act
         runnable = {a.name for a in BASE_ALGORITHMS if a.runnable_today}
 
         # Assert
-        assert runnable == {"NSGA-II", "MOEA/D", "RVEA"}
+        assert runnable == {a.name for a in BASE_ALGORITHMS} - {"MOPSO"}
 
     def test_should_ask_for_weight_vectors_only_for_moead_and_rvea(self):
         """Both read their weight vectors from files, so both need the directory."""
@@ -105,8 +105,18 @@ class TestDefaultConfigurations:
         for algorithm in BASE_ALGORITHMS:
             assert set(algorithm.default_configurations) <= set(algorithm.encodings)
 
-    def test_should_offer_a_default_configuration_for_every_runnable_encoding(self):
-        """Evolver 2.3 ships one for each, so the Run algorithm page never starts from the space."""
+    def test_should_offer_a_default_configuration_for_every_runnable_encoding_but_a_known_few(self):
+        """Evolver ships one for most; the others start the Run algorithm form from the space."""
+        # Arrange
+        known_without = {
+            ("MOEA/D", "Binary"),
+            ("MOEA/D", "Permutation"),
+            ("SMS-EMOA", "Binary"),
+            ("SMS-EMOA", "Permutation"),
+            ("RDE-MOEA", "Double"),
+            ("RDE-MOEA", "Permutation"),
+        }
+
         # Act
         without = {
             (a.name, encoding)
@@ -116,7 +126,7 @@ class TestDefaultConfigurations:
         }
 
         # Assert
-        assert without == set()
+        assert without == known_without
 
     def test_should_reference_default_configuration_files_that_exist_in_the_jar(self):
         """A stale filename would break the Run algorithm page when it is chosen."""
