@@ -218,24 +218,18 @@ def plan_jobs(
     return jobs, skipped
 
 
-def write_study(
-    study: ValidationStudy, study_directory: Path, working_directory: Path
-) -> list[Job]:
-    """Write a study to disk: its manifest and the request of each job.
+def build_manifest(study: ValidationStudy, jobs: list[Job], skipped: list[SkippedJob]) -> dict:
+    """The manifest of a planned study: what it is, and what each job is.
 
     Args:
         study: The study.
-        study_directory: Where to keep it, created if missing.
-        working_directory: The JVM's working directory.
+        jobs: Its jobs, as `plan_jobs` returns them.
+        skipped: The pairs left out.
 
     Returns:
-        The jobs written.
+        The manifest, as `write_study` writes it and `read_manifest` reads it back.
     """
-    jobs, skipped = plan_jobs(study, study_directory, working_directory)
-    for job in jobs:
-        job.directory.mkdir(parents=True, exist_ok=True)
-        (job.directory / "request.yaml").write_text(solve_request_to_yaml(job.request))
-    manifest = {
+    return {
         "encoding": study.encoding,
         "pivot": study.pivot,
         "populationSize": study.population_size,
@@ -268,9 +262,49 @@ def write_study(
             {"contender": s.contender, "problem": s.problem, "reason": s.reason} for s in skipped
         ],
     }
+
+
+def write_study(
+    study: ValidationStudy, study_directory: Path, working_directory: Path
+) -> list[Job]:
+    """Write a study to disk: its manifest and the request of each job.
+
+    Args:
+        study: The study.
+        study_directory: Where to keep it, created if missing.
+        working_directory: The JVM's working directory.
+
+    Returns:
+        The jobs written.
+    """
+    jobs, skipped = plan_jobs(study, study_directory, working_directory)
+    for job in jobs:
+        job.directory.mkdir(parents=True, exist_ok=True)
+        (job.directory / "request.yaml").write_text(solve_request_to_yaml(job.request))
+    manifest = build_manifest(study, jobs, skipped)
     study_directory.mkdir(parents=True, exist_ok=True)
     (study_directory / MANIFEST_NAME).write_text(yaml.safe_dump(manifest, sort_keys=False))
     return jobs
+
+
+def study_is_written(
+    study: ValidationStudy, study_directory: Path, working_directory: Path
+) -> bool:
+    """Tell whether a directory holds exactly this study, planned the same way.
+
+    Args:
+        study: The study.
+        study_directory: Where it would be kept.
+        working_directory: The JVM's working directory.
+
+    Returns:
+        Whether the manifest there is the one `write_study` would write now.
+    """
+    existing = read_manifest(study_directory)
+    if existing is None:
+        return False
+    jobs, skipped = plan_jobs(study, study_directory, working_directory)
+    return existing == build_manifest(study, jobs, skipped)
 
 
 def read_manifest(study_directory: Path) -> dict | None:

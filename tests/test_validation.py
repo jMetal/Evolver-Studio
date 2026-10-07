@@ -14,6 +14,7 @@ from evolver_studio.validation import (
     list_studies,
     plan_jobs,
     read_manifest,
+    study_is_written,
     write_study,
 )
 
@@ -266,3 +267,30 @@ class TestListStudies:
     def test_should_list_nothing_without_a_directory(self, tmp_path: Path):
         # Act / Assert
         assert list_studies(tmp_path / "nothing") == []
+
+
+class TestStudyIsWritten:
+    def test_should_recognize_the_study_that_was_written_there(self, working_directory: Path):
+        # Arrange
+        directory = working_directory / "validation-runs" / "x"
+        write_study(_study(), directory, working_directory)
+
+        # Act / Assert
+        assert study_is_written(_study(), directory, working_directory)
+
+    @pytest.mark.parametrize(
+        "changes", [{"runs": 6}, {"max_evaluations": 2000}, {"seed": 2}, {"population_size": 91}]
+    )
+    def test_should_not_recognize_a_study_planned_differently(
+        self, working_directory: Path, changes: dict
+    ):
+        # Arrange
+        directory = working_directory / "validation-runs" / "x"
+        write_study(_study(), directory, working_directory)
+
+        # Act / Assert
+        assert not study_is_written(_study(**changes), directory, working_directory)
+
+    def test_should_not_recognize_a_directory_without_a_study(self, working_directory: Path):
+        # Act / Assert
+        assert not study_is_written(_study(), working_directory / "nothing", working_directory)

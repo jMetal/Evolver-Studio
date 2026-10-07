@@ -202,6 +202,18 @@ def parse_arguments_text(problem: Problem, text: str) -> list[ArgumentValue] | s
     return values
 
 
+def arguments_text(arguments: Sequence[ArgumentValue]) -> str:
+    """Write arguments as `parse_arguments_text` reads them, e.g. "12, 2".
+
+    Args:
+        arguments: The values, in order.
+
+    Returns:
+        The comma-separated text; empty for no arguments.
+    """
+    return ", ".join(_format_value(value) for value in arguments)
+
+
 def format_arguments(problem: Problem) -> str:
     """Describe a problem's arguments and their defaults, e.g. "numberOfVariables=12, ...".
 

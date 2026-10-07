@@ -18,6 +18,7 @@ from evolver_studio.configuration import (
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_catalogue import (
     Problem,
+    arguments_text,
     number_of_objectives,
     parse_arguments_text,
 )
@@ -27,9 +28,84 @@ from evolver_studio.problems import (
     reference_front_dimension,
     reference_front_for_objectives,
 )
-from evolver_studio.validation import StudyProblem
+from evolver_studio.validation import StudyProblem, ValidationStudy, base_algorithm
 
 PROBLEM_COLUMNS = ("problem", "arguments", "reference_front")
+
+# The widget keys of the Validation page, defined here because restoring a study means setting
+# them: the page and this module must agree on them.
+ENCODING_KEY = "validation_encoding"
+PROBLEM_ROWS_KEY = "validation_problem_rows"
+TUNED_SOURCE_KEY = "validation_tuned_source"
+PASTED_ALGORITHM_KEY = "validation_pasted_algorithm"
+PASTED_CONFIGURATION_KEY = "validation_pasted_configuration"
+POPULATION_KEY = "validation_population"
+EVALUATIONS_KEY = "validation_evaluations"
+RUNS_KEY = "validation_runs"
+SEED_KEY = "validation_seed"
+INDICATORS_KEY = "validation_indicators"
+TUNED_FROM_TRAINING = "A training run"
+TUNED_PASTED = "A configuration I paste"
+
+
+def problems_key(encoding: str) -> str:
+    """The key of the problems selector of an encoding."""
+    return f"validation_problems_{encoding}"
+
+
+def defaults_key(encoding: str) -> str:
+    """The key of the selector of the algorithms compared with their default configuration."""
+    return f"validation_defaults_{encoding}"
+
+
+def tuned_name_key(registry_name: str) -> str:
+    """The key of the name of the tuned configuration, which depends on its algorithm."""
+    return f"validation_tuned_name_{registry_name}"
+
+
+def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
+    """Translate a study into the values of the Validation form's widgets.
+
+    The tuned configuration (the pivot) is restored as a pasted one: the training run it came from
+    may be gone, and its configuration is all the study needs.
+
+    Args:
+        study: The study.
+
+    Returns:
+        The session state to set, widget keys to values.
+
+    Raises:
+        ValueError: If the pivot is not one of the study's contenders or its algorithm is unknown.
+    """
+    pivot = next((c for c in study.contenders if c.name == study.pivot), None)
+    algorithm = base_algorithm(pivot.algorithm) if pivot is not None else None
+    if pivot is None or algorithm is None:
+        raise ValueError("the study's pivot is not one of its contenders")
+    others = [c.name for c in study.contenders if c.name != study.pivot]
+    rows = [
+        {
+            "problem": problem.name,
+            "arguments": arguments_text(problem.arguments),
+            "reference_front": problem.reference_front,
+        }
+        for problem in study.problems
+    ]
+    return {
+        ENCODING_KEY: study.encoding,
+        problems_key(study.encoding): [problem.name for problem in study.problems],
+        PROBLEM_ROWS_KEY: pd.DataFrame(rows, columns=list(PROBLEM_COLUMNS)),
+        TUNED_SOURCE_KEY: TUNED_PASTED,
+        PASTED_ALGORITHM_KEY: algorithm.name,
+        PASTED_CONFIGURATION_KEY: pivot.configuration,
+        tuned_name_key(pivot.algorithm): pivot.name,
+        defaults_key(study.encoding): others,
+        POPULATION_KEY: study.population_size,
+        EVALUATIONS_KEY: study.max_evaluations,
+        RUNS_KEY: study.runs,
+        SEED_KEY: study.seed,
+        INDICATORS_KEY: list(study.indicators),
+    }
 
 
 def problem_table(

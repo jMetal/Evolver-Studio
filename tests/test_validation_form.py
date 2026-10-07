@@ -6,11 +6,22 @@ import pandas as pd
 import pytest
 
 from evolver_studio.problem_catalogue import Problem, ProblemArgument
+from evolver_studio.validation import Contender, StudyProblem, ValidationStudy
 from evolver_studio.validation_form import (
+    ENCODING_KEY,
+    PASTED_ALGORITHM_KEY,
+    PASTED_CONFIGURATION_KEY,
     PROBLEM_COLUMNS,
+    PROBLEM_ROWS_KEY,
+    TUNED_PASTED,
+    TUNED_SOURCE_KEY,
     configuration_errors,
+    defaults_key,
+    form_state_from_study,
     parse_problem_table,
     problem_table,
+    problems_key,
+    tuned_name_key,
 )
 
 CATALOGUE = {
@@ -155,3 +166,54 @@ algorithmResult:
         assert configuration_errors("  ", self.SPACE, "tuned") == [
             "tuned: the configuration is empty."
         ]
+
+
+class TestFormStateFromStudy:
+    STUDY = ValidationStudy(
+        encoding="Double",
+        problems=(
+            StudyProblem("WFG2", (), "resources/referenceFronts/WFG2.2D.csv"),
+            StudyProblem("DTLZ2", (12, 2), "resources/referenceFronts/DTLZ2.2D.csv"),
+        ),
+        contenders=(
+            Contender("NSGA-II (tuned)", "NSGA-II", "--crossover blxAlpha"),
+            Contender("NSGA-II", "NSGA-II", "--crossover SBX"),
+            Contender("MOEA/D", "MOEAD", "--x 1"),
+        ),
+        pivot="NSGA-II (tuned)",
+        population_size=100,
+        max_evaluations=25000,
+        runs=15,
+        seed=1,
+    )
+
+    def test_should_set_the_problems_with_their_arguments_and_fronts(self):
+        # Act
+        state = form_state_from_study(self.STUDY)
+
+        # Assert
+        assert state[ENCODING_KEY] == "Double"
+        assert state[problems_key("Double")] == ["WFG2", "DTLZ2"]
+        rows = state[PROBLEM_ROWS_KEY]
+        assert list(rows["problem"]) == ["WFG2", "DTLZ2"]
+        assert list(rows["arguments"]) == ["", "12, 2"]
+        assert rows["reference_front"].iloc[1] == "resources/referenceFronts/DTLZ2.2D.csv"
+
+    def test_should_restore_the_pivot_as_a_pasted_configuration_and_the_others_as_defaults(self):
+        # Act
+        state = form_state_from_study(self.STUDY)
+
+        # Assert
+        assert state[TUNED_SOURCE_KEY] == TUNED_PASTED
+        assert state[PASTED_ALGORITHM_KEY] == "NSGA-II"
+        assert state[PASTED_CONFIGURATION_KEY] == "--crossover blxAlpha"
+        assert state[tuned_name_key("NSGA-II")] == "NSGA-II (tuned)"
+        assert state[defaults_key("Double")] == ["NSGA-II", "MOEA/D"]
+
+    def test_should_not_restore_a_study_whose_pivot_is_missing(self):
+        # Arrange
+        study = ValidationStudy("Double", (), (), pivot="nobody")
+
+        # Act / Assert
+        with pytest.raises(ValueError):
+            form_state_from_study(study)

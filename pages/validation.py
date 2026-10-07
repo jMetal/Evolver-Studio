@@ -44,10 +44,25 @@ from evolver_studio.validation import (
     write_study,
 )
 from evolver_studio.validation_form import (
+    ENCODING_KEY,
+    EVALUATIONS_KEY,
+    INDICATORS_KEY,
+    PASTED_ALGORITHM_KEY,
+    PASTED_CONFIGURATION_KEY,
+    POPULATION_KEY,
     PROBLEM_COLUMNS,
+    PROBLEM_ROWS_KEY,
+    RUNS_KEY,
+    SEED_KEY,
+    TUNED_FROM_TRAINING,
+    TUNED_PASTED,
+    TUNED_SOURCE_KEY,
     configuration_errors,
+    defaults_key,
     parse_problem_table,
     problem_table,
+    problems_key,
+    tuned_name_key,
 )
 from evolver_studio.validation_runner import (
     VALIDATION_RUNS_DIRECTORY_NAME,
@@ -68,9 +83,6 @@ RUNS_DIRECTORY = WORKING_DIRECTORY / VALIDATION_RUNS_DIRECTORY_NAME
 POLL_EVERY_SECONDS = 1
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 ENCODINGS = ("Double", "Binary", "Permutation")
-TUNED_FROM_TRAINING = "A training run"
-TUNED_PASTED = "A configuration I paste"
-PROBLEM_ROWS_KEY = "validation_problem_rows"
 HISTORY_KEY = "validation_history"
 SPACE_COLUMN_HELP = (
     "Optional: the constructor's arguments, all of them or none, comma-separated "
@@ -104,14 +116,14 @@ def _render_problems(catalogue: dict[str, Problem]) -> tuple[str, tuple[StudyPro
     encoding = st.selectbox(
         "Encoding of the problems",
         ENCODINGS,
-        key="validation_encoding",
+        key=ENCODING_KEY,
         help="All the problems of a study share it: an algorithm solves the problems of the "
         "encodings it supports, so the algorithms to compare are those of this encoding.",
     )
     names = st.multiselect(
         "Problems",
         problems_with_encoding(catalogue, encoding),
-        key=f"validation_problems_{encoding}",
+        key=problems_key(encoding),
         placeholder="Choose the problems",
     )
     if not names:
@@ -177,13 +189,11 @@ def _tuned_pasted(encoding: str) -> tuple[str, str] | None:
     algorithms = [
         a for a in BASE_ALGORITHMS if a.runnable_today and encoding in a.runnable_encodings
     ]
-    name = st.selectbox(
-        "Algorithm", [a.name for a in algorithms], key="validation_pasted_algorithm"
-    )
+    name = st.selectbox("Algorithm", [a.name for a in algorithms], key=PASTED_ALGORITHM_KEY)
     configuration = st.text_area(
         "Configuration",
         placeholder="--algorithmResult population --crossover SBX ...",
-        key="validation_pasted_configuration",
+        key=PASTED_CONFIGURATION_KEY,
         help="As a training run writes it: --parameter value pairs.",
     )
     if not configuration.strip():
@@ -198,7 +208,7 @@ def _render_tuned(encoding: str, jar: Path) -> TunedChoice:
         "Tuned configuration from",
         (TUNED_FROM_TRAINING, TUNED_PASTED),
         horizontal=True,
-        key="validation_tuned_source",
+        key=TUNED_SOURCE_KEY,
     )
     chosen = (
         _tuned_from_training(encoding) if source == TUNED_FROM_TRAINING else _tuned_pasted(encoding)
@@ -211,7 +221,7 @@ def _render_tuned(encoding: str, jar: Path) -> TunedChoice:
     name = st.text_input(
         "Name in the tables",
         f"{algorithm.name} (tuned)",
-        key=f"validation_tuned_name_{registry_name}",
+        key=tuned_name_key(registry_name),
     )
     errors = configuration_errors(
         configuration, parameter_space_text(jar, algorithm.encodings[encoding]), name
@@ -239,7 +249,7 @@ def _render_contenders(
         "Algorithms to compare it with, with their default configuration",
         [c.name for c in defaults],
         default=["NSGA-II"] if any(c.name == "NSGA-II" for c in defaults) else [],
-        key=f"validation_defaults_{encoding}",
+        key=defaults_key(encoding),
         help="Every algorithm of Evolver that has a default configuration for this encoding.",
     )
     others = tuple(c for c in defaults if c.name in chosen)
@@ -268,7 +278,7 @@ def _render_budget() -> Budget:
         "Population size",
         2,
         value=DEFAULT_POPULATION_SIZE,
-        key="validation_population",
+        key=POPULATION_KEY,
         help="The same for every algorithm. MOEA/D, RVEA and NSGA-III need a weight vector file "
         "that matches it and the problem's number of objectives; they are left out of the "
         "problems that have none.",
@@ -278,17 +288,17 @@ def _render_budget() -> Budget:
         100,
         value=DEFAULT_MAX_EVALUATIONS,
         step=1000,
-        key="validation_evaluations",
+        key=EVALUATIONS_KEY,
     )
     runs = columns[2].number_input(
         "Independent runs",
         2,
         value=DEFAULT_RUNS,
-        key="validation_runs",
+        key=RUNS_KEY,
         help="Per algorithm and problem. Run i uses the seed + i - 1, the same for every "
         "algorithm.",
     )
-    seed = columns[3].number_input("First seed", 0, value=1, key="validation_seed")
+    seed = columns[3].number_input("First seed", 0, value=1, key=SEED_KEY)
     processes = columns[4].number_input(
         "Parallel jobs",
         1,
@@ -300,7 +310,7 @@ def _render_budget() -> Budget:
         "Quality indicators",
         [indicator.registry_name for indicator in QUALITY_INDICATORS],
         default=list(DEFAULT_INDICATORS),
-        key="validation_indicators",
+        key=INDICATORS_KEY,
         help="Computed on each run's front, normalized with the problem's reference front. "
         "All are minimized.",
     )
