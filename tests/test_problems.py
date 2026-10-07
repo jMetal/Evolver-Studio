@@ -8,6 +8,7 @@ from evolver_studio.problems import (
     default_reference_front,
     reference_front_candidates,
     reference_front_dimension,
+    reference_front_for_objectives,
 )
 
 
@@ -119,3 +120,23 @@ class TestReferenceFrontDimension:
 
         # Assert
         assert dimension == 3
+
+
+class TestReferenceFrontForObjectives:
+    def test_should_pick_the_front_with_the_problems_objectives(self, tmp_path: Path):
+        # Arrange
+        fronts = tmp_path / "resources" / "referenceFronts"
+        fronts.mkdir(parents=True)
+        (fronts / "DTLZ2.2D.csv").write_text("0,1\n")
+        (fronts / "DTLZ2.3D.csv").write_text("0,1,0\n")
+        candidates = [
+            "resources/referenceFronts/DTLZ2.2D.csv",
+            "resources/referenceFronts/DTLZ2.3D.csv",
+        ]
+
+        # Act / Assert
+        assert (
+            reference_front_for_objectives(candidates, 3, tmp_path)
+            == "resources/referenceFronts/DTLZ2.3D.csv"
+        )
+        assert reference_front_for_objectives(candidates, 5, tmp_path) is None

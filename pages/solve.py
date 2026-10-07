@@ -16,6 +16,7 @@ import streamlit as st
 
 from evolver_studio.app_state import (
     registered_problem_names,
+    registered_problems,
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
@@ -45,10 +46,12 @@ from evolver_studio.evolver_client import (
 )
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
+from evolver_studio.problem_catalogue import ArgumentValue, Problem
 from evolver_studio.problems import (
     default_reference_front,
     reference_front_candidates,
     reference_front_dimension,
+    reference_front_for_objectives,
 )
 from evolver_studio.progress import estimate_remaining_seconds, format_duration
 from evolver_studio.resource_files import (
@@ -80,6 +83,8 @@ from evolver_studio.solve_form import (
     encoding_key,
     form_state_from_request,
     indicators_key,
+    problem_argument_key,
+    problem_arguments_key,
     reference_front_key,
 )
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
@@ -121,31 +126,60 @@ TRACKING_MODES = (TRACKING_SILENT, TRACKING_PROGRESS, TRACKING_FRONT)
 PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
 
 
-def _render_problem() -> tuple[str, str | None] | None:
-    """Section 1: the problem and its reference front.
+@dataclass(slots=True, frozen=True)
+class ProblemChoice:
+    """What section 1 chooses.
+
+    Attributes:
+        name: The problem's name.
+        arguments: Its constructor's arguments, all of them in order, or empty for none.
+        encoding: Its encoding, or None when the jar does not describe the problems.
+        reference_front: Its reference front file, or None for no indicators.
+    """
+
+    name: str
+    arguments: tuple[ArgumentValue, ...]
+    encoding: str | None
+    reference_front: str | None
+
+
+def _render_problem() -> ProblemChoice | None:
+    """Section 1: the problem, its arguments and its reference front.
 
     Returns:
-        The problem's name and its reference front file (None for no indicators), or None while
-        either is not chosen yet.
+        The choice, or None while the problem, its arguments or its reference front are not
+        chosen yet.
     """
     st.subheader("1. Problem")
     names = registered_problem_names(str(jar))
     if names is None:
         st.warning("Could not list the problems (is Java installed?).")
         return None
+    problems = registered_problems(str(jar)) or {}
     problem = st.selectbox(
-        "Problem", names, index=None, placeholder="Choose a problem", key=PROBLEM_KEY
+        "Problem",
+        names,
+        index=None,
+        placeholder="Choose a problem",
+        format_func=lambda name: _problem_label(problems.get(name), name),
+        key=PROBLEM_KEY,
     )
     if problem is None:
         return None
+    described = problems.get(problem)
+    arguments = _render_problem_arguments(described) if described is not None else ()
+    if arguments is None:
+        return None
+    objectives = _number_of_objectives(described, arguments)
+    encoding = described.encoding if described is not None else None
     candidates = reference_front_candidates(problem)
     if not candidates:
         st.info("This problem has no reference front among the resources: no indicators.")
-        return problem, None
+        return ProblemChoice(problem, arguments, encoding, None)
     choice = st.selectbox(
         "Reference front",
         [*candidates, NO_REFERENCE_FRONT],
-        index=_default_front_index(candidates),
+        index=_default_front_index(candidates, objectives),
         placeholder="Choose the reference front",
         key=reference_front_key(problem),
         help="The indicators compare each front with it. Fronts with a dimension suffix (3D) "
@@ -153,38 +187,134 @@ def _render_problem() -> tuple[str, str | None] | None:
     )
     if choice is None:
         return None
-    return problem, None if choice == NO_REFERENCE_FRONT else choice
+    if choice != NO_REFERENCE_FRONT and objectives is not None:
+        dimension = reference_front_dimension(WORKING_DIRECTORY / choice)
+        if dimension is not None and dimension != objectives:
+            st.warning(
+                f"This front has {dimension} objectives, but the problem has {objectives}: the "
+                "indicators would fail."
+            )
+    return ProblemChoice(
+        problem, arguments, encoding, None if choice == NO_REFERENCE_FRONT else choice
+    )
 
 
-def _default_front_index(candidates: list[str]) -> int | None:
+def _problem_label(problem: Problem | None, name: str) -> str:
+    """A problem's name in the selector, with its encoding when it is not real-valued."""
+    if problem is None or problem.encoding == "Double":
+        return name
+    return f"{name} ({problem.encoding.lower()})"
+
+
+def _render_problem_arguments(problem: Problem) -> tuple[ArgumentValue, ...] | None:
+    """Offer to set a problem's arguments (all of them, or none: Evolver builds it with either).
+
+    Args:
+        problem: The chosen problem.
+
+    Returns:
+        The arguments (empty to build it with none), or None while one of them has no value.
+    """
+    if not problem.arguments:
+        return ()
+    shape = ", ".join(
+        part
+        for part in (
+            f"{problem.number_of_objectives} objectives" if problem.number_of_objectives else "",
+            f"{problem.number_of_variables} variables" if problem.number_of_variables else "",
+        )
+        if part
+    )
+    custom = st.checkbox(
+        "Set its arguments",
+        key=problem_arguments_key(problem.name),
+        help=f"Without them, {problem.name} is built with its defaults"
+        + (f" ({shape})." if shape else "."),
+    )
+    if not custom:
+        return ()
+    columns = st.columns(min(len(problem.arguments), 4))
+    values: list[ArgumentValue | None] = []
+    for index, argument in enumerate(problem.arguments):
+        column = columns[index % len(columns)]
+        key = problem_argument_key(problem.name, argument.name)
+        if argument.type == "boolean":
+            values.append(column.checkbox(argument.name, value=bool(argument.default), key=key))
+        elif argument.type == "integer":
+            value = column.number_input(argument.name, value=argument.default, step=1, key=key)
+            values.append(None if value is None else int(value))
+        else:
+            value = column.number_input(argument.name, value=argument.default, key=key)
+            values.append(None if value is None else float(value))
+    if any(value is None for value in values):
+        st.warning("Give every argument a value: Evolver takes all of them, or none.")
+        return None
+    return tuple(value for value in values if value is not None)
+
+
+def _number_of_objectives(
+    problem: Problem | None, arguments: tuple[ArgumentValue, ...]
+) -> int | None:
+    """The chosen problem's number of objectives, when it is known."""
+    if problem is None:
+        return None
+    for argument, value in zip(problem.arguments, arguments, strict=False):
+        if argument.name == "numberOfObjectives":
+            return int(value)
+    return problem.number_of_objectives
+
+
+def _default_front_index(candidates: list[str], objectives: int | None) -> int | None:
     default = default_reference_front(candidates)
+    if default is None and objectives is not None:
+        default = reference_front_for_objectives(candidates, objectives, WORKING_DIRECTORY)
     return candidates.index(default) if default is not None else None
 
 
-def _render_algorithm() -> tuple[BaseAlgorithm, str, dict[str, str] | None] | None:
+def _render_algorithm(
+    problem_encoding: str | None,
+) -> tuple[BaseAlgorithm, str, dict[str, str] | None] | None:
     """Section 2: the algorithm, its encoding and what it needs besides.
+
+    Args:
+        problem_encoding: The problem's encoding, which the algorithm must support; None when it
+            is not known (the encoding is then chosen).
 
     Returns:
         The algorithm, the encoding and the extra configuration (None if it needs none), or None
         while no algorithm is chosen.
     """
     st.subheader("2. Algorithm")
-    runnable = [algorithm for algorithm in BASE_ALGORITHMS if algorithm.runnable_today]
+    runnable = [
+        algorithm
+        for algorithm in BASE_ALGORITHMS
+        if algorithm.runnable_today
+        and (problem_encoding is None or problem_encoding in algorithm.runnable_encodings)
+    ]
+    if not runnable:
+        st.warning(f"No algorithm of this app solves {problem_encoding} problems.")
+        return None
     name = st.selectbox(
         "Algorithm",
         [algorithm.name for algorithm in runnable],
         index=None,
         placeholder="Choose an algorithm",
+        help=None
+        if problem_encoding is None
+        else f"The algorithms that solve {problem_encoding} problems.",
         key=ALGORITHM_KEY,
     )
     if name is None:
         return None
     algorithm = next(algorithm for algorithm in runnable if algorithm.name == name)
-    encodings = algorithm.runnable_encodings
-    if len(encodings) == 1:
-        (encoding,) = encodings
+    if problem_encoding is not None:
+        encoding = problem_encoding
+    elif len(algorithm.runnable_encodings) == 1:
+        (encoding,) = algorithm.runnable_encodings
     else:
-        encoding = st.selectbox("Encoding", encodings, key=encoding_key(algorithm.name))
+        encoding = st.selectbox(
+            "Encoding", algorithm.runnable_encodings, key=encoding_key(algorithm.name)
+        )
     extra_config = None
     if "weightVectorFilesDirectory" in algorithm.required_extra_config_keys:
         directory = st.text_input(
@@ -500,8 +630,8 @@ def _render_form(can_run: bool) -> None:
     problem = _render_problem()
     if problem is None:
         return
-    problem_name, reference_front = problem
-    algorithm_choice = _render_algorithm()
+    reference_front = problem.reference_front
+    algorithm_choice = _render_algorithm(problem.encoding)
     if algorithm_choice is None:
         return
     algorithm, encoding, extra_config = algorithm_choice
@@ -518,7 +648,8 @@ def _render_form(can_run: bool) -> None:
             yaml_parameter_space_file=algorithm.encodings[encoding],
             extra_config=extra_config,
             configuration=configuration,
-            problem=problem_name,
+            problem=problem.name,
+            problem_arguments=problem.arguments,
             reference_front_file_name=reference_front,
             max_evaluations=budget.max_evaluations,
             number_of_independent_runs=budget.runs,
@@ -753,6 +884,7 @@ def _load_run(run: SolveRunInfo) -> None:
         BASE_ALGORITHMS,
         names,
         st.session_state.get(CONFIGURATION_VERSION_KEY, 0),
+        registered_problems(str(jar)),
     )
     if state is None:
         st.session_state["solve_load_error"] = run.run_id
@@ -776,7 +908,8 @@ def _render_details(run: SolveRunInfo) -> None:
     )
     if st.session_state.get("solve_load_error") == run.run_id:
         st.warning(
-            "This run's settings cannot be restored: its algorithm or problem is not offered."
+            "This run's settings cannot be restored: its algorithm, its problem or the "
+            "problem's arguments are not offered."
         )
     st.download_button(
         "Download request.yaml",

@@ -15,6 +15,7 @@ import pandas as pd
 import yaml
 
 from evolver_studio.evolver_client import RunState, read_status
+from evolver_studio.problem_catalogue import format_problem_spec
 
 RUN_DIRECTORY_PATTERN = re.compile(r"run-(\d+)")
 INDICATORS_FILE = "INDICATORS.csv"
@@ -33,7 +34,7 @@ class SolveRunInfo:
         run_dir: The directory holding its request and status files.
         output_directory: The directory holding its results.
         algorithm: The algorithm's name.
-        problem: The problem's name.
+        problem: The problem's name, with its arguments if it has any (e.g. "DTLZ2(12, 5)").
         state: Its state, or None if its status file is missing or unreadable.
         request: Its request file's content, as Evolver reads it.
     """
@@ -244,7 +245,7 @@ def list_solve_runs(runs_directory: Path, working_directory: Path) -> list[Solve
                     run_dir=run_dir,
                     output_directory=working_directory / request["outputDirectory"],
                     algorithm=request["algorithmName"],
-                    problem=request["problem"],
+                    problem=format_problem_spec(request["problem"]),
                     state=status.state if status is not None else None,
                     request=request,
                 )

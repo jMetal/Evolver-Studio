@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 import yaml
 
+from evolver_studio.problem_catalogue import ArgumentValue, problem_spec
+
 
 @dataclass(slots=True, frozen=True)
 class SolveRequest:
@@ -37,6 +39,8 @@ class SolveRequest:
         write_population: Whether that file holds the whole population instead of only the
             non-dominated solutions; needs `front_frequency`.
         output_directory: Where the results are written.
+        problem_arguments: The problem's constructor arguments, all of them in order, or empty to
+            build it with none.
     """
 
     algorithm_name: str
@@ -55,6 +59,7 @@ class SolveRequest:
     front_frequency: int | None
     write_population: bool
     output_directory: str
+    problem_arguments: tuple[ArgumentValue, ...] = ()
 
     def validation_errors(self) -> list[str]:
         """Check what Evolver would reject, to tell the user before launching.
@@ -107,7 +112,7 @@ def solve_request_to_yaml(request: SolveRequest) -> str:
         "yamlParameterSpaceFile": request.yaml_parameter_space_file,
         "extraConfig": request.extra_config or {},
         "configuration": request.configuration,
-        "problem": request.problem,
+        "problem": problem_spec(request.problem, request.problem_arguments),
     }
     if request.reference_front_file_name:
         data["referenceFrontFileName"] = request.reference_front_file_name

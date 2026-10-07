@@ -75,3 +75,25 @@ def default_reference_front(candidates: list[str]) -> str | None:
         different numbers of objectives, and which one fits depends on the problem's instance).
     """
     return candidates[0] if len(candidates) == 1 else None
+
+
+def reference_front_for_objectives(
+    candidates: list[str], objectives: int, working_directory: Path
+) -> str | None:
+    """Pick the reference front that has a given number of objectives.
+
+    Args:
+        candidates: The files `reference_front_candidates` found, relative to the working
+            directory.
+        objectives: The problem's number of objectives.
+        working_directory: The directory the candidates are relative to.
+
+    Returns:
+        The only candidate with that many objectives, or None when there is none or several.
+    """
+    matching = [
+        candidate
+        for candidate in candidates
+        if reference_front_dimension(working_directory / candidate) == objectives
+    ]
+    return matching[0] if len(matching) == 1 else None

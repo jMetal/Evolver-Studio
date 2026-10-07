@@ -1,5 +1,6 @@
 """Tests for the Run algorithm page."""
 
+import functools
 import subprocess
 import sys
 import time
@@ -12,7 +13,8 @@ from streamlit.testing.v1 import AppTest
 
 from evolver_studio import catalogue, evolver_client
 from evolver_studio.catalogue import is_at_least
-from evolver_studio.evolver_client import jar_path, write_pid_file
+from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path, write_pid_file
+from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.runs import RunPhase, run_phase
 
@@ -26,6 +28,8 @@ NSGAII_DEFAULT = (
     "--polynomialMutationDistributionIndex 20.0 --selection tournament --selectionTournamentSize 2"
 )
 RUN_TIMEOUT_SECONDS = 60
+# A problem of each encoding, for a jar that describes the problems (the encoding then follows it).
+PROBLEM_OF_ENCODING = {"Double": "ZDT1", "Binary": "ZDT5", "Permutation": "KroAB100TSP"}
 
 
 def _jar_reports_progress() -> bool:
@@ -42,6 +46,29 @@ def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
     (tmp_path / "resources").symlink_to(RESOURCES)
     monkeypatch.setattr(evolver_client, "WORKING_DIRECTORY", tmp_path)
     return AppTest.from_file(str(PAGE_SCRIPT), default_timeout=60).run()
+
+
+@functools.cache
+def _jar_describes_problems() -> bool:
+    """Whether the Evolver jar in use has a problem catalogue (newer than 2.3)."""
+    result = describe(WORKING_DIRECTORY, jar_path())
+    return parse_problem_catalogue(getattr(result, "value", {})) is not None
+
+
+def _choose_encoding(app: AppTest, algorithm: str, encoding: str) -> AppTest:
+    """Choose an algorithm for a problem of an encoding: chosen with the problem when the jar
+    describes the problems, or in its own selector otherwise."""
+    if _jar_describes_problems():
+        app.selectbox(key="solve_problem").select(PROBLEM_OF_ENCODING[encoding]).run()
+        return app.selectbox(key="solve_algorithm").select(algorithm).run()
+    app.selectbox(key="solve_problem").select("ZDT1").run()
+    app.selectbox(key="solve_algorithm").select(algorithm).run()
+    return app.selectbox(key=f"solve_encoding_{algorithm}").select(encoding).run()
+
+
+def _needs_problem_catalogue() -> None:
+    if not _jar_describes_problems():
+        pytest.skip("The Evolver jar in use does not describe the problems")
 
 
 def _choose_zdt1_and_nsgaii(app: AppTest) -> AppTest:
@@ -67,14 +94,64 @@ class TestOpening:
             == "resources/referenceFronts/ZDT1.csv"
         )
 
-    def test_should_ask_for_the_reference_front_when_there_are_several(self, app: AppTest):
-        """DTLZ2 has fronts for 2 to 8 objectives, and which fits depends on the problem."""
+    def test_should_pick_among_several_fronts_only_when_the_objectives_are_known(
+        self, app: AppTest
+    ):
+        """DTLZ2 has fronts for 2 to 8 objectives; the catalogue says it has 3 by default."""
         # Act
         app.selectbox(key="solve_problem").select("DTLZ2").run()
 
         # Assert
-        assert app.selectbox(key="solve_reference_front_DTLZ2").value is None
-        assert [subheader.value for subheader in app.subheader] == ["1. Problem"]
+        if _jar_describes_problems():
+            assert (
+                app.selectbox(key="solve_reference_front_DTLZ2").value
+                == "resources/referenceFronts/DTLZ2.3D.csv"
+            )
+        else:
+            assert app.selectbox(key="solve_reference_front_DTLZ2").value is None
+            assert [subheader.value for subheader in app.subheader] == ["1. Problem"]
+
+
+class TestProblemCatalogue:
+    def test_should_offer_only_the_algorithms_that_solve_the_problems_encoding(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+
+        # Act
+        app.selectbox(key="solve_problem").select("ZDT5").run()
+
+        # Assert: RVEA and NSGA-III solve real-valued problems only, and no encoding is asked
+        options = list(app.selectbox(key="solve_algorithm").options)
+        assert "NSGA-II" in options and "PAES" in options
+        assert "RVEA" not in options and "NSGA-III" not in options
+        app.selectbox(key="solve_algorithm").select("NSGA-II").run()
+        assert not any(box.key == "solve_encoding_NSGA-II" for box in app.selectbox)
+        assert any("NSGAIIBinaryDefault.txt" in caption.value for caption in app.caption)
+
+    def test_should_warn_when_the_front_does_not_have_the_objectives_set(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+        app.selectbox(key="solve_problem").select("DTLZ2").run()
+
+        # Act
+        app.checkbox(key="solve_problem_arguments_DTLZ2").check().run()
+        app.number_input(key="solve_problem_argument_DTLZ2_numberOfObjectives").set_value(2).run()
+
+        # Assert
+        assert any("This front has 3 objectives" in warning.value for warning in app.warning)
+
+    def test_should_ask_for_every_argument_without_default(self, app: AppTest):
+        """LZ09's arguments have no default: Evolver takes all of them or none."""
+        # Arrange
+        _needs_problem_catalogue()
+        app.selectbox(key="solve_problem").select("LZ09F1").run()
+
+        # Act
+        app.checkbox(key="solve_problem_arguments_LZ09F1").check().run()
+
+        # Assert
+        assert any("Give every argument a value" in warning.value for warning in app.warning)
+        assert not any(subheader.value == "2. Algorithm" for subheader in app.subheader)
 
 
 class TestConfiguration:
@@ -123,12 +200,8 @@ class TestConfiguration:
     def test_should_start_every_encoding_of_nsgaii_from_its_default(
         self, app: AppTest, encoding: str, file: str
     ):
-        # Arrange
-        app.selectbox(key="solve_problem").select("ZDT1").run()
-        app.selectbox(key="solve_algorithm").select("NSGA-II").run()
-
         # Act
-        app.selectbox(key="solve_encoding_NSGA-II").select(encoding).run()
+        _choose_encoding(app, "NSGA-II", encoding)
 
         # Assert
         assert not app.exception
@@ -149,11 +222,9 @@ class TestConfiguration:
                 for algorithm in catalogue.BASE_ALGORITHMS
             ),
         )
-        app.selectbox(key="solve_problem").select("ZDT1").run()
-        app.selectbox(key="solve_algorithm").select("NSGA-II").run()
 
         # Act
-        app.selectbox(key="solve_encoding_NSGA-II").select("Permutation").run()
+        _choose_encoding(app, "NSGA-II", "Permutation")
 
         # Assert
         assert not app.exception
@@ -244,7 +315,10 @@ class TestTrackingControls:
 
         # Assert
         assert app.select_slider(key="solve_update_every_Progress bar").value == 500
-        assert len(app.checkbox) == 1  # only "Fix the seed"
+        # only "Fix the seed", besides ZDT1's "Set its arguments" when the jar describes problems
+        assert [box.label for box in app.checkbox if box.label != "Set its arguments"] == [
+            "Fix the seed"
+        ]
         assert not any("slow" in warning.value for warning in app.warning)
 
     def test_should_warn_when_updating_the_progress_after_every_evaluation(self, app: AppTest):
@@ -424,6 +498,45 @@ class TestRepeatARun:
         assert "--crossover blxAlpha" in app.code[0].value
         assert "--blxAlphaCrossoverAlpha" in app.code[0].value
         assert len(app.get("download_button")) == 3  # the table, the request and the zip
+
+    def test_should_run_a_problem_with_arguments_and_restore_them(
+        self, app: AppTest, tmp_path: Path
+    ):
+        # Arrange: DTLZ2 with two objectives, its two-objective front and NSGA-II
+        _needs_problem_catalogue()
+        app.selectbox(key="solve_problem").select("DTLZ2").run()
+        app.checkbox(key="solve_problem_arguments_DTLZ2").check().run()
+        app.number_input(key="solve_problem_argument_DTLZ2_numberOfObjectives").set_value(2).run()
+        app.selectbox(key="solve_reference_front_DTLZ2").select(
+            "resources/referenceFronts/DTLZ2.2D.csv"
+        ).run()
+        app.selectbox(key="solve_algorithm").select("NSGA-II").run()
+        app.number_input(key="solve_evaluations").set_value(500).run()
+
+        # Act
+        next(button for button in app.button if button.label == "Run").click().run()
+        run_dir = next((tmp_path / "solve-runs").iterdir())
+        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
+        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the run did not finish"
+            time.sleep(0.2)
+        app.run()
+        request = yaml.safe_load((run_dir / "request.yaml").read_text())
+
+        # Assert: Evolver ran the problem it was given
+        assert run_phase(run_dir) == RunPhase.FINISHED
+        assert request["problem"] == {"class": "DTLZ2", "args": [12, 2]}
+        assert "DTLZ2(12, 2)" in app.selectbox(key="solve_history").options[0]
+
+        # Act: change the arguments, then restore the run
+        app.selectbox(key="solve_history").select(run_dir.name).run()
+        app.checkbox(key="solve_problem_arguments_DTLZ2").uncheck().run()
+        app.button(key=f"solve_load_{run_dir.name}").click().run()
+
+        # Assert
+        assert not app.exception
+        assert app.checkbox(key="solve_problem_arguments_DTLZ2").value is True
+        assert app.number_input(key="solve_problem_argument_DTLZ2_numberOfObjectives").value == 2
 
 
 class TestLiveFront:

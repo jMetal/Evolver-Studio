@@ -155,3 +155,21 @@ class TestValidationErrors:
 
         # Assert
         assert len(errors) == 7
+
+
+class TestProblemArguments:
+    def test_should_name_the_problem_with_its_arguments_when_it_has_some(self):
+        # Act
+        data = yaml.safe_load(
+            solve_request_to_yaml(_request(problem="DTLZ2", problem_arguments=(12, 2)))
+        )
+
+        # Assert
+        assert data["problem"] == {"class": "DTLZ2", "args": [12, 2]}
+
+    def test_should_name_the_problem_alone_without_arguments(self):
+        # Act
+        data = yaml.safe_load(solve_request_to_yaml(_request(problem_arguments=())))
+
+        # Assert
+        assert data["problem"] == "ZDT1"

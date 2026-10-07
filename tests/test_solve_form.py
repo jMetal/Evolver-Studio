@@ -3,6 +3,7 @@
 import pytest
 
 from evolver_studio.catalogue import BASE_ALGORITHMS
+from evolver_studio.problem_catalogue import Problem, ProblemArgument
 from evolver_studio.solve_form import (
     ALGORITHM_KEY,
     CONFIGURATION_VERSION_KEY,
@@ -19,10 +20,23 @@ from evolver_studio.solve_form import (
     encoding_key,
     form_state_from_request,
     indicators_key,
+    problem_argument_key,
+    problem_arguments_key,
     reference_front_key,
 )
 
 PROBLEMS = ["ZDT1", "DTLZ2"]
+DTLZ2 = Problem(
+    name="DTLZ2",
+    family="DTLZ",
+    encoding="Double",
+    number_of_objectives=3,
+    number_of_variables=12,
+    arguments=(
+        ProblemArgument("numberOfVariables", "integer", 12),
+        ProblemArgument("numberOfObjectives", "integer", 3),
+    ),
+)
 
 
 def _request(**changes) -> dict:
@@ -145,3 +159,41 @@ class TestFormStateFromRequest:
 
         # Assert
         assert state is None
+
+
+class TestProblemArguments:
+    def test_should_set_the_arguments_of_a_problem_built_with_them(self):
+        # Arrange
+        request = _request(problem={"class": "DTLZ2", "args": [12, 2]})
+
+        # Act
+        state = form_state_from_request(request, BASE_ALGORITHMS, PROBLEMS, 0, {"DTLZ2": DTLZ2})
+
+        # Assert
+        assert state is not None
+        assert state[PROBLEM_KEY] == "DTLZ2"
+        assert state[problem_arguments_key("DTLZ2")] is True
+        assert state[problem_argument_key("DTLZ2", "numberOfVariables")] == 12
+        assert state[problem_argument_key("DTLZ2", "numberOfObjectives")] == 2
+
+    def test_should_clear_the_arguments_of_a_problem_built_without_them(self):
+        # Act
+        state = form_state_from_request(
+            _request(problem="DTLZ2"), BASE_ALGORITHMS, PROBLEMS, 0, {"DTLZ2": DTLZ2}
+        )
+
+        # Assert
+        assert state is not None
+        assert state[problem_arguments_key("DTLZ2")] is False
+
+    @pytest.mark.parametrize(
+        ("args", "problems"),
+        [([12, 2], None), ([12], {"DTLZ2": DTLZ2})],
+        ids=["no catalogue to name them", "not as many as the problem takes"],
+    )
+    def test_should_not_restore_arguments_it_cannot_name(self, args, problems):
+        # Arrange
+        request = _request(problem={"class": "DTLZ2", "args": args})
+
+        # Act / Assert
+        assert form_state_from_request(request, BASE_ALGORITHMS, PROBLEMS, 0, problems) is None
