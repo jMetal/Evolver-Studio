@@ -21,6 +21,7 @@ from evolver_studio.evolver_client import (
     is_jar_overridden,
     jar_path,
 )
+from evolver_studio.problem_catalogue import Problem, parse_problem_catalogue
 from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.result import Err, Ok
 
@@ -91,19 +92,43 @@ def warn_if_jar_older_than_catalogue(jar: Path) -> None:
 
 
 @st.cache_data(show_spinner=False)
-def registered_problem_names(jar_str: str) -> list[str] | None:
-    """List the problems Evolver can resolve by name, from DescribeMain's manifest.
-
-    Cached because DescribeMain starts a JVM, fast enough for one call but too slow to repeat on
-    every rerun.
+def _manifest(jar_str: str) -> dict | None:
+    """Run DescribeMain once per jar: it starts a JVM, too slow to repeat on every rerun.
 
     Args:
         jar_str: Path to Evolver's jar, as a string (cache keys must be hashable, and
             st.cache_data hashes Path objects by identity, not by value).
 
     Returns:
-        The registered problem names, sorted, or None if DescribeMain could not be run (e.g. Java
-        is not installed).
+        The parsed manifest, or None if DescribeMain could not be run (e.g. Java is not
+        installed).
     """
     result = describe(WORKING_DIRECTORY, Path(jar_str))
-    return sorted(result.value["problems"]) if isinstance(result, Ok) else None
+    return result.value if isinstance(result, Ok) else None
+
+
+def registered_problem_names(jar_str: str) -> list[str] | None:
+    """List the problems Evolver can resolve by name, from DescribeMain's manifest.
+
+    Args:
+        jar_str: Path to Evolver's jar, as a string.
+
+    Returns:
+        The registered problem names, sorted, or None if DescribeMain could not be run.
+    """
+    manifest = _manifest(jar_str)
+    return sorted(manifest["problems"]) if manifest is not None else None
+
+
+def registered_problems(jar_str: str) -> dict[str, Problem] | None:
+    """Describe the problems Evolver can resolve by name: encoding, dimensions, arguments.
+
+    Args:
+        jar_str: Path to Evolver's jar, as a string.
+
+    Returns:
+        The problems by name, or None if DescribeMain could not be run or its manifest has no
+        problem catalogue (Evolver 2.3 or older).
+    """
+    manifest = _manifest(jar_str)
+    return parse_problem_catalogue(manifest) if manifest is not None else None
