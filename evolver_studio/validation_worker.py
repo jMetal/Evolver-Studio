@@ -134,9 +134,10 @@ class StudyRunner:
 
 
 def main(arguments: list[str]) -> int:
-    """Run a study: `<study directory> <jar> <processes>`."""
+    """Run a study: `<study directory> <jar> <processes> [<working directory>]`."""
     study_directory, jar, processes = Path(arguments[0]), Path(arguments[1]), int(arguments[2])
-    runner = StudyRunner(study_directory, jar, processes)
+    working_directory = Path(arguments[3]) if len(arguments) > 3 else WORKING_DIRECTORY
+    runner = StudyRunner(study_directory, jar, processes, working_directory)
 
     def stop(signal_number, frame) -> None:
         runner.stop()

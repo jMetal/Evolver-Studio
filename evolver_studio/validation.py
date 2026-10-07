@@ -381,3 +381,43 @@ def _request(
         write_population=False,
         output_directory=str(relative_output),
     )
+
+
+@dataclass(slots=True, frozen=True)
+class StudyInfo:
+    """A study that was run, as listed for reopening.
+
+    Attributes:
+        study_id: Its timestamp-based identifier (its directory's name).
+        directory: Its directory.
+        manifest: Its manifest.
+    """
+
+    study_id: str
+    directory: Path
+    manifest: dict
+
+    @property
+    def label(self) -> str:
+        """The study in one line, e.g. "20261007-120000 · NSGA-II (tuned) · 9 problems"."""
+        problems = len(self.manifest.get("problems", ()))
+        return f"{self.study_id} · {self.manifest.get('pivot', '?')} · {problems} problems"
+
+
+def list_studies(runs_directory: Path) -> list[StudyInfo]:
+    """List the studies kept in a directory, most recent first.
+
+    Args:
+        runs_directory: The directory whose subdirectories are studies (validation-runs/).
+
+    Returns:
+        The studies whose manifest can be read.
+    """
+    if not runs_directory.is_dir():
+        return []
+    studies = []
+    for directory in sorted(runs_directory.iterdir(), reverse=True):
+        manifest = read_manifest(directory)
+        if manifest is not None:
+            studies.append(StudyInfo(directory.name, directory, manifest))
+    return studies

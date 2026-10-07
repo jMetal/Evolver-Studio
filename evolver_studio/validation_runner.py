@@ -6,13 +6,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-from evolver_studio.evolver_client import WORKING_DIRECTORY, write_pid_file
+from evolver_studio.evolver_client import write_pid_file
 
 VALIDATION_RUNS_DIRECTORY_NAME = "validation-runs"
 WORKER_LOG_NAME = "worker.log"
 
 
-def start_study(study_directory: Path, jar: Path, processes: int) -> subprocess.Popen:
+def start_study(
+    study_directory: Path, jar: Path, processes: int, working_directory: Path
+) -> subprocess.Popen:
     """Run a written study in a detached process, in a session of its own.
 
     The session lets `cancel_study` stop the worker and the JVMs it started at once.
@@ -21,6 +23,7 @@ def start_study(study_directory: Path, jar: Path, processes: int) -> subprocess.
         study_directory: The study's directory, with its manifest and the request of each job.
         jar: Evolver's jar.
         processes: How many jobs run at the same time.
+        working_directory: The JVM's working directory, which the requests' paths are relative to.
 
     Returns:
         The worker's process; its PID is also written to the study's `pid.txt`.
@@ -34,8 +37,9 @@ def start_study(study_directory: Path, jar: Path, processes: int) -> subprocess.
                 str(study_directory),
                 str(jar),
                 str(processes),
+                str(working_directory),
             ],
-            cwd=WORKING_DIRECTORY,
+            cwd=working_directory,
             stdout=log,
             stderr=subprocess.STDOUT,
             start_new_session=True,

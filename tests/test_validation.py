@@ -11,6 +11,7 @@ from evolver_studio.validation import (
     ValidationStudy,
     collect_runs,
     default_contenders,
+    list_studies,
     plan_jobs,
     read_manifest,
     write_study,
@@ -243,3 +244,25 @@ class TestDefaultContenders:
         # Assert
         assert nsgaii.configuration == "--from NSGAIIDoubleDefault.txt"
         assert nsgaii.algorithm == "NSGA-II"
+
+
+class TestListStudies:
+    def test_should_list_the_studies_with_a_manifest_most_recent_first(
+        self, working_directory: Path
+    ):
+        # Arrange
+        runs = working_directory / "validation-runs"
+        write_study(_study(), runs / "20260101-000000", working_directory)
+        write_study(_study(), runs / "20260102-000000", working_directory)
+        (runs / "not-a-study").mkdir()
+
+        # Act
+        studies = list_studies(runs)
+
+        # Assert
+        assert [s.study_id for s in studies] == ["20260102-000000", "20260101-000000"]
+        assert studies[0].label == "20260102-000000 · NSGA-II (tuned) · 1 problems"
+
+    def test_should_list_nothing_without_a_directory(self, tmp_path: Path):
+        # Act / Assert
+        assert list_studies(tmp_path / "nothing") == []

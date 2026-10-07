@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from evolver_studio import running_badge
 from evolver_studio.app_state import (
     registered_problem_names,
     registered_problems,
@@ -114,21 +115,6 @@ LOG_LINES_SHOWN = 15
 STATUS_FREQUENCY = 1000
 # The Evolver release from which a run reports its progress while it runs.
 PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
-# A blinking label while a run is in progress (Streamlit has no such element).
-RUNNING_STYLE = """
-<style>
-@keyframes solve-running-blink { 50% { opacity: 0.35; } }
-.solve-running {
-  display: inline-block;
-  padding: 0.4rem 1rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 75, 75, 0.7);
-  background: rgba(255, 75, 75, 0.15);
-  font-weight: 600;
-  animation: solve-running-blink 1s ease-in-out infinite;
-}
-</style>
-"""
 
 
 @dataclass(slots=True, frozen=True)
@@ -581,12 +567,12 @@ def _render_run_in_progress(run_dir: Path) -> None:
     ends."""
     request = read_request(run_dir) or {}
     runs = int(request.get("numberOfIndependentRuns", 1))
-    st.markdown(RUNNING_STYLE, unsafe_allow_html=True)
+    running_badge.inject_style()
 
     @st.fragment(run_every=POLL_EVERY_SECONDS, key=f"solve_poll_{run_dir.name}")
     def _poll() -> None:
         label = running_label(read_status(run_dir / "status.yaml"), runs)
-        st.markdown(f'<span class="solve-running">⏳ {label}</span>', unsafe_allow_html=True)
+        running_badge.render(label)
         if run_phase(run_dir) not in (RunPhase.STARTING, RunPhase.RUNNING):
             st.session_state["solve_history"] = run_dir.name
             st.rerun()

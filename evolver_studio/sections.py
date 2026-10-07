@@ -115,9 +115,10 @@ SECTIONS = (
                 "pages/validation.py",
                 "Validation",
                 "✅",
-                "Compare a tuned configuration with the default one on a validation set, with "
-                "statistical tests.",
-                available=False,
+                "Compare a tuned configuration with the default configurations of other algorithms "
+                "on a set of problems: many independent runs, medians, Wilcoxon tests and effect "
+                "sizes.",
+                available=True,
             ),
         ),
     ),
