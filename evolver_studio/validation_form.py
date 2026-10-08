@@ -22,12 +22,7 @@ from evolver_studio.problem_catalogue import (
     number_of_objectives,
     parse_arguments_text,
 )
-from evolver_studio.problems import (
-    default_reference_front,
-    reference_front_candidates,
-    reference_front_dimension,
-    reference_front_for_objectives,
-)
+from evolver_studio.problems import reference_front_dimension, suggested_reference_front
 from evolver_studio.validation import StudyProblem, ValidationStudy, base_algorithm
 
 PROBLEM_COLUMNS = ("problem", "arguments", "reference_front")
@@ -144,7 +139,7 @@ def problem_table(
             {
                 "problem": name,
                 "arguments": "",
-                "reference_front": _default_front(name, objectives, working_directory),
+                "reference_front": suggested_reference_front(name, objectives, working_directory),
             }
         )
     return pd.DataFrame(rows, columns=list(PROBLEM_COLUMNS))
@@ -219,14 +214,6 @@ def configuration_errors(configuration: str, parameter_space_text_: str, label: 
     if outside:
         return [f"{label}: the space does not allow the value of {', '.join(outside)}."]
     return []
-
-
-def _default_front(name: str, objectives: int | None, working_directory: Path) -> str:
-    candidates = reference_front_candidates(name)
-    chosen = default_reference_front(candidates)
-    if chosen is None and objectives is not None:
-        chosen = reference_front_for_objectives(candidates, objectives, working_directory)
-    return chosen or ""
 
 
 def _front_error(

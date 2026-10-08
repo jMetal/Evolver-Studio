@@ -97,3 +97,22 @@ def reference_front_for_objectives(
         if reference_front_dimension(working_directory / candidate) == objectives
     ]
     return matching[0] if len(matching) == 1 else None
+
+
+def suggested_reference_front(problem: str, objectives: int | None, working_directory: Path) -> str:
+    """Pick the reference front to start from for a problem, when there is no doubt about it.
+
+    Args:
+        problem: A problem name or a fully-qualified class name.
+        objectives: The problem's number of objectives when known (to choose among fronts of
+            several dimensions), else None.
+        working_directory: The directory the fronts' paths are relative to.
+
+    Returns:
+        The front's path, or "" when there is none or several that cannot be told apart.
+    """
+    candidates = reference_front_candidates(problem)
+    chosen = default_reference_front(candidates)
+    if chosen is None and objectives is not None:
+        chosen = reference_front_for_objectives(candidates, objectives, working_directory)
+    return chosen or ""

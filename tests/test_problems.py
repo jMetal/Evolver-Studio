@@ -9,6 +9,7 @@ from evolver_studio.problems import (
     reference_front_candidates,
     reference_front_dimension,
     reference_front_for_objectives,
+    suggested_reference_front,
 )
 
 
@@ -140,3 +141,33 @@ class TestReferenceFrontForObjectives:
             == "resources/referenceFronts/DTLZ2.3D.csv"
         )
         assert reference_front_for_objectives(candidates, 5, tmp_path) is None
+
+
+class TestSuggestedReferenceFront:
+    @pytest.fixture
+    def working_directory(self, tmp_path: Path) -> Path:
+        fronts = tmp_path / "resources" / "referenceFronts"
+        fronts.mkdir(parents=True)
+        (fronts / "ZDT1.csv").write_text("0,1\n")
+        (fronts / "DTLZ2.2D.csv").write_text("0,1\n")
+        (fronts / "DTLZ2.3D.csv").write_text("0,0,1\n")
+        return tmp_path
+
+    def test_should_take_the_only_front_of_a_problem(self, working_directory: Path):
+        # Act / Assert
+        assert (
+            suggested_reference_front("ZDT1", 2, working_directory)
+            == "resources/referenceFronts/ZDT1.csv"
+        )
+
+    def test_should_choose_among_several_by_the_number_of_objectives(self, working_directory):
+        # Act / Assert
+        assert (
+            suggested_reference_front("DTLZ2", 3, working_directory)
+            == "resources/referenceFronts/DTLZ2.3D.csv"
+        )
+
+    def test_should_give_nothing_when_it_cannot_tell_or_there_is_none(self, working_directory):
+        # Act / Assert
+        assert suggested_reference_front("DTLZ2", None, working_directory) == ""
+        assert suggested_reference_front("Nothing", 2, working_directory) == ""

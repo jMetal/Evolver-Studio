@@ -15,50 +15,9 @@ from evolver_studio.app_state import (
     require_evolver_jar,
 )
 from evolver_studio.catalogue import BASE_ALGORITHMS
-from evolver_studio.problem_catalogue import Problem, format_arguments
-from evolver_studio.problems import reference_front_candidates
+from evolver_studio.problem_browser import ALL, render_filters, render_table
 
-ALL = "All"
-ENCODING_KEY = "explore_problems_encoding"
-FAMILY_KEY = "explore_problems_family"
-FILTER_KEY = "explore_problems_filter"
-
-
-def _problem_table(problems: list[Problem]) -> pd.DataFrame:
-    """One row per problem, with its reference fronts' file names.
-
-    Args:
-        problems: The problems to show.
-
-    Returns:
-        The table.
-    """
-    rows = [
-        {
-            "Problem": problem.name,
-            "Family": problem.family,
-            "Encoding": problem.encoding,
-            "Objectives": problem.number_of_objectives,
-            "Variables": problem.number_of_variables,
-            "Arguments": format_arguments(problem),
-            "Reference fronts": ", ".join(
-                path.rsplit("/", 1)[-1] for path in reference_front_candidates(problem.name)
-            ),
-        }
-        for problem in problems
-    ]
-    return pd.DataFrame(
-        rows,
-        columns=[
-            "Problem",
-            "Family",
-            "Encoding",
-            "Objectives",
-            "Variables",
-            "Arguments",
-            "Reference fronts",
-        ],
-    )
+KEY_PREFIX = "explore_problems"
 
 
 def _algorithms_for(encoding: str) -> list[str]:
@@ -96,23 +55,11 @@ st.markdown(
     "objectives: the dimension suffix (`3D`) says which one."
 )
 
-encodings = sorted({problem.encoding for problem in problems.values()})
-families = sorted({problem.family for problem in problems.values()})
-columns = st.columns(3)
-encoding = columns[0].selectbox("Encoding", [ALL, *encodings], key=ENCODING_KEY)
-family = columns[1].selectbox("Family", [ALL, *families], key=FAMILY_KEY)
-text = columns[2].text_input("Filter by name", key=FILTER_KEY, placeholder="e.g. DTLZ")
-
-shown = [
-    problem
-    for problem in sorted(problems.values(), key=lambda problem: (problem.family, problem.name))
-    if encoding in (ALL, problem.encoding)
-    and family in (ALL, problem.family)
-    and text.strip().lower() in problem.name.lower()
-]
-if encoding != ALL:
+encoding_filter = st.session_state.get(f"{KEY_PREFIX}_encoding")
+shown = render_filters(problems, KEY_PREFIX)
+if encoding_filter not in (None, ALL):
     st.caption(
-        f"Algorithms that solve {encoding} problems: {', '.join(_algorithms_for(encoding))}."
+        f"Algorithms that solve {encoding_filter} problems: "
+        f"{', '.join(_algorithms_for(encoding_filter))}."
     )
-st.caption(f"{len(shown)} of {len(problems)} problems.")
-st.dataframe(_problem_table(shown), hide_index=True)
+render_table(shown, len(problems), f"{KEY_PREFIX}_table")
