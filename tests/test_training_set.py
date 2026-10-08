@@ -1,15 +1,19 @@
 """Tests for training set table validation."""
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from evolver_studio.problem_catalogue import Problem, ProblemArgument
 from evolver_studio.training_set import (
+    DEFAULT_EVALUATIONS,
     TRAINING_SET_COLUMNS,
     TrainingSet,
-    default_training_set_table,
+    add_problems,
     parse_training_set,
     training_problem_specs,
+    training_set_table,
 )
 
 PROBLEMS = {
@@ -110,9 +114,9 @@ class TestParseTrainingSet:
 
 
 class TestArgumentsColumn:
-    def test_should_start_with_no_arguments(self):
+    def test_should_start_with_no_arguments(self, tmp_path: Path):
         # Act
-        training_set = parse_training_set(default_training_set_table())
+        training_set = parse_training_set(training_set_table(["ZDT4"], PROBLEMS, tmp_path))
 
         # Assert
         assert training_set is not None
@@ -187,3 +191,84 @@ class TestTrainingProblemSpecs:
 
         # Assert
         assert (specs, errors) == (["ZDT4"], [])
+
+
+class TestTrainingSetTable:
+    @pytest.fixture
+    def working_directory(self, tmp_path: Path) -> Path:
+        fronts = tmp_path / "resources" / "referenceFronts"
+        fronts.mkdir(parents=True)
+        (fronts / "ZDT4.csv").write_text("0,1\n")
+        (fronts / "DTLZ2.2D.csv").write_text("0,1\n")
+        (fronts / "DTLZ2.3D.csv").write_text("0,0,1\n")
+        return tmp_path
+
+    def test_should_give_a_row_per_problem_with_its_front_and_the_default_budget(
+        self, working_directory: Path
+    ):
+        # Act
+        table = training_set_table(["ZDT4", "DTLZ2"], PROBLEMS, working_directory)
+
+        # Assert: DTLZ2 has fronts for several objectives; the catalogue says it has 3
+        assert list(table["problem"]) == ["ZDT4", "DTLZ2"]
+        assert list(table["reference_front"]) == [
+            "resources/referenceFronts/ZDT4.csv",
+            "resources/referenceFronts/DTLZ2.3D.csv",
+        ]
+        assert list(table["evaluations"]) == [DEFAULT_EVALUATIONS, DEFAULT_EVALUATIONS]
+        assert parse_training_set(table) is not None
+
+    def test_should_keep_what_the_user_edited_of_a_problem_that_stays(
+        self, working_directory: Path
+    ):
+        # Arrange
+        edited = _table(
+            {
+                "problem": "DTLZ2",
+                "arguments": "12, 2",
+                "reference_front": "mine.csv",
+                "evaluations": 500,
+            }
+        )
+
+        # Act
+        table = training_set_table(["ZDT4", "DTLZ2"], PROBLEMS, working_directory, edited)
+
+        # Assert
+        row = table.set_index("problem").loc["DTLZ2"]
+        assert (row["arguments"], row["reference_front"], row["evaluations"]) == (
+            "12, 2",
+            "mine.csv",
+            500,
+        )
+        assert list(table["problem"]) == ["ZDT4", "DTLZ2"]
+
+    def test_should_accept_a_class_name_the_catalogue_does_not_know(self, working_directory):
+        # Act
+        table = training_set_table(["org.example.MyProblem"], {}, working_directory)
+
+        # Assert: no front can be guessed for it, so the user fills it in
+        assert list(table["problem"]) == ["org.example.MyProblem"]
+        assert list(table["reference_front"]) == [""]
+
+    def test_should_be_empty_without_problems(self, working_directory: Path):
+        # Act
+        table = training_set_table([], PROBLEMS, working_directory)
+
+        # Assert
+        assert table.empty
+        assert list(table.columns) == list(TRAINING_SET_COLUMNS)
+
+
+class TestAddProblems:
+    def test_should_add_the_new_ones_after_the_chosen(self):
+        # Act / Assert
+        assert add_problems(["ZDT4"], ["DTLZ2", "WFG1"]) == ["ZDT4", "DTLZ2", "WFG1"]
+
+    def test_should_leave_out_the_ones_already_chosen(self):
+        # Act / Assert
+        assert add_problems(["ZDT4", "DTLZ2"], ["DTLZ2", "WFG1", "WFG1"]) == [
+            "ZDT4",
+            "DTLZ2",
+            "WFG1",
+        ]

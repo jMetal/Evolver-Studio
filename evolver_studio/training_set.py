@@ -10,32 +10,81 @@ trainingProblemNames.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pandas as pd
 
 from evolver_studio.problem_catalogue import (
     ArgumentValue,
     Problem,
+    number_of_objectives,
     parse_arguments_text,
     problem_spec,
 )
+from evolver_studio.problems import suggested_reference_front
 
 TRAINING_SET_COLUMNS = ("problem", "arguments", "reference_front", "evaluations")
 
 
-def default_training_set_table() -> pd.DataFrame:
-    """A single-row starting table (ZDT4), editable from there.
+DEFAULT_EVALUATIONS = 12000
+
+
+def training_set_table(
+    names: list[str],
+    catalogue: Mapping[str, Problem],
+    working_directory: Path,
+    previous: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """The table of the training set, a row per chosen problem.
+
+    A problem that was already in the table keeps its row (what the user edited); a new one gets
+    no arguments, the evaluation budget `DEFAULT_EVALUATIONS` and the reference front that fits it,
+    when there is no doubt about which. A name that is not in the catalogue (a fully-qualified
+    class name) is a row like any other.
+
+    Args:
+        names: The chosen problems, in order.
+        catalogue: The problem catalogue (empty when the jar has none).
+        working_directory: The directory the reference fronts' paths are relative to.
+        previous: The table as it was, with the user's edits.
 
     Returns:
-        A DataFrame with TRAINING_SET_COLUMNS, one row.
+        The table, with the columns `TRAINING_SET_COLUMNS`.
     """
-    row = {
-        "problem": "ZDT4",
-        "arguments": "",
-        "reference_front": "resources/referenceFronts/ZDT4.csv",
-        "evaluations": 12000,
-    }
-    return pd.DataFrame([row], columns=list(TRAINING_SET_COLUMNS))
+    kept = (
+        {row["problem"]: row for _, row in previous.iterrows()}
+        if previous is not None and not previous.empty
+        else {}
+    )
+    rows = []
+    for name in names:
+        if name in kept:
+            rows.append({column: kept[name][column] for column in TRAINING_SET_COLUMNS})
+            continue
+        problem = catalogue.get(name)
+        objectives = number_of_objectives(problem, ()) if problem is not None else None
+        rows.append(
+            {
+                "problem": name,
+                "arguments": "",
+                "reference_front": suggested_reference_front(name, objectives, working_directory),
+                "evaluations": DEFAULT_EVALUATIONS,
+            }
+        )
+    return pd.DataFrame(rows, columns=list(TRAINING_SET_COLUMNS))
+
+
+def add_problems(current: list[str], added: list[str]) -> list[str]:
+    """Add problems to the chosen ones, keeping their order and leaving out the repeated.
+
+    Args:
+        current: The problems already chosen.
+        added: The problems to add.
+
+    Returns:
+        The chosen problems followed by the new ones.
+    """
+    return list(dict.fromkeys([*current, *added]))
 
 
 @dataclass(slots=True, frozen=True)

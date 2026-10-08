@@ -38,7 +38,8 @@ from evolver_studio.evolver_client import (
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
-from evolver_studio.problem_catalogue import problems_with_encoding
+from evolver_studio.problem_browser import render_filters, render_table
+from evolver_studio.problem_catalogue import Problem, problems_with_encoding
 from evolver_studio.request import (
     FLAT_META_SEARCH_SCALAR_KEYS,
     BaseLevelConfig,
@@ -60,10 +61,12 @@ from evolver_studio.results import (
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
 from evolver_studio.slider_state import next_slider_value
 from evolver_studio.training_set import (
+    TRAINING_SET_COLUMNS,
     TrainingSet,
-    default_training_set_table,
+    add_problems,
     parse_training_set,
     training_problem_specs,
+    training_set_table,
 )
 
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
@@ -499,48 +502,113 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
         return _render_guided_editor(default_text, f"{key_prefix}_form")
 
 
-def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
-    """Let the user define the training set as an editable table of rows.
+DEFAULT_TRAINING_PROBLEMS = {"Double": ["ZDT4"]}
+TRAINING_SET_ROWS_KEY = "training_set_rows"
 
-    Each row is one training problem, its reference front file, and its
-    evaluation budget — BaseLevelConfig's three parallel lists, spelled out
-    explicitly since the CLI does not resolve training sets by name.
+
+def _add_chosen_problems(key: str, added: list[str], browser_key: str) -> None:
+    """Add problems to the chosen ones, and clear the listing's selection.
+
+    A button's callback, which may set the selector's value. The listing's rows are unselected by
+    giving the table a new key: a selection cannot be cleared otherwise.
+    """
+    st.session_state[key] = add_problems(st.session_state.get(key) or [], added)
+    st.session_state[browser_key] = st.session_state.get(browser_key, 0) + 1
+
+
+def _render_problem_browser(
+    catalogue: dict[str, Problem], encoding: str, problems_key: str
+) -> None:
+    """Offer the listing of Explore › Problems, to add problems with their details in view.
+
+    Args:
+        catalogue: The problem catalogue.
+        encoding: The base algorithm's encoding: only its problems are listed.
+        problems_key: The key of the selector the chosen problems are added to.
+    """
+    if not st.toggle(
+        "Browse the problems",
+        key=f"train_browse_{encoding}",
+        help="The same listing as Explore › Problems, with each problem's objectives, variables, "
+        "arguments and reference fronts: select rows and add them to the training set.",
+    ):
+        return
+    shown = render_filters(catalogue, f"train_browser_{encoding}", fixed_encoding=encoding)
+    resets_key = f"train_browser_resets_{encoding}"
+    selected = render_table(
+        shown,
+        len(catalogue),
+        f"train_browser_table_{encoding}_{st.session_state.get(resets_key, 0)}",
+        selectable=True,
+    )
+    st.button(
+        f"Add the {len(selected)} selected" if selected else "Add the selected problems",
+        disabled=not selected,
+        on_click=_add_chosen_problems,
+        args=(problems_key, selected, resets_key),
+        key=f"train_browser_add_{encoding}",
+    )
+
+
+def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
+    """Let the user choose the training problems, and edit what each one needs.
+
+    The problems are chosen from a list (those of the base algorithm's encoding when the jar
+    describes them), and a fully-qualified class name can be typed to add any other one; each
+    chosen problem is a row of a table with its arguments, its reference front file and its
+    evaluation budget — BaseLevelConfig's parallel lists, spelled out explicitly since the CLI
+    does not resolve training sets by name.
 
     Args:
         jar: Path to Evolver's jar, to look up valid problem names from
             DescribeMain's manifest.
-        encoding: The base algorithm's encoding: the curated names offered
-            are those of its problems, when the jar describes them.
+        encoding: The base algorithm's encoding: the problems offered are those of it, when the
+            jar describes them.
 
     Returns:
-        The current (possibly user-edited) training set table.
+        The training set table (without rows while no problem is chosen).
     """
-    problems = registered_problems(str(jar))
-    problem_names = (
-        problems_with_encoding(problems, encoding)
-        if problems is not None
+    catalogue = registered_problems(str(jar))
+    options = (
+        problems_with_encoding(catalogue, encoding)
+        if catalogue is not None
         else registered_problem_names(str(jar))
     )
-    problem_help = (
-        "A curated name (e.g. ZDT4, DTLZ3) or a fully-qualified jMetal class name for any "
-        "other Problem<S> on the classpath (e.g. "
-        "org.uma.jmetal.problem.multiobjective.multiobjectivetsp.instance.KroAB100TSP), "
-        "resolved by reflection."
-    )
-    if problem_names is not None:
-        label = f"Curated {encoding} problems" if problems is not None else "Curated names"
-        problem_help += f" {label}: " + ", ".join(sorted(problem_names))
-    else:
+    if options is None:
         st.warning("Could not list registered problems (is Java installed?).")
+        options = []
+    problems_key = f"train_problems_{encoding}"
+    names = st.multiselect(
+        "Training problems",
+        options,
+        default=[n for n in DEFAULT_TRAINING_PROBLEMS.get(encoding, []) if n in options],
+        accept_new_options=True,
+        placeholder="Choose the problems, or type a class name",
+        key=problems_key,
+        help="The problems of this encoding. To train on any other jMetal Problem on the "
+        "classpath, type its fully-qualified class name (e.g. org.uma.jmetal.problem."
+        "multiobjective.multiobjectivetsp.instance.KroAB100TSP): Evolver resolves it by "
+        "reflection.",
+    )
+    if catalogue is not None:
+        _render_problem_browser(catalogue, encoding, problems_key)
+    if not names:
+        return pd.DataFrame(columns=list(TRAINING_SET_COLUMNS))
     st.caption(
         "Reference front files live under resources/referenceFronts/ (or "
         "resources/referenceFrontsTSP/ for TSP problems); some "
         "problems use a dimension suffix (e.g. DTLZ1.3D.csv)."
     )
-    return st.data_editor(
-        st.session_state.get("training_set_table", default_training_set_table()),
+    table = training_set_table(
+        names,
+        catalogue or {},
+        WORKING_DIRECTORY,
+        st.session_state.get(TRAINING_SET_ROWS_KEY),
+    )
+    edited = st.data_editor(
+        table,
         column_config={
-            "problem": st.column_config.TextColumn("Problem", required=True, help=problem_help),
+            "problem": st.column_config.TextColumn("Problem", disabled=True),
             "arguments": st.column_config.TextColumn(
                 "Arguments",
                 help="Optional: the problem's constructor arguments, all of them or none, "
@@ -552,10 +620,12 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
                 "Evaluations", min_value=1, step=100, required=True
             ),
         },
-        num_rows="dynamic",
+        hide_index=True,
         width="stretch",
-        key="training_set_table",
+        key=f"train_set_table_{encoding}_{'|'.join(names)}",
     )
+    st.session_state[TRAINING_SET_ROWS_KEY] = edited[list(TRAINING_SET_COLUMNS)]
+    return edited
 
 
 def _render_active_run(active_run: ActiveRun) -> None:
@@ -650,12 +720,14 @@ else:
         )
 
     with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
-        training_set_table = _render_training_set_editor(jar, encoding)
-    training_set = parse_training_set(training_set_table)
+        training_set_table_value = _render_training_set_editor(jar, encoding)
+    training_set = parse_training_set(training_set_table_value)
     problem_specs: list[str | dict] = []
     problem_errors: list[str] = []
-    if training_set is None:
-        st.error("Every row needs a problem, a reference front file, and evaluations > 0.")
+    if training_set_table_value.empty:
+        st.error("Choose at least one training problem.")
+    elif training_set is None:
+        st.error("Every row needs a reference front file and evaluations > 0.")
     else:
         problem_specs, problem_errors = training_problem_specs(
             training_set, registered_problems(str(jar)), encoding
