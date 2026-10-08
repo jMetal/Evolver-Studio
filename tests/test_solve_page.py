@@ -50,7 +50,7 @@ def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
 
 @functools.cache
 def _jar_describes_problems() -> bool:
-    """Whether the Evolver jar in use has a problem catalogue (newer than 2.3)."""
+    """Whether the Evolver jar in use has a problem catalogue (2.4 or later)."""
     result = describe(WORKING_DIRECTORY, jar_path())
     return parse_problem_catalogue(getattr(result, "value", {})) is not None
 

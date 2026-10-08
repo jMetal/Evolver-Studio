@@ -74,7 +74,7 @@ class TestOpening:
         self, app: AppTest
     ):
         # Act
-        needs_newer = any("newer than 2.3" in info.value for info in app.info)
+        needs_newer = any("2.4 or later" in info.value for info in app.info)
 
         # Assert
         assert needs_newer is not _jar_describes_problems()

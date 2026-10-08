@@ -549,7 +549,7 @@ warn_if_jar_older_than_catalogue(jar)
 catalogue = registered_problems(str(jar))
 if catalogue is None:
     st.info(
-        "This page needs an Evolver that describes its problems (newer than 2.3): it chooses "
+        "This page needs an Evolver that describes its problems (2.4 or later): it chooses "
         "the algorithms to compare from the encoding of the problems."
     )
     st.stop()

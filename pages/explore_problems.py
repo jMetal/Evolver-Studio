@@ -81,7 +81,7 @@ if problems is None:
         st.stop()
     st.info(
         "This Evolver jar lists the problems by name only: their encoding, dimensions and "
-        "arguments need a newer Evolver."
+        "arguments need Evolver 2.4 or later."
     )
     st.dataframe(pd.DataFrame({"Problem": names}), hide_index=True)
     st.stop()

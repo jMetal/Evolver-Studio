@@ -44,7 +44,7 @@ class SolveRequest:
             build it with none.
         front_delay_millis: How long the run pauses after writing each front, so that the page,
             which polls for it, can show every one; None for no pause. Needs `front_frequency`
-            and an Evolver newer than 2.3 (2.3 ignores it).
+            and Evolver 2.4 or later (2.3 ignores it).
     """
 
     algorithm_name: str

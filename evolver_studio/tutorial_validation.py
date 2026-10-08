@@ -126,7 +126,7 @@ def _needs_problem_catalogue(render: Callable[[Path], None]) -> Callable[[Path],
     def step(jar: Path) -> None:
         if registered_problems(str(jar)) is None:
             st.info(
-                "This step needs an Evolver that describes its problems (newer than 2.3): the "
+                "This step needs an Evolver that describes its problems (2.4 or later): the "
                 "study gives DTLZ2 its number of objectives and variables."
             )
             return

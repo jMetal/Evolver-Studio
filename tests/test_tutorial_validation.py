@@ -231,4 +231,4 @@ class TestWithAnOlderEvolver:
 
         # Assert
         assert not app.exception
-        assert any("newer than 2.3" in info.value for info in app.info)
+        assert any("2.4 or later" in info.value for info in app.info)
