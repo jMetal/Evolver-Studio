@@ -51,7 +51,7 @@ from evolver_studio.monitor_view import (
 )
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
-from evolver_studio.problem_browser import render_problem_adder
+from evolver_studio.problem_browser import render_problem_selector
 from evolver_studio.problem_catalogue import problems_with_encoding
 from evolver_studio.request import (
     DEFAULT_META_POPULATION_SIZE,
@@ -663,20 +663,20 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
         st.warning("Could not list registered problems (is Java installed?).")
         options = []
     problems_key = f"train_problems_{encoding}"
-    names = st.multiselect(
-        "Training problems",
+    names = render_problem_selector(
+        catalogue,
         options,
-        default=[n for n in DEFAULT_TRAINING_PROBLEMS.get(encoding, []) if n in options],
-        accept_new_options=True,
-        placeholder="Choose the problems, or type a class name",
-        key=problems_key,
-        help="The problems of this encoding. To train on any other jMetal Problem on the "
+        encoding,
+        "Training problems",
+        problems_key,
+        "train",
+        default=DEFAULT_TRAINING_PROBLEMS.get(encoding),
+        help_text="The problems of this encoding. To train on any other jMetal Problem on the "
         "classpath, type its fully-qualified class name (e.g. org.uma.jmetal.problem."
         "multiobjective.multiobjectivetsp.instance.KroAB100TSP): Evolver resolves it by "
         "reflection.",
+        accept_class_names=True,
     )
-    if catalogue is not None:
-        render_problem_adder(catalogue, encoding, problems_key, "train")
     if not names:
         return pd.DataFrame(columns=list(TRAINING_SET_COLUMNS))
     st.caption(

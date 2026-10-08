@@ -1,4 +1,5 @@
-"""The listing of Evolver's problems, with its filters: shared by Explore and by Training.
+"""The listing of Evolver's problems and the selector built on it: shared by Explore, Training
+and Validation.
 
 Explore › Problems shows it to browse the problems; Training shows it, with the encoding fixed to
 the base algorithm's and rows that can be selected, to add problems to the training set.
@@ -166,3 +167,52 @@ def render_problem_adder(
         args=(selector_key, selected, resets_key),
         key=f"{key_prefix}_browser_add_{encoding}",
     )
+
+
+def render_problem_selector(
+    catalogue: Mapping[str, Problem] | None,
+    options: list[str],
+    encoding: str,
+    label: str,
+    selector_key: str,
+    key_prefix: str,
+    default: list[str] | None = None,
+    help_text: str | None = None,
+    accept_class_names: bool = False,
+) -> list[str]:
+    """Let the user choose problems: from a list, or with their details in a listing.
+
+    It is the one way Training and Validation choose them: a selector with the problems of an
+    encoding and, when the jar describes the problems, the listing of Explore › Problems to add
+    several rows at once.
+
+    Args:
+        catalogue: The problem catalogue, or None when the jar does not describe the problems
+            (there is then no listing).
+        options: The problems the selector offers.
+        encoding: The encoding of the problems.
+        label: The selector's label.
+        selector_key: The selector's widget key, also the one the listing adds to.
+        key_prefix: Prefixes the listing's widget keys, so that pages do not share them.
+        default: The problems chosen at first, those of them that are offered.
+        help_text: The selector's help.
+        accept_class_names: Whether a fully-qualified class name can be typed to add a problem
+            that is not in the list.
+
+    Returns:
+        The names chosen.
+    """
+    names = st.multiselect(
+        label,
+        options,
+        default=[name for name in default or [] if name in options],
+        accept_new_options=accept_class_names,
+        placeholder="Choose the problems, or type a class name"
+        if accept_class_names
+        else "Choose the problems",
+        key=selector_key,
+        help=help_text,
+    )
+    if catalogue is not None:
+        render_problem_adder(catalogue, encoding, selector_key, key_prefix)
+    return names
