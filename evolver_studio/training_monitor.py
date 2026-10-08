@@ -316,6 +316,31 @@ def format_duration(seconds: float | None) -> str:
     return f"{secs} s"
 
 
+def tail_text(path: Path, lines: int = 40, max_bytes: int = 65536) -> str | None:
+    """Read the last lines of a log, without reading the whole file.
+
+    Args:
+        path: The log.
+        lines: How many lines to give.
+        max_bytes: How far from the end to read at most.
+
+    Returns:
+        The last lines, or None if the file does not exist or cannot be read.
+    """
+    try:
+        with path.open("rb") as file:
+            file.seek(0, 2)
+            size = file.tell()
+            file.seek(max(size - max_bytes, 0))
+            data = file.read()
+    except OSError:
+        return None
+    text = data.decode(errors="replace")
+    if size > max_bytes:
+        text = text.split("\n", 1)[-1]  # the first line may have been cut in half
+    return "\n".join(text.splitlines()[-lines:])
+
+
 def _elapsed_seconds(status: RunStatus, started_at: datetime | None, now: datetime) -> float | None:
     if status.elapsed_minutes is not None:
         return status.elapsed_minutes * 60.0

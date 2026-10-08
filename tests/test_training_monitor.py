@@ -15,6 +15,7 @@ from evolver_studio.training_monitor import (
     build_population_figure,
     format_duration,
     summarize_run,
+    tail_text,
 )
 
 HEADER = "Evaluation,SolutionId,EP,NHV\n"
@@ -389,3 +390,31 @@ class TestConvergenceFigure:
     def test_should_draw_an_empty_figure_without_checkpoints(self):
         # Act / Assert
         assert len(build_convergence_figure([]).data) == 0
+
+
+class TestTailText:
+    def test_should_give_the_last_lines(self, tmp_path: Path):
+        # Arrange
+        log = tmp_path / "runner.log"
+        log.write_text("".join(f"line {n}\n" for n in range(1, 101)))
+
+        # Act
+        text = tail_text(log, lines=3)
+
+        # Assert
+        assert text == "line 98\nline 99\nline 100"
+
+    def test_should_not_read_more_than_the_end_of_a_big_file(self, tmp_path: Path):
+        # Arrange: a log of 1 MB, whose line at the cut is not a whole one
+        log = tmp_path / "runner.log"
+        log.write_text("".join(f"line {n:07d}\n" for n in range(100_000)))
+
+        # Act
+        text = tail_text(log, lines=2, max_bytes=1000)
+
+        # Assert
+        assert text == "line 0099998\nline 0099999"
+
+    def test_should_give_nothing_for_a_log_that_does_not_exist(self, tmp_path: Path):
+        # Act / Assert
+        assert tail_text(tmp_path / "missing.log") is None
