@@ -78,17 +78,17 @@ below; revisit and reorder as real usage surfaces new ones.
 - **Catalogue synced with Evolver 2.4**: every base
   algorithm `DescribeMain` registers is runnable (NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and
   SSMOEA join NSGA-II, MOEA/D and RVEA, MOEA/D gaining its Binary and Permutation encodings), with
-  the default configurations the jar ships; MOPSO stays browsable only. Done on
-  `experiment/evolver-3-sync` against the `develop` jar, and confirmed with the 2.4 release.
+  the default configurations the jar ships; MOPSO stays browsable only. Done against the
+  `develop` jar before the release, and confirmed with 2.4.
 
-- **Problem catalogue (same branch)**: `DescribeMain`'s `problemCatalogue`
+- **Problem catalogue**: `DescribeMain`'s `problemCatalogue`
   (`evolver_studio/problem_catalogue.py`) gives each problem's encoding, dimensions and constructor
   arguments. Explore › Problems lists them; Run algorithm offers only the algorithms of the
   problem's encoding and lets its arguments be set (a `{class, args}` problem in the request); the
   Training set takes arguments per problem and checks the encodings. With a 2.3 jar, which has no
   catalogue, the pages fall back to the plain list of names.
 
-- **A running label instead of a live view (same branch)**: Run algorithm no longer offers the
+- **A running label instead of a live view**: Run algorithm no longer offers the
   progress bar and live front modes, which a benchmark run, over in a second or two, rarely gave
   time to see. A run in progress shows a blinking label with the evaluation it is at (its status is
   updated every 1000 evaluations, `pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
@@ -195,7 +195,7 @@ Landing page now exists (`pages/analysis.py`), currently a placeholder pointing 
 
 ## Phase 4 — Validation runs
 
-First version shipped (`pages/validation.py`, same branch as the Evolver 2.4 sync): a study compares a
+First version shipped (`pages/validation.py`, with the Evolver 2.4 sync): a study compares a
 tuned configuration, the pivot (from a finished training run's `VAR_CONF.txt`, or pasted), with the
 default configurations of Evolver's algorithms for the encoding of the problems. It needs no change
 in Evolver: a study is a `cli.solving` request per algorithm and problem

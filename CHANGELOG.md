@@ -8,7 +8,7 @@ version works with.
 
 Works with Evolver 2.4.
 
-### Moving to Evolver 2.4 (on `experiment/evolver-3-sync`)
+### Moving to Evolver 2.4
 
 - **Base algorithms**: NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and SSMOEA can be launched from
   Training and Run algorithm, and MOEA/D also with its Binary and Permutation encodings, as
