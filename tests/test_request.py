@@ -198,6 +198,34 @@ class TestMetaSearchEncodingAndLimit:
 
 
 class TestRequestToYaml:
+    def test_should_ask_for_the_population_only_when_wanted(self):
+        # Act
+        without = yaml.safe_load(request_to_yaml("b.yaml", "m.yaml", "out"))
+        with_population = yaml.safe_load(
+            request_to_yaml("b.yaml", "m.yaml", "out", write_population=True)
+        )
+
+        # Assert
+        assert "writePopulation" not in without
+        assert with_population["writePopulation"] is True
+
+    def test_should_never_ask_for_the_swing_front_plot(self):
+        """frontPlotFrequency opens a window: Studio runs headless."""
+        # Act
+        parsed = yaml.safe_load(
+            request_to_yaml(
+                "b.yaml",
+                "m.yaml",
+                "out",
+                write_frequency=100,
+                status_frequency=100,
+                write_population=True,
+            )
+        )
+
+        # Assert
+        assert "frontPlotFrequency" not in parsed
+
     def test_should_reference_base_level_and_meta_search_by_file_name(self):
         """baseLevel/metaSearch are file-name references, not inline objects."""
         # Act

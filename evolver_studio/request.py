@@ -201,6 +201,7 @@ def request_to_yaml(
     output_directory: str,
     write_frequency: int | None = None,
     status_frequency: int | None = None,
+    write_population: bool = False,
 ) -> str:
     """Serialize the top-level request.yaml TrainingRunnerMain expects.
 
@@ -216,6 +217,9 @@ def request_to_yaml(
             own default (100).
         status_frequency: How often (in evaluations) status.yaml is
             updated, or None for TrainingRunnerMain's own default (100).
+        write_population: Whether Evolver also writes the meta-optimizer's whole population at
+            every checkpoint (POPULATION_INDICATORS.csv and POPULATION_CONFIGURATIONS.csv), not
+            only its non-dominated front.
 
     Returns:
         The YAML document text, with baseLevel/metaSearch as file-name
@@ -230,6 +234,8 @@ def request_to_yaml(
         request["writeFrequency"] = write_frequency
     if status_frequency is not None:
         request["statusFrequency"] = status_frequency
+    if write_population:
+        request["writePopulation"] = True
     return yaml.safe_dump(request, sort_keys=False)
 
 

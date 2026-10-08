@@ -18,6 +18,9 @@ class ResultsPointer:
         indicators_file: Path to INDICATORS.csv.
         configurations_file: Path to CONFIGURATIONS.csv.
         var_conf_file: Path to VAR_CONF.txt (not listed in results.yaml itself).
+        population_indicators_file: Path to POPULATION_INDICATORS.csv, when the run was asked to
+            write its population (`writePopulation`).
+        population_configurations_file: Path to POPULATION_CONFIGURATIONS.csv, likewise.
     """
 
     output_directory: Path
@@ -25,6 +28,8 @@ class ResultsPointer:
     indicators_file: Path
     configurations_file: Path
     var_conf_file: Path
+    population_indicators_file: Path | None = None
+    population_configurations_file: Path | None = None
 
 
 def read_results_pointer(results_yaml: Path, working_directory: Path) -> ResultsPointer:
@@ -50,7 +55,18 @@ def read_results_pointer(results_yaml: Path, working_directory: Path) -> Results
         indicators_file=working_directory / raw["indicatorsFile"],
         configurations_file=working_directory / raw["configurationsFile"],
         var_conf_file=output_directory / "VAR_CONF.txt",
+        population_indicators_file=_optional_path(
+            raw, "populationIndicatorsFile", working_directory
+        ),
+        population_configurations_file=_optional_path(
+            raw, "populationConfigurationsFile", working_directory
+        ),
     )
+
+
+def _optional_path(raw: dict, key: str, working_directory: Path) -> Path | None:
+    value = raw.get(key)
+    return working_directory / value if value else None
 
 
 def load_indicators(indicators_csv: Path) -> pd.DataFrame:

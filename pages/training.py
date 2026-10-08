@@ -175,6 +175,7 @@ def _launch_run(
     meta_max_minutes: float | None,
     number_of_cores: int,
     update_every_evaluations: int,
+    write_population: bool,
 ) -> None:
     """Write the base-level/meta-search/request files, launch training, persist its PID.
 
@@ -210,6 +211,8 @@ def _launch_run(
         meta_max_minutes: The computing time limit in minutes, when the meta-optimizer stops by
             time instead of by evaluations; else None.
         number_of_cores: Cores used to parallelize base-level runs.
+        write_population: Whether Evolver also writes the meta-optimizer's whole population at
+            every checkpoint, for the population viewer of the monitor.
         update_every_evaluations: Chosen live-preview redraw threshold, also
             used as writeFrequency/statusFrequency for this run.
     """
@@ -249,6 +252,7 @@ def _launch_run(
             f"{output_directory_base}/{run_id}",
             write_frequency=update_every_evaluations,
             status_frequency=update_every_evaluations,
+            write_population=write_population,
         )
     )
     process = start_training(
@@ -761,6 +765,13 @@ else:
     frequency_error = checkpoint_frequency_error(int(update_every_evaluations))
     if frequency_error is not None:
         st.error(frequency_error)
+    write_population = st.checkbox(
+        "Show the meta-optimizer's population while it runs",
+        key="train_write_population",
+        help="Evolver also writes the whole population of the meta-optimizer at every "
+        "checkpoint, not only its non-dominated front, and the monitor gets a Population tab "
+        "that shows how it evolves. The files are larger; leave it off if you do not need it.",
+    )
 
     default_base_text = parameter_space_text(jar, algorithm.encodings[encoding])
     parameter_space_text_value = _render_parameter_space_editor(
@@ -843,6 +854,7 @@ else:
             meta_max_minutes,
             int(number_of_cores),
             int(update_every_evaluations),
+            write_population,
         )
         st.rerun()
 

@@ -36,6 +36,37 @@ def _write_run(
     return run_dir
 
 
+class TestActiveRunMonitoredFiles:
+    def test_should_point_at_the_log_and_not_at_a_population_by_default(self, tmp_path: Path):
+        # Arrange
+        run_dir = _write_run(tmp_path, "20260101-000000", STATUS_RUNNING, "results/x/20260101")
+
+        # Act
+        active_run = find_active_run(tmp_path)
+
+        # Assert
+        assert active_run is not None
+        assert active_run.log_file == run_dir / "runner.log"
+        assert active_run.population_indicators_csv is None
+
+    def test_should_point_at_the_population_when_the_run_was_asked_to_write_it(
+        self, tmp_path: Path
+    ):
+        # Arrange
+        run_dir = _write_run(tmp_path, "20260101-000000", STATUS_RUNNING, "results/x/20260101")
+        with (run_dir / "request.yaml").open("a") as request:
+            request.write("writePopulation: true\n")
+
+        # Act
+        active_run = find_active_run(tmp_path)
+
+        # Assert
+        assert active_run is not None
+        assert active_run.population_indicators_csv == (
+            tmp_path / "results/x/20260101" / "POPULATION_INDICATORS.csv"
+        )
+
+
 class TestFindActiveRun:
     def test_should_return_none_when_runs_directory_does_not_exist(self, tmp_path: Path):
         """A fresh installation with no prior runs must not raise."""

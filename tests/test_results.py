@@ -39,6 +39,47 @@ class TestReadResultsPointer:
         assert pointer.var_conf_file == working_directory / "results/nsgaii/ZDT4" / "VAR_CONF.txt"
 
 
+class TestReadResultsPointerPopulation:
+    RESULTS = (
+        "outputDirectory: results/x\nmetadataFile: results/x/METADATA.txt\n"
+        "indicatorsFile: results/x/INDICATORS.csv\n"
+        "configurationsFile: results/x/CONFIGURATIONS.csv\n"
+    )
+
+    def test_should_point_at_the_population_files_when_the_run_wrote_them(self, tmp_path: Path):
+        # Arrange
+        results_yaml = tmp_path / "results.yaml"
+        results_yaml.write_text(
+            self.RESULTS
+            + "populationIndicatorsFile: results/x/POPULATION_INDICATORS.csv\n"
+            + "populationConfigurationsFile: results/x/POPULATION_CONFIGURATIONS.csv\n"
+        )
+
+        # Act
+        pointer = read_results_pointer(results_yaml, tmp_path)
+
+        # Assert
+        assert (
+            pointer.population_indicators_file == tmp_path / "results/x/POPULATION_INDICATORS.csv"
+        )
+        assert (
+            pointer.population_configurations_file
+            == tmp_path / "results/x/POPULATION_CONFIGURATIONS.csv"
+        )
+
+    def test_should_have_no_population_files_otherwise(self, tmp_path: Path):
+        # Arrange
+        results_yaml = tmp_path / "results.yaml"
+        results_yaml.write_text(self.RESULTS)
+
+        # Act
+        pointer = read_results_pointer(results_yaml, tmp_path)
+
+        # Assert
+        assert pointer.population_indicators_file is None
+        assert pointer.population_configurations_file is None
+
+
 class TestLoadIndicators:
     def test_should_load_indicator_columns(self, tmp_path: Path):
         """INDICATORS.csv rows/columns must load into a DataFrame with the same header."""

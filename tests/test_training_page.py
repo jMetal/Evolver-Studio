@@ -258,3 +258,18 @@ class TestCheckpointFrequency:
         # Assert
         assert any("multiple of the frequency" in e.value for e in app.error)
         assert _launch_button(app).disabled
+
+
+class TestPopulationOption:
+    def test_should_leave_the_population_off_unless_asked_for(self, app: AppTest):
+        # Assert
+        assert app.checkbox(key="train_write_population").value is False
+
+    def test_should_offer_it_alongside_the_update_frequency(self, app: AppTest):
+        # Act
+        app.checkbox(key="train_write_population").check().run()
+
+        # Assert
+        assert app.checkbox(key="train_write_population").value is True
+        assert not app.exception
+        assert not _launch_button(app).disabled

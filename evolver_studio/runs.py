@@ -30,6 +30,8 @@ class ActiveRun:
         pid_file: Path to the launched subprocess's PID file.
         indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
         log_file: Path to the runner's log, `runner.log` in the run's directory.
+        population_indicators_csv: Path to the run's (still-growing) POPULATION_INDICATORS.csv,
+            or None when the run was not asked to write its population.
     """
 
     run_id: str
@@ -38,6 +40,7 @@ class ActiveRun:
     pid_file: Path
     indicators_csv: Path
     log_file: Path
+    population_indicators_csv: Path | None = None
 
 
 def mark_cancelled(run_dir: Path) -> None:
@@ -88,14 +91,19 @@ def _active_run_in(run_dir: Path) -> ActiveRun | None:
     if pid is not None and not is_alive(pid):
         return None
     request_yaml = run_dir / "request.yaml"
-    output_directory = yaml.safe_load(request_yaml.read_text())["outputDirectory"]
+    request = yaml.safe_load(request_yaml.read_text())
+    output_directory = request["outputDirectory"]
+    output = run_dir.parent.parent / output_directory
     return ActiveRun(
         run_id=run_dir.name,
         run_dir=run_dir,
         status_yaml=status_yaml,
         pid_file=pid_file,
-        indicators_csv=run_dir.parent.parent / output_directory / "INDICATORS.csv",
+        indicators_csv=output / "INDICATORS.csv",
         log_file=run_dir / "runner.log",
+        population_indicators_csv=(
+            output / "POPULATION_INDICATORS.csv" if request.get("writePopulation") else None
+        ),
     )
 
 
