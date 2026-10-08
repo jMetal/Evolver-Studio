@@ -12,11 +12,18 @@ from dataclasses import dataclass
 
 import yaml
 
-# Scalar keys MetaOptimizerConfigurationReader consumes directly for the flat encoding; every
-# other key in a metaSearch file is an operator flag, passed straight through to the algorithm's
-# own operator parameter space (see FlatMetaSearchConfig.operator_flags).
-FLAT_META_SEARCH_SCALAR_KEYS = frozenset(
-    {"algorithm", "encoding", "metaMaxEvaluations", "metaPopulationSize", "numberOfCores"}
+# Scalar keys MetaOptimizerConfigurationReader consumes directly, for the flat and the tree
+# encoding; every other key in a metaSearch file is an operator flag, passed straight through to
+# the algorithm's own operator parameter space (see MetaSearchConfig.operator_flags).
+META_SEARCH_SCALAR_KEYS = frozenset(
+    {
+        "algorithm",
+        "encoding",
+        "metaMaxEvaluations",
+        "metaMaxComputingTimeMinutes",
+        "metaPopulationSize",
+        "numberOfCores",
+    }
 )
 
 
@@ -78,23 +85,29 @@ class BaseLevelConfig:
 
 
 @dataclass(slots=True, frozen=True)
-class FlatMetaSearchConfig:
-    """How the meta-optimizer searches, for the flat [0,1]^n encoding.
+class MetaSearchConfig:
+    """How the meta-optimizer searches, for the flat [0,1]^n or the tree encoding.
 
-    Mirrors org.uma.evolver.cli.training.FlatMetaSearchConfig field for
-    field. Reusable across many requests.
+    Mirrors org.uma.evolver.cli.training.FlatMetaSearchConfig and TreeMetaSearchConfig, which
+    have the same fields: the encoding is the `encoding` key of the file. Reusable across many
+    requests.
 
     Attributes:
         algorithm: The meta-optimizer algorithm name, resolved via
             MetaAlgorithmRegistry (e.g. "NSGA-II", "SPEA2",
             "AsyncNSGA-II", "SMPSO").
-        meta_max_evaluations: Meta-level evaluation budget.
+        meta_max_evaluations: Meta-level evaluation budget; ignored (and left out of the file)
+            when `meta_max_computing_time_minutes` is given: the two limits are exclusive.
         meta_population_size: Meta-level population size, or None to use
             MetaAlgorithmRegistry's own default.
         number_of_cores: Cores used to parallelize base-level runs.
         operator_flags: The meta-optimizer's own operator configuration
             (crossover, mutation, ...), as plain key/value pairs — every
-            algorithm accepts a different set (SMPSO accepts none).
+            algorithm accepts a different set (SMPSO accepts none), and the tree encoding
+            has others than the flat one.
+        encoding: "flat" or "tree".
+        meta_max_computing_time_minutes: Stop the meta-optimizer after this many minutes
+            (decimals allowed) instead of after `meta_max_evaluations`, or None for the latter.
     """
 
     algorithm: str
@@ -102,20 +115,25 @@ class FlatMetaSearchConfig:
     meta_population_size: int | None
     number_of_cores: int
     operator_flags: dict[str, object]
+    encoding: str = "flat"
+    meta_max_computing_time_minutes: float | None = None
 
     def to_dict(self) -> dict:
         """Build the mapping MetaOptimizerConfigurationReader expects.
 
         Returns:
-            A dict with the flat scalar keys, the `encoding: "flat"`
-            discriminator, and every operator flag as a top-level key.
+            A dict with the scalar keys, the `encoding` discriminator ("flat" or
+            "tree"), and every operator flag as a top-level key.
         """
         data = {
             "algorithm": self.algorithm,
-            "encoding": "flat",
-            "metaMaxEvaluations": self.meta_max_evaluations,
-            "numberOfCores": self.number_of_cores,
+            "encoding": self.encoding,
         }
+        if self.meta_max_computing_time_minutes is not None:
+            data["metaMaxComputingTimeMinutes"] = self.meta_max_computing_time_minutes
+        else:
+            data["metaMaxEvaluations"] = self.meta_max_evaluations
+        data["numberOfCores"] = self.number_of_cores
         if self.meta_population_size is not None:
             data["metaPopulationSize"] = self.meta_population_size
         data.update(self.operator_flags)
@@ -134,11 +152,11 @@ def base_level_to_yaml(base_level: BaseLevelConfig) -> str:
     return yaml.safe_dump(base_level.to_dict(), sort_keys=False)
 
 
-def flat_meta_search_to_yaml(meta_search: FlatMetaSearchConfig) -> str:
-    """Serialize a flat meta-search config to a reusable metaSearch configuration file.
+def meta_search_to_yaml(meta_search: MetaSearchConfig) -> str:
+    """Serialize a meta-search config to a reusable metaSearch configuration file.
 
     Args:
-        meta_search: How the meta-optimizer searches (flat encoding).
+        meta_search: How the meta-optimizer searches (flat or tree encoding).
 
     Returns:
         The YAML document text, readable by MetaOptimizerConfigurationReader.

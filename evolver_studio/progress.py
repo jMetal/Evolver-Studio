@@ -42,3 +42,24 @@ def study_running_label(status: RunStatus | None) -> str:
         return "Running…"
     done = min(status.evaluations_done, status.max_evaluations)
     return f"Running · {done} of {status.max_evaluations} jobs finished"
+
+
+def training_progress(status: RunStatus) -> tuple[float, str]:
+    """The fraction of a training run done, and what to say about it.
+
+    Args:
+        status: The run's status.
+
+    Returns:
+        A value in [0, 1] and its text: the evaluations done of those to do, or the computing time
+        spent of the limit when the run is limited by time (it has no evaluations to do).
+    """
+    if status.max_computing_time_minutes:
+        elapsed = status.elapsed_minutes or 0.0
+        fraction = min(elapsed / status.max_computing_time_minutes, 1.0)
+        return fraction, (
+            f"{elapsed:.1f} of {status.max_computing_time_minutes:g} min · "
+            f"{status.evaluations_done} evaluations"
+        )
+    fraction = min(status.evaluations_done / max(status.max_evaluations, 1), 1.0)
+    return fraction, f"{status.evaluations_done}/{status.max_evaluations}"

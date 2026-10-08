@@ -56,9 +56,13 @@ class RunStatus:
     Attributes:
         state: Current run state.
         evaluations_done: Meta-level evaluations completed so far.
-        max_evaluations: Meta-level evaluation budget.
+        max_evaluations: Meta-level evaluation budget; 0 when the run is limited by computing
+            time instead.
         updated_at: Timestamp of the last status write, as written by Evolver.
         error_message: Failure reason, only set when state is FAILED.
+        max_computing_time_minutes: The computing time limit, when the run has one instead of a
+            limit on the evaluations.
+        elapsed_minutes: The computing time spent so far, for a run with a time limit.
     """
 
     state: RunState
@@ -66,6 +70,8 @@ class RunStatus:
     max_evaluations: int
     updated_at: str
     error_message: str | None = None
+    max_computing_time_minutes: float | None = None
+    elapsed_minutes: float | None = None
 
 
 def is_jar_overridden() -> bool:
@@ -316,4 +322,6 @@ def read_status(status_yaml: Path) -> RunStatus | None:
         max_evaluations=raw["maxEvaluations"],
         updated_at=raw["updatedAt"],
         error_message=raw.get("errorMessage"),
+        max_computing_time_minutes=raw.get("maxComputingTimeMinutes"),
+        elapsed_minutes=raw.get("elapsedMinutes"),
     )

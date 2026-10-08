@@ -1,7 +1,7 @@
 """Tests for describing a run in progress."""
 
 from evolver_studio.evolver_client import RunState, RunStatus
-from evolver_studio.progress import running_label, study_running_label
+from evolver_studio.progress import running_label, study_running_label, training_progress
 
 
 def _status(done: int, total: int) -> RunStatus:
@@ -39,3 +39,37 @@ class TestStudyRunningLabel:
     def test_should_say_only_running_before_the_first_status(self):
         # Act / Assert
         assert study_running_label(None) == "Running…"
+
+
+class TestTrainingProgress:
+    def test_should_give_the_evaluations_done_of_those_to_do(self):
+        # Act
+        fraction, text = training_progress(_status(500, 2000))
+
+        # Assert
+        assert (fraction, text) == (0.25, "500/2000")
+
+    def test_should_not_go_past_one(self):
+        # Act / Assert
+        assert training_progress(_status(2100, 2000))[0] == 1.0
+
+    def test_should_give_the_time_spent_of_the_limit_for_a_run_limited_by_time(self):
+        """Such a run has no evaluations to do: its status says 0, and the fraction is of time."""
+        # Arrange
+        status = RunStatus(
+            RunState.RUNNING, 340, 0, "x", max_computing_time_minutes=10.0, elapsed_minutes=2.5
+        )
+
+        # Act
+        fraction, text = training_progress(status)
+
+        # Assert
+        assert fraction == 0.25
+        assert text == "2.5 of 10 min · 340 evaluations"
+
+    def test_should_say_zero_time_before_the_first_status_of_a_timed_run(self):
+        # Arrange
+        status = RunStatus(RunState.RUNNING, 0, 0, "x", max_computing_time_minutes=2.0)
+
+        # Act / Assert
+        assert training_progress(status)[0] == 0.0

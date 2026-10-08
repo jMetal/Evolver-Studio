@@ -5,9 +5,9 @@ import yaml
 
 from evolver_studio.request import (
     BaseLevelConfig,
-    FlatMetaSearchConfig,
+    MetaSearchConfig,
     base_level_to_yaml,
-    flat_meta_search_to_yaml,
+    meta_search_to_yaml,
     parse_operator_flags_yaml,
     request_to_yaml,
 )
@@ -29,7 +29,7 @@ def _base_level(**overrides) -> BaseLevelConfig:
     return BaseLevelConfig(**defaults)
 
 
-def _meta_search(**overrides) -> FlatMetaSearchConfig:
+def _meta_search(**overrides) -> MetaSearchConfig:
     defaults = {
         "algorithm": "NSGA-II",
         "meta_max_evaluations": 2000,
@@ -38,7 +38,7 @@ def _meta_search(**overrides) -> FlatMetaSearchConfig:
         "operator_flags": {"crossover": "SBX", "crossoverProbability": 0.9},
     }
     defaults.update(overrides)
-    return FlatMetaSearchConfig(**defaults)
+    return MetaSearchConfig(**defaults)
 
 
 class TestBaseLevelToYaml:
@@ -118,14 +118,14 @@ class TestBaseLevelToYaml:
         assert "outputDirectory" not in parsed
 
 
-class TestFlatMetaSearchToYaml:
+class TestMetaSearchToYaml:
     def test_should_serialize_flat_encoding_discriminator(self):
         """The metaSearch file must carry the flat encoding discriminator."""
         # Arrange
         meta_search = _meta_search()
 
         # Act
-        parsed = yaml.safe_load(flat_meta_search_to_yaml(meta_search))
+        parsed = yaml.safe_load(meta_search_to_yaml(meta_search))
 
         # Assert
         assert parsed["encoding"] == "flat"
@@ -136,7 +136,7 @@ class TestFlatMetaSearchToYaml:
         meta_search = _meta_search()
 
         # Act
-        parsed = yaml.safe_load(flat_meta_search_to_yaml(meta_search))
+        parsed = yaml.safe_load(meta_search_to_yaml(meta_search))
 
         # Assert
         assert parsed["algorithm"] == "NSGA-II"
@@ -150,7 +150,7 @@ class TestFlatMetaSearchToYaml:
         meta_search = _meta_search(operator_flags={"crossover": "SBX", "mutation": "Polynomial"})
 
         # Act
-        parsed = yaml.safe_load(flat_meta_search_to_yaml(meta_search))
+        parsed = yaml.safe_load(meta_search_to_yaml(meta_search))
 
         # Assert
         assert parsed["crossover"] == "SBX"
@@ -162,10 +162,38 @@ class TestFlatMetaSearchToYaml:
         meta_search = _meta_search(meta_population_size=None)
 
         # Act
-        parsed = yaml.safe_load(flat_meta_search_to_yaml(meta_search))
+        parsed = yaml.safe_load(meta_search_to_yaml(meta_search))
 
         # Assert
         assert "metaPopulationSize" not in parsed
+
+
+class TestMetaSearchEncodingAndLimit:
+    def test_should_serialize_the_tree_encoding_discriminator(self):
+        # Act
+        parsed = yaml.safe_load(meta_search_to_yaml(_meta_search(encoding="tree")))
+
+        # Assert
+        assert parsed["encoding"] == "tree"
+
+    def test_should_stop_by_computing_time_instead_of_by_evaluations(self):
+        """Evolver rejects a file that gives both limits, so only the time is written."""
+        # Act
+        parsed = yaml.safe_load(
+            meta_search_to_yaml(_meta_search(meta_max_computing_time_minutes=2.5))
+        )
+
+        # Assert
+        assert parsed["metaMaxComputingTimeMinutes"] == 2.5
+        assert "metaMaxEvaluations" not in parsed
+
+    def test_should_stop_by_evaluations_by_default(self):
+        # Act
+        parsed = yaml.safe_load(meta_search_to_yaml(_meta_search()))
+
+        # Assert
+        assert parsed["metaMaxEvaluations"] == 2000
+        assert "metaMaxComputingTimeMinutes" not in parsed
 
 
 class TestRequestToYaml:

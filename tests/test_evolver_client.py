@@ -60,6 +60,40 @@ class TestReadStatus:
         assert status.state == RunState.FAILED
         assert status.error_message == "boom"
 
+    def test_should_parse_the_time_limit_of_a_run_stopped_by_computing_time(self, tmp_path: Path):
+        """Such a run has no evaluations to do: maxEvaluations is 0, and the time is reported."""
+        # Arrange
+        status_yaml = tmp_path / "status.yaml"
+        status_yaml.write_text(
+            "status: RUNNING\nevaluationsDone: 340\nmaxEvaluations: 0\n"
+            "maxComputingTimeMinutes: 10.0\nelapsedMinutes: 2.5\n"
+            "updatedAt: '2026-09-15T10:23:41.123456'\n"
+        )
+
+        # Act
+        status = read_status(status_yaml)
+
+        # Assert
+        assert status.max_evaluations == 0
+        assert status.max_computing_time_minutes == 10.0
+        assert status.elapsed_minutes == 2.5
+
+    def test_should_leave_the_time_fields_empty_for_a_run_stopped_by_evaluations(
+        self, tmp_path: Path
+    ):
+        # Arrange
+        status_yaml = tmp_path / "status.yaml"
+        status_yaml.write_text(
+            "status: RUNNING\nevaluationsDone: 100\nmaxEvaluations: 2000\nupdatedAt: x\n"
+        )
+
+        # Act
+        status = read_status(status_yaml)
+
+        # Assert
+        assert status.max_computing_time_minutes is None
+        assert status.elapsed_minutes is None
+
     def test_should_return_none_when_status_file_missing(self, tmp_path: Path):
         """Polling before the file exists must not raise."""
         # Arrange
