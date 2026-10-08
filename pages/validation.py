@@ -23,6 +23,7 @@ from evolver_studio.app_state import (
 )
 from evolver_studio.catalogue import BASE_ALGORITHMS, QUALITY_INDICATORS
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
+from evolver_studio.problem_browser import render_problem_adder
 from evolver_studio.problem_catalogue import Problem, problems_with_encoding
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
@@ -126,6 +127,7 @@ def _render_problems(catalogue: dict[str, Problem]) -> tuple[str, tuple[StudyPro
         key=problems_key(encoding),
         placeholder="Choose the problems",
     )
+    render_problem_adder(catalogue, encoding, problems_key(encoding), "validation")
     if not names:
         return encoding, ()
     table = problem_table(

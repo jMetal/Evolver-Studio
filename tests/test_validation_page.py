@@ -186,3 +186,46 @@ class TestRunAStudy:
         assert list(medians.value.index) == ["ZDT1", "DTLZ2"]
         # 2 contenders on ZDT1, 3 on DTLZ2, 4 runs each
         assert len(next(d for d in app.dataframe if "Seed" in d.value.columns).value) == 20
+
+
+class TestProblemBrowser:
+    """The listing of Explore › Problems, to add problems to the study."""
+
+    @staticmethod
+    def _browser_table(app: AppTest):
+        return next(d.value for d in app.dataframe if "Family" in d.value.columns)
+
+    def test_should_keep_the_listing_hidden_until_asked_for(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+
+        # Assert
+        assert app.toggle(key="validation_browse_Double").value is False
+        assert not any("Family" in d.value.columns for d in app.dataframe)
+
+    def test_should_list_the_problems_of_the_encoding_the_study_uses(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+        app.selectbox(key="validation_encoding").select("Binary").run()
+
+        # Act
+        app.toggle(key="validation_browse_Binary").set_value(True).run()
+
+        # Assert: binary problems only, and no encoding filter: the study fixes it
+        table = self._browser_table(app)
+        assert set(table["Encoding"]) == {"Binary"}
+        assert "ZDT5" in set(table["Problem"])
+        assert not any(box.key == "validation_browser_Binary_encoding" for box in app.selectbox)
+        assert not app.exception
+
+    def test_should_filter_the_listing_by_name(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+        app.toggle(key="validation_browse_Double").set_value(True).run()
+
+        # Act
+        app.text_input(key="validation_browser_Double_filter").input("WFG").run()
+
+        # Assert
+        names = list(self._browser_table(app)["Problem"])
+        assert names and all("WFG" in name for name in names)
