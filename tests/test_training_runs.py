@@ -79,3 +79,25 @@ class TestListFinishedTrainings:
     def test_should_list_nothing_without_a_runs_directory(self, tmp_path: Path):
         # Act / Assert
         assert list_finished_trainings(tmp_path) == []
+
+
+class TestSeveralCheckpoints:
+    def test_should_offer_only_the_final_front_of_a_training_with_several_checkpoints(
+        self, tmp_path: Path
+    ):
+        # Arrange: Evolver appends a block per checkpoint to VAR_CONF.txt
+        text = (
+            "# Evaluation: 100\n# Time (min): 0.5\nEP=9 NHV=1 | --crossover SBX\n\n"
+            "# Evaluation: 200\n# Time (min): 1.0\nEP=5 NHV=1 | --crossover PCX\n"
+            "EP=4 NHV=2 | --crossover blxAlpha\n\n"
+        )
+        _training(tmp_path, "20261007-120000", var_conf=text)
+
+        # Act
+        (training,) = list_finished_trainings(tmp_path)
+
+        # Assert
+        assert [c.configuration for c in training.configurations] == [
+            "--crossover PCX",
+            "--crossover blxAlpha",
+        ]
