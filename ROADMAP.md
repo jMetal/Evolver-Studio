@@ -172,6 +172,14 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 
 ## Next up
 
+- **With Evolver 2.5** (`/bump-evolver 2.5`, then `/sync-catalogue`): SPEA2 gets the tree encoding
+  (`TreeSPEA2`, `SPEA2MetaTree.yaml`, `MetaSPEA2TreeConfiguration.yaml`, already on Evolver's
+  `develop`), so the catalogue's SPEA2 becomes `supports_tree=True` with its tree example file, and
+  the notes Training shows for it (`fixed_operators_note`, `flat_only_reason`) must be reviewed.
+  Still open on the Evolver side: the *flat* SPEA2 only takes `mutationProbabilityFactor`, while
+  its `SPEA2MetaDouble.yaml` already holds the operators of NSGA-II (SBX, polynomial mutation,
+  tournament selection) and SPEA2's own (k-nearest-neighbour density, strength ranking); making it
+  configurable like NSGA-II is a small change in `MetaAlgorithmRegistry.buildSPEA2`.
 - **Solving track, next steps** (the first version of Run algorithm is done): start from a
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.
