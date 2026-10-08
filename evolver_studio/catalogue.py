@@ -87,6 +87,8 @@ class MetaAlgorithm:
             under src/main/resources/metaOptimizerConfigurations/, whose
             operator flags seed this algorithm's launch-form editor. None when
             not `wired_into_cli_runner` (nothing to launch).
+        tree_example_config_file: The same for the tree encoding, or None when the algorithm does
+            not support it (`supports_tree` is False).
         operator_parameter_space_file: Filename of the real ParameterSpace YAML
             backing this algorithm's flat-encoding operator catalogue, under
             src/main/resources/parameterSpaces/ (same format/parser as a base
@@ -107,6 +109,7 @@ class MetaAlgorithm:
     tree_parameters: tuple[str, ...]
     wired_into_cli_runner: bool
     example_config_file: str | None = None
+    tree_example_config_file: str | None = None
     operator_parameter_space_file: str | None = None
     tree_operator_parameter_space_file: str | None = None
 
@@ -298,6 +301,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=_TREE_NSGAII_PARAMETERS,
         wired_into_cli_runner=True,
         example_config_file="MetaNSGAIIFlatConfiguration.yaml",
+        tree_example_config_file="MetaNSGAIITreeConfiguration.yaml",
         operator_parameter_space_file="NSGAIIMetaDouble.yaml",
         tree_operator_parameter_space_file="NSGAIIMetaTree.yaml",
     ),
@@ -312,6 +316,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=(*_TREE_NSGAII_PARAMETERS, "agemoeaVariant"),
         wired_into_cli_runner=True,
         example_config_file="MetaAGEMOEAFlatConfiguration.yaml",
+        tree_example_config_file="MetaAGEMOEATreeConfiguration.yaml",
         operator_parameter_space_file="AGEMOEAMetaDouble.yaml",
         tree_operator_parameter_space_file="AGEMOEAMetaTree.yaml",
     ),
@@ -363,6 +368,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=tuple(p for p in _TREE_NSGAII_PARAMETERS if p != "selection"),
         wired_into_cli_runner=True,
         example_config_file="MetaAsyncNSGAIIFlatConfiguration.yaml",
+        tree_example_config_file="MetaAsyncNSGAIITreeConfiguration.yaml",
         operator_parameter_space_file="AsyncNSGAIIMetaDouble.yaml",
         tree_operator_parameter_space_file="AsyncNSGAIIMetaTree.yaml",
     ),
@@ -393,6 +399,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=("maxEvaluations", "numberOfCores"),
         wired_into_cli_runner=True,
         example_config_file="MetaRandomSearchFlatConfiguration.yaml",
+        tree_example_config_file="MetaRandomSearchTreeConfiguration.yaml",
     ),
 )
 

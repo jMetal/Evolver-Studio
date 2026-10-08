@@ -249,6 +249,35 @@ class TestIsAtLeast:
         assert is_at_least(version, minimum) is expected
 
 
+class TestMetaAlgorithmExampleFiles:
+    def test_should_have_a_tree_example_exactly_for_the_algorithms_that_support_tree(self):
+        """Training offers the tree encoding only with a file to start its operator flags from."""
+        # Act / Assert
+        for meta in META_ALGORITHMS:
+            if meta.wired_into_cli_runner:
+                assert (meta.tree_example_config_file is not None) is meta.supports_tree, meta.name
+
+    def test_should_name_example_files_that_exist_in_the_jar(self):
+        """A stale filename would break the Training page when the encoding is chosen."""
+        # Arrange
+        jar = jar_path()
+        if not jar.is_file():
+            pytest.skip(f"Evolver jar not found at {jar}")
+        with zipfile.ZipFile(jar) as archive:
+            names = set(archive.namelist())
+
+        # Act
+        missing = [
+            file_name
+            for meta in META_ALGORITHMS
+            for file_name in (meta.example_config_file, meta.tree_example_config_file)
+            if file_name and f"metaOptimizerConfigurations/{file_name}" not in names
+        ]
+
+        # Assert
+        assert missing == []
+
+
 class TestCatalogueMatchesEvolverJar:
     """The app reads parameter spaces from Evolver's jar (see resource_files.py)."""
 

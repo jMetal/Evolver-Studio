@@ -24,7 +24,7 @@ from evolver_studio.app_state import (
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
-from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS
+from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
     RunState,
@@ -40,12 +40,13 @@ from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
 from evolver_studio.problem_browser import render_problem_adder
 from evolver_studio.problem_catalogue import problems_with_encoding
+from evolver_studio.progress import training_progress
 from evolver_studio.request import (
-    FLAT_META_SEARCH_SCALAR_KEYS,
+    META_SEARCH_SCALAR_KEYS,
     BaseLevelConfig,
-    FlatMetaSearchConfig,
+    MetaSearchConfig,
     base_level_to_yaml,
-    flat_meta_search_to_yaml,
+    meta_search_to_yaml,
     parse_operator_flags_yaml,
     request_to_yaml,
 )
@@ -119,32 +120,39 @@ def _base_level_config(
 
 def _meta_search_config(
     algorithm: str,
+    meta_encoding: str,
     meta_max_evaluations: int,
+    meta_max_minutes: float | None,
     number_of_cores: int,
     operator_flags: dict[str, object],
-) -> FlatMetaSearchConfig:
-    """Build the flat meta-search config for the selected meta-optimizer.
+) -> MetaSearchConfig:
+    """Build the meta-search config for the selected meta-optimizer and encoding.
 
     The meta population size is left to Evolver's own default (50, see
     MetaAlgorithmRegistry.DEFAULT_POPULATION_SIZE), rather than duplicated here.
 
     Args:
         algorithm: The selected meta-optimizer's name (catalogue.MetaAlgorithm.name).
+        meta_encoding: The meta-optimizer's encoding, "flat" or "tree".
         meta_max_evaluations: Meta-level evaluation budget.
+        meta_max_minutes: Stop after this many minutes of computing time instead of after
+            `meta_max_evaluations`, or None to stop by evaluations.
         number_of_cores: Cores used to parallelize base-level runs.
         operator_flags: The meta-optimizer's own operator configuration
             (possibly user-edited), as plain key/value pairs.
 
     Returns:
-        The flat meta-search config for the selected algorithm.
+        The meta-search config for the selected algorithm.
     """
-    return FlatMetaSearchConfig(
+    return MetaSearchConfig(
         algorithm=algorithm,
         meta_max_evaluations=meta_max_evaluations,
         # None omits metaPopulationSize, so Evolver applies its own default (50).
         meta_population_size=None,
         number_of_cores=number_of_cores,
         operator_flags=operator_flags,
+        encoding=meta_encoding,
+        meta_max_computing_time_minutes=meta_max_minutes,
     )
 
 
@@ -154,6 +162,7 @@ def _launch_run(
     algorithm_name: str,
     encoding: str,
     meta_algorithm_name: str,
+    meta_encoding: str,
     output_directory_base: str,
     parameter_space_text_: str,
     extra_config: dict[str, str] | None,
@@ -161,6 +170,7 @@ def _launch_run(
     problem_specs: list[str | dict],
     operator_flags: dict[str, object],
     meta_max_evaluations: int,
+    meta_max_minutes: float | None,
     number_of_cores: int,
     update_every_evaluations: int,
 ) -> None:
@@ -179,6 +189,7 @@ def _launch_run(
             runnable_encodings), e.g. "Double" or "Permutation".
         meta_algorithm_name: The selected meta-optimizer's name
             (catalogue.MetaAlgorithm.name), e.g. "SPEA2".
+        meta_encoding: The meta-optimizer's encoding, "flat" or "tree".
         output_directory_base: Output directory, nested under run_id so
             INDICATORS.csv (append-only in Evolver) never mixes checkpoints
             across runs that share the same base output directory.
@@ -194,6 +205,8 @@ def _launch_run(
         operator_flags: The (possibly user-edited) meta-optimizer operator
             configuration, as plain key/value pairs.
         meta_max_evaluations: Meta-level evaluation budget.
+        meta_max_minutes: The computing time limit in minutes, when the meta-optimizer stops by
+            time instead of by evaluations; else None.
         number_of_cores: Cores used to parallelize base-level runs.
         update_every_evaluations: Chosen live-preview redraw threshold, also
             used as writeFrequency/statusFrequency for this run.
@@ -216,10 +229,15 @@ def _launch_run(
     base_level_file.write_text(base_level_to_yaml(base_level))
 
     meta_search = _meta_search_config(
-        meta_algorithm_name, meta_max_evaluations, number_of_cores, operator_flags
+        meta_algorithm_name,
+        meta_encoding,
+        meta_max_evaluations,
+        meta_max_minutes,
+        number_of_cores,
+        operator_flags,
     )
     meta_search_file = run_dir / "meta_search.yaml"
-    meta_search_file.write_text(flat_meta_search_to_yaml(meta_search))
+    meta_search_file.write_text(meta_search_to_yaml(meta_search))
 
     request_yaml = run_dir / "request.yaml"
     request_yaml.write_text(
@@ -339,8 +357,7 @@ def _poll_tick(
     """
     status = read_status(status_yaml)
     if status is not None:
-        fraction = status.evaluations_done / max(status.max_evaluations, 1)
-        st.progress(fraction, text=f"{status.evaluations_done}/{status.max_evaluations}")
+        st.progress(*training_progress(status))
     else:
         st.progress(0.0, text="Starting…")
     update = renderer.poll(indicators_csv)
@@ -435,6 +452,78 @@ def _render_guided_editor(default_text: str, key_prefix: str) -> str:
     return serialize_parameter_space(edited)
 
 
+META_ENCODINGS = {"Flat": "flat", "Tree": "tree"}
+STOP_BY_EVALUATIONS = "Evaluations"
+STOP_BY_TIME = "Computing time"
+DEFAULT_META_EVALUATIONS = 2000
+DEFAULT_META_MINUTES = 10.0
+
+
+def _render_meta_limit() -> tuple[int, float | None]:
+    """Choose when the meta-optimizer stops: after a number of evaluations or a computing time.
+
+    Evolver takes one limit or the other, never both.
+
+    Returns:
+        The meta-evaluations to run (the default one when the limit is by time) and the minutes
+        of computing time (None when the limit is by evaluations).
+    """
+    stop_by = st.radio(
+        "Stop the meta-optimizer after",
+        [STOP_BY_EVALUATIONS, STOP_BY_TIME],
+        horizontal=True,
+        key="train_meta_stop_by",
+        help="A number of meta-evaluations (configurations evaluated), or an amount of computing "
+        "time. With a time limit the generation in progress is completed, so the run lasts a "
+        "little longer than the limit; and what a run does in that time depends on the "
+        "meta-optimizer and on the number of cores.",
+    )
+    if stop_by == STOP_BY_TIME:
+        minutes = st.number_input(
+            "Meta max computing time (minutes)",
+            value=DEFAULT_META_MINUTES,
+            min_value=0.1,
+            step=1.0,
+            key="train_meta_minutes",
+        )
+        return DEFAULT_META_EVALUATIONS, float(minutes)
+    evaluations = st.number_input(
+        "Meta max evaluations",
+        value=DEFAULT_META_EVALUATIONS,
+        min_value=100,
+        key="train_meta_evals",
+    )
+    return int(evaluations), None
+
+
+def _render_meta_encoding(meta_algorithm: MetaAlgorithm) -> str:
+    """Choose the meta-optimizer's encoding: flat, or tree when the algorithm supports it.
+
+    The flat encoding searches a vector of numbers in [0, 1]; the tree encoding searches
+    derivation trees of the base algorithm's grammar. Each has its own operators, so the flags
+    below depend on the choice.
+
+    Args:
+        meta_algorithm: The selected meta-optimizer.
+
+    Returns:
+        "flat" or "tree".
+    """
+    supports_tree = meta_algorithm.supports_tree and meta_algorithm.tree_example_config_file
+    choice = st.radio(
+        "Meta-optimizer encoding",
+        list(META_ENCODINGS) if supports_tree else ["Flat"],
+        horizontal=True,
+        key=f"train_meta_encoding_{meta_algorithm.name}",
+        help="Flat: a vector of numbers in [0, 1], one for each parameter of the base algorithm. "
+        "Tree: a derivation tree of the grammar of its parameter space, which has no inactive "
+        "parameters. Each has its own operators.",
+    )
+    if not supports_tree:
+        st.caption(f"{meta_algorithm.name} supports only the flat encoding.")
+    return META_ENCODINGS[choice]
+
+
 def _default_operator_flags_text(jar: Path, example_config_file: str) -> str:
     """Read a meta-algorithm's example config, stripped to its operator flags.
 
@@ -445,14 +534,15 @@ def _default_operator_flags_text(jar: Path, example_config_file: str) -> str:
     Args:
         jar: Path to Evolver's jar.
         example_config_file: Filename under metaOptimizerConfigurations/ for the
-            selected meta-algorithm (catalogue.MetaAlgorithm.example_config_file).
+            selected meta-algorithm and encoding (catalogue.MetaAlgorithm.example_config_file or
+            tree_example_config_file).
 
     Returns:
         A flat YAML mapping of just the operator flags, as starting text for the editor.
     """
     example = yaml.safe_load(meta_optimizer_configuration_text(jar, example_config_file))
     operator_flags = {
-        key: value for key, value in example.items() if key not in FLAT_META_SEARCH_SCALAR_KEYS
+        key: value for key, value in example.items() if key not in META_SEARCH_SCALAR_KEYS
     }
     return yaml.safe_dump(operator_flags, sort_keys=False)
 
@@ -652,7 +742,7 @@ else:
     )
 
     output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
-    meta_max_evaluations = st.number_input("Meta max evaluations", value=2000, min_value=100)
+    meta_max_evaluations, meta_max_minutes = _render_meta_limit()
     number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
     update_every_evaluations = st.number_input(
         "Update every N evaluations",
@@ -668,10 +758,16 @@ else:
         f"base_{algorithm.name}_{encoding}",
     )
 
-    with st.expander(f"Meta-optimizer operator flags ({meta_algorithm.name})"):
+    meta_encoding = _render_meta_encoding(meta_algorithm)
+    example_file = (
+        meta_algorithm.tree_example_config_file
+        if meta_encoding == "tree"
+        else meta_algorithm.example_config_file
+    )
+    with st.expander(f"Meta-optimizer operator flags ({meta_algorithm.name}, {meta_encoding})"):
         operator_flags = _render_operator_flags_editor(
-            _default_operator_flags_text(jar, meta_algorithm.example_config_file),
-            f"meta_operator_flags_{meta_algorithm.name}",
+            _default_operator_flags_text(jar, example_file),
+            f"meta_operator_flags_{meta_algorithm.name}_{meta_encoding}",
         )
 
     with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
@@ -707,12 +803,14 @@ else:
         )
         meta_search = _meta_search_config(
             meta_algorithm.name,
-            int(meta_max_evaluations),
+            meta_encoding,
+            meta_max_evaluations,
+            meta_max_minutes,
             int(number_of_cores),
             operator_flags or {},
         )
         st.code(base_level_to_yaml(base_level), language="yaml")
-        st.code(flat_meta_search_to_yaml(meta_search), language="yaml")
+        st.code(meta_search_to_yaml(meta_search), language="yaml")
 
     if st.button("Launch training", disabled=not can_launch):
         run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -722,13 +820,15 @@ else:
             algorithm.registry_name,
             encoding,
             meta_algorithm.name,
+            meta_encoding,
             output_directory_base,
             parameter_space_text_value,
             extra_config,
             training_set,
             problem_specs,
             operator_flags,
-            int(meta_max_evaluations),
+            meta_max_evaluations,
+            meta_max_minutes,
             int(number_of_cores),
             int(update_every_evaluations),
         )
