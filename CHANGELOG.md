@@ -44,6 +44,12 @@ Works with Evolver 2.4.
   tuning; what the text says about the results is read from them, and one comparison that the test
   cannot settle is used as the example. "Open in Validation" fills Validation's form with the study.
   It needs Evolver 2.4 or later.
+- **Training**: a selector chooses the meta-optimizer's encoding, flat or tree (the latter for the
+  meta-optimizers that support it), right before the box with its operator flags, which start
+  from the example file of the chosen encoding; and another chooses when the meta-optimizer stops,
+  after a number of evaluations or an amount of computing time (Evolver takes one limit or the
+  other), with the progress shown as time spent of the limit. Verified with real runs of the tree
+  encoding and of a time limit.
 - **Training**: the problems of the training set are chosen from a list instead of typed (the
   problems of the base algorithm's encoding, with the option to type any other jMetal class name),
   and a *Browse the problems* switch shows the listing of Explore › Problems, with its filters, to
@@ -64,9 +70,9 @@ Works with Evolver 2.4.
 - **Training**: configure, launch, monitor and cancel a meta-optimization run, with a live view of
   the front of configurations found. NSGA-II (Double, Binary and Permutation), MOEA/D and RVEA as base
   algorithms; NSGA-II, AGE-MOEA, SPEA2, SMPSO, AsyncNSGA-II and Random Search as meta-optimizers,
-  with the flat encoding (the tree encoding is browsable in Explore but cannot be launched yet).
-  Arbitrary multi-problem training sets, and a guided or expert editor of the base algorithm's
-  parameter space.
+  with the flat encoding and, for NSGA-II, AGE-MOEA, AsyncNSGA-II and Random Search, the tree
+  encoding. Arbitrary multi-problem training sets, and a guided or expert editor of the base
+  algorithm's parameter space.
 - **Run algorithm**: run one of Evolver's configurable algorithms (NSGA-II, MOEA/D, RVEA) on a
   problem, through `cli.solving`. The configuration starts from the algorithm's default one and can
   be adjusted within its parameter space (a widget per active parameter, limited to what the space

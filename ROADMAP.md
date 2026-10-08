@@ -172,9 +172,6 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 
 ## Next up
 
-- **Tree-encoding training in the Training page**: Evolver's `cli.training` now accepts tree
-  `metaSearch` files for NSGA-II, AGE-MOEA and RandomSearch (operator flags, like the flat ones, plus
-  the selection); the Training page only builds flat requests today.
 - **Solving track, next steps** (the first version of Run algorithm is done): start from a
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.

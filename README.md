@@ -86,10 +86,9 @@ that can be launched from the app today are:
 | Level | Algorithms |
 |---|---|
 | Base level | NSGA-II, MOEA/D, SMS-EMOA, PAES (Double, Binary, Permutation); RDE-MOEA (Double, Permutation); NSGA-III, AGE-MOEA, RVEA, SSMOEA (Double) |
-| Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding) |
+| Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding); NSGA-II, AGE-MOEA, Async NSGA-II, Random Search (tree encoding) |
 
-The tree encoding of NSGA-II, AGE-MOEA, Async NSGA-II and Random Search is browsable in Explore but
-cannot be launched yet. MOPSO is browsable only, until Evolver's command-line runner supports it. See Evolver's
+MOPSO is browsable only, until Evolver's command-line runner supports it. See Evolver's
 [supported algorithms](https://github.com/jMetal/Evolver#supported-algorithms) for the full list.
 
 ## Requirements
@@ -165,7 +164,7 @@ Code and commits follow [CODING_GUIDELINES.md](CODING_GUIDELINES.md) and
 
 ## Roadmap
 
-Next steps include tree-encoding training runs, the analysis layer, and more statistics for
+Next steps include the analysis layer, and more statistics for
 validation studies (Friedman and critical difference plots). See
 [ROADMAP.md](ROADMAP.md) for details and the use cases behind them.
 
