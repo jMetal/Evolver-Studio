@@ -217,16 +217,16 @@ class TestQualityIndicators:
 
 
 class TestIsOlderThanCatalogue:
-    """The catalogue mirrors the release the app runs, Evolver 2.3 (EVOLVER_VERSION)."""
+    """The catalogue mirrors the release the app runs, Evolver 2.4 (EVOLVER_VERSION)."""
 
-    @pytest.mark.parametrize("version", ["2.2", "2.1", "2.0", "1.0.1"])
+    @pytest.mark.parametrize("version", ["2.3", "2.2", "2.0", "1.0.1"])
     def test_should_flag_an_earlier_release(self, version: str):
         # Act / Assert
         assert is_older_than_catalogue(version)
 
-    @pytest.mark.parametrize("version", ["2.3", "2.3-SNAPSHOT", "2.3.1", "2.4-SNAPSHOT", "3.0"])
+    @pytest.mark.parametrize("version", ["2.4", "2.4-SNAPSHOT", "2.4.1", "2.5-SNAPSHOT", "3.0"])
     def test_should_accept_the_same_or_a_later_release_or_its_snapshot(self, version: str):
-        """A snapshot built from develop on its way to 2.3 already has its catalogue."""
+        """A snapshot built from develop on its way to 2.4 already has its catalogue."""
         # Act / Assert
         assert not is_older_than_catalogue(version)
 
