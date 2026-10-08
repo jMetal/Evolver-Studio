@@ -39,6 +39,7 @@ EVALUATIONS_KEY = "validation_evaluations"
 RUNS_KEY = "validation_runs"
 SEED_KEY = "validation_seed"
 INDICATORS_KEY = "validation_indicators"
+ADJUSTED_SUFFIX = " (adjusted)"
 TUNED_FROM_TRAINING = "A training run"
 TUNED_PASTED = "A configuration I paste"
 
@@ -53,6 +54,17 @@ def defaults_key(encoding: str) -> str:
     return f"validation_defaults_{encoding}"
 
 
+def adjusted_key(encoding: str, name: str) -> str:
+    """The key of the values an algorithm compared with starts from, when they are not its
+    default configuration's (a study run again with that algorithm adjusted)."""
+    return f"validation_adjusted_{encoding}_{name}"
+
+
+def adjusted_name(name: str) -> str:
+    """The name, in a study, of an algorithm whose default configuration was adjusted."""
+    return f"{name}{ADJUSTED_SUFFIX}"
+
+
 def tuned_name_key(registry_name: str) -> str:
     """The key of the name of the tuned configuration, which depends on its algorithm."""
     return f"validation_tuned_name_{registry_name}"
@@ -62,7 +74,8 @@ def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
     """Translate a study into the values of the Validation form's widgets.
 
     The tuned configuration (the pivot) is restored as a pasted one: the training run it came from
-    may be gone, and its configuration is all the study needs.
+    may be gone, and its configuration is all the study needs. An algorithm compared with an
+    adjusted configuration is chosen again by its name, and starts from that configuration.
 
     Args:
         study: The study.
@@ -77,7 +90,17 @@ def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
     algorithm = base_algorithm(pivot.algorithm) if pivot is not None else None
     if pivot is None or algorithm is None:
         raise ValueError("the study's pivot is not one of its contenders")
-    others = [c.name for c in study.contenders if c.name != study.pivot]
+    others = []
+    adjusted = {}
+    for contender in study.contenders:
+        if contender.name == study.pivot:
+            continue
+        name = contender.name.removesuffix(ADJUSTED_SUFFIX)
+        others.append(name)
+        # None leaves an algorithm adjusted in the form before at its default configuration.
+        adjusted[adjusted_key(study.encoding, name)] = (
+            parse_configuration(contender.configuration) if name != contender.name else None
+        )
     rows = [
         {
             "problem": problem.name,
@@ -100,6 +123,7 @@ def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
         RUNS_KEY: study.runs,
         SEED_KEY: study.seed,
         INDICATORS_KEY: list(study.indicators),
+        **adjusted,
     }
 
 

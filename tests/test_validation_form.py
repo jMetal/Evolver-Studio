@@ -15,6 +15,7 @@ from evolver_studio.validation_form import (
     PROBLEM_ROWS_KEY,
     TUNED_PASTED,
     TUNED_SOURCE_KEY,
+    adjusted_key,
     configuration_errors,
     defaults_key,
     form_state_from_study,
@@ -209,6 +210,26 @@ class TestFormStateFromStudy:
         assert state[PASTED_CONFIGURATION_KEY] == "--crossover blxAlpha"
         assert state[tuned_name_key("NSGA-II")] == "NSGA-II (tuned)"
         assert state[defaults_key("Double")] == ["NSGA-II", "MOEA/D"]
+        assert state[adjusted_key("Double", "MOEA/D")] is None
+
+    def test_should_restore_an_adjusted_algorithm_by_its_name_with_its_configuration(self):
+        # Arrange
+        study = ValidationStudy(
+            "Double",
+            self.STUDY.problems,
+            (
+                self.STUDY.contenders[0],
+                Contender("NSGA-II (adjusted)", "NSGA-II", "--crossover BLX_ALPHA"),
+            ),
+            pivot="NSGA-II (tuned)",
+        )
+
+        # Act
+        state = form_state_from_study(study)
+
+        # Assert
+        assert state[defaults_key("Double")] == ["NSGA-II"]
+        assert state[adjusted_key("Double", "NSGA-II")] == {"crossover": "BLX_ALPHA"}
 
     def test_should_not_restore_a_study_whose_pivot_is_missing(self):
         # Arrange

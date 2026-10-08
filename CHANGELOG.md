@@ -19,6 +19,12 @@ Works with Evolver 2.4.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
   S4 analysis, S5 validation.
 
+### Validation
+
+- The algorithms the tuned configuration is compared with start from their default configuration,
+  and each has an **Adjust the parameters** form, the one of *Run algorithm*: a changed algorithm
+  enters the study as "<name> (adjusted)", and *Open in Validation* brings it back adjusted.
+
 ### Analysis
 
 - *Training*'s best configurations, while it runs and once it has finished, have a **Validate this

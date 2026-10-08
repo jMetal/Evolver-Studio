@@ -113,6 +113,55 @@ class TestOpening:
         assert any("Choose at least one problem" in w.value for w in app.warning)
 
 
+class TestAdjustingAnAlgorithm:
+    @staticmethod
+    def _crossover_probability(app: AppTest):
+        return next(
+            widget
+            for widget in app.number_input
+            if widget.key.startswith("validation_adjusted_Double_NSGA-II_")
+            and widget.key.endswith("_crossoverProbability")
+        )
+
+    def test_should_start_from_the_default_configuration(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+
+        # Assert: the form is there, and nothing is marked as adjusted
+        assert self._crossover_probability(app).value is not None
+        assert not any("(adjusted)" in caption.value for caption in app.caption)
+
+    def test_should_compare_with_the_adjusted_configuration_under_its_own_name(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+
+        # Act
+        self._crossover_probability(app).set_value(0.5).run()
+
+        # Assert
+        assert not app.exception
+        assert any(
+            "NSGA-II (adjusted)" in caption.value and "crossoverProbability" in caption.value
+            for caption in app.caption
+        )
+
+    def test_should_go_back_to_the_default_configuration(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+        self._crossover_probability(app).set_value(0.5).run()
+
+        # Act
+        next(
+            b
+            for b in app.button
+            if b.label == "Reset to the default configuration"
+            and b.key.startswith("validation_adjusted_Double_NSGA-II")
+        ).click().run()
+
+        # Assert
+        assert not any("(adjusted)" in caption.value for caption in app.caption)
+
+
 class TestTunedConfiguration:
     def test_should_offer_a_configuration_a_training_run_found(
         self, app: AppTest, working_directory: Path

@@ -8,6 +8,7 @@ runs it, and its results are compared with medians, a Wilcoxon test and the A12 
 
 import datetime as dt
 import os
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,7 +23,16 @@ from evolver_studio.app_state import (
     warn_if_jar_older_than_catalogue,
 )
 from evolver_studio.catalogue import BASE_ALGORITHMS, QUALITY_INDICATORS
+from evolver_studio.configuration import (
+    complete_values,
+    configuration_string,
+    modified_values,
+    parse_configuration,
+    values_outside_the_space,
+)
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
+from evolver_studio.parameter_form import render_configuration_form
+from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
 from evolver_studio.problem_catalogue import Problem, problems_with_encoding
 from evolver_studio.progress import study_running_label
@@ -58,6 +68,8 @@ from evolver_studio.validation_form import (
     TUNED_FROM_TRAINING,
     TUNED_PASTED,
     TUNED_SOURCE_KEY,
+    adjusted_key,
+    adjusted_name,
     configuration_errors,
     defaults_key,
     parse_problem_table,
@@ -249,16 +261,65 @@ def _render_contenders(
         encoding, lambda file_name: default_configuration_text(jar, file_name)
     )
     chosen = st.multiselect(
-        "Algorithms to compare it with, with their default configuration",
+        "Algorithms to compare it with",
         [c.name for c in defaults],
         default=["NSGA-II"] if any(c.name == "NSGA-II" for c in defaults) else [],
         key=defaults_key(encoding),
-        help="Every algorithm of Evolver that has a default configuration for this encoding.",
+        help="Every algorithm of Evolver that has a default configuration for this encoding. "
+        "Each starts from it; adjust its parameters below if you want.",
     )
-    others = tuple(c for c in defaults if c.name in chosen)
+    others = tuple(_adjust(c, encoding, jar) for c in defaults if c.name in chosen)
     if tuned.contender is None:
         return others, None, tuned.errors
     return (tuned.contender, *others), tuned.contender.name, tuned.errors
+
+
+def _adjust(contender: Contender, encoding: str, jar: Path) -> Contender:
+    """Let the user adjust the default configuration of an algorithm compared with.
+
+    The form of Run algorithm, within the algorithm's parameter space; the marks show what
+    differs from the default configuration.
+
+    Args:
+        contender: The algorithm with its default configuration.
+        encoding: The encoding of the problems.
+        jar: Path to Evolver's jar, which holds the parameter space.
+
+    Returns:
+        The contender as it is, or with the configuration adjusted and its name marked so.
+    """
+    algorithm = base_algorithm(contender.algorithm)
+    if algorithm is None or encoding not in algorithm.encodings:
+        return contender
+    parameters = parse_parameter_space(parameter_space_text(jar, algorithm.encodings[encoding]))
+    reference = parse_configuration(contender.configuration)
+    start_key = adjusted_key(encoding, contender.name)
+    start = st.session_state.get(start_key) or reference
+    values = complete_values(parameters, start)
+    version_key = f"{start_key}_version"
+    version = st.session_state.setdefault(version_key, 0)
+    # A new start (a study chosen again) gives new widgets, which then show it.
+    fingerprint = zlib.crc32(repr(sorted(start.items())).encode())
+    key_prefix = f"{start_key}_{version}_{fingerprint:x}"
+    with st.expander(f"Adjust the parameters of {contender.name}"):
+        if st.button("Reset to the default configuration", key=f"{start_key}_reset"):
+            st.session_state.pop(start_key, None)
+            st.session_state[version_key] = version + 1
+            st.rerun()
+        edited = render_configuration_form(parameters, values, reference, key_prefix)
+        outside = values_outside_the_space(parameters, edited)
+        if outside:
+            st.warning("Outside the parameter space: " + ", ".join(f"`{name}`" for name in outside))
+    changed = modified_values(parameters, edited, reference)
+    if not changed:
+        return contender
+    st.caption(
+        f"**{adjusted_name(contender.name)}**: {len(changed)} parameter(s) changed from the "
+        f"default configuration ({', '.join(f'`{name}`' for name in changed)})."
+    )
+    return Contender(
+        adjusted_name(contender.name), contender.algorithm, configuration_string(parameters, edited)
+    )
 
 
 @dataclass(slots=True, frozen=True)
