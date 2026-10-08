@@ -76,7 +76,12 @@ The Training page provides:
   arguments (e.g. DTLZ2 with 2 objectives), and one of another encoding than the base algorithm's
   is reported before launching.
 - A choice of meta-optimizer, with its operator settings pre-filled from Evolver's example files.
-- A live plot of the indicator front as the run progresses.
+- A monitor for runs that last hours: progress, pace and time left (with a warning when a run
+  seems stuck), the front and, optionally, the meta-optimizer's whole **population** as it evolves
+  (a checkbox before launching), how each meta-objective converges, the configurations found so far
+  (downloadable, to validate one without waiting for the end) and the runner's log. It follows the
+  files Evolver appends to without reading them again at every refresh, and survives closing the
+  page: the run is picked up again when it is reopened.
 
 ## Supported algorithms
 

@@ -44,6 +44,25 @@ Works with Evolver 2.4.
   tuning; what the text says about the results is read from them, and one comparison that the test
   cannot settle is used as the example. "Open in Validation" fills Validation's form with the study.
   It needs Evolver 2.4 or later.
+- **Training monitor**, for runs that last hours: tabs with the progress, pace, time left and a
+  warning when the run seems stuck (*Overview*); the front; optionally the meta-optimizer's whole
+  population at a checkpoint, with the front over it and a control to browse the earlier ones
+  (*Population*, from a checkbox before launching, which makes Evolver write
+  `POPULATION_INDICATORS.csv`); how the best, the median and the worst of each meta-objective
+  improve, by evaluations or by computing time (*Convergence*); the configurations found so far,
+  one of them downloadable (*Best so far*); and the runner's log. The files are followed from where
+  the last refresh stopped, so a run of days does not slow the page down, and a finished run shows
+  the same views. Verified with real runs.
+- **Training**: the size of the meta-optimizer's population can be chosen (Random Search has none),
+  the update frequency must be a multiple of it (Evolver writes a checkpoint only then, and a
+  frequency that was not gave no checkpoints), SPEA2 and SMPSO say which operators they hardcode
+  and why they have no tree encoding instead of showing an empty box, and the preview of the
+  request says where the parameter space file will be instead of a placeholder.
+- **Fixes in Training**: the runner's output goes to `runner.log` (it was a pipe that nobody read,
+  which in a long run could block Evolver); a run that has not written its first status yet is
+  found, so the page no longer shows the launch form again right after *Launch*; and the
+  configurations a training found are those of its last checkpoint, no longer those of every
+  checkpoint (this affected the tuned configurations Validation offers).
 - **Training**: a selector chooses the meta-optimizer's encoding, flat or tree (the latter for the
   meta-optimizers that support it), right before the box with its operator flags, which start
   from the example file of the chosen encoding; and another chooses when the meta-optimizer stops,
