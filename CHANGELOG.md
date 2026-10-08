@@ -8,6 +8,15 @@ version works with.
 
 Works with Evolver 2.4.
 
+### Analysis
+
+- *Meta-optimization › Analysis* lists the finished trainings and, for the one chosen, shows how it
+  was run and what it took, how its meta-objectives converged, the front and (if it was written) the
+  population at each checkpoint, and the configurations of its final front. A configuration can be
+  downloaded, sent to *Validation* as the tuned configuration, or to *Run algorithm* on one of the
+  training's problems. A *Parameters* tab shows, per parameter, how much the front's configurations
+  agree and where they differ from the algorithm's default configuration.
+
 ### Moving to Evolver 2.4
 
 - **Base algorithms**: NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and SSMOEA can be launched from

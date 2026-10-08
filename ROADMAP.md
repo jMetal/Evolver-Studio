@@ -137,7 +137,7 @@ below; revisit and reorder as real usage surfaces new ones.
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
   `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
-  `pages/tutorials.py`). Analysis is a placeholder.
+  `pages/tutorials.py`).
 - **Home page**: the app opens on `pages/home.py`, which presents Evolver-Studio's two uses and
   shows a card for each page (its section, what it does, whether it is available or coming soon,
   and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
@@ -190,13 +190,13 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 
 ## Phase 3 — Analysis layer
 
-Landing page now exists (`pages/analysis.py`), currently a placeholder pointing back here.
+First version shipped (`pages/analysis.py`): the history of finished trainings, and for one of them
+its summary, convergence, front, population, final-front configurations (to download or send to
+Validation / Run algorithm) and a parameter analysis against the default configuration.
 
-- Structured parsing of `CONFIGURATIONS.csv`/`VAR_CONF.txt` (today only listed as files).
-- Run history: browsing past runs, not just the latest one (each run is currently ephemeral from the
-  UI's perspective once a new one starts).
-- Statistical comparison across runs/configurations (Wilcoxon, comparison tables — `CLAUDE.md`'s
-  original analysis-layer goal, not started yet).
+- Statistical comparison of several trainings (Wilcoxon, comparison tables — `CLAUDE.md`'s original
+  analysis-layer goal, not started yet).
+- Tutorial "Analyzing training results".
 
 ## Phase 4 — Validation runs
 

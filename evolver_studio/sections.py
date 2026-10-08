@@ -107,9 +107,10 @@ SECTIONS = (
                 "pages/analysis.py",
                 "Analysis",
                 "📊",
-                "Study a training run's results: the configurations found, how they converge, and "
-                "how to choose one.",
-                available=False,
+                "Study a finished training run: how it converged, how its population evolved, the "
+                "configurations of its final front and what they have in common, and take one to "
+                "Validation or to Run algorithm.",
+                available=True,
             ),
             Page(
                 "pages/validation.py",
