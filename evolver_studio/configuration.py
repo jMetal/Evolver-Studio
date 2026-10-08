@@ -112,7 +112,7 @@ def values_outside_the_space(
         The names of the active parameters whose value is not one of a categorical parameter's
         values, or is not a number inside a range parameter's bounds.
     """
-    by_name = _parameters_by_name(parameters)
+    by_name = parameters_by_name(parameters)
     return [
         name
         for name in active_parameter_names(parameters, dict(values))
@@ -143,7 +143,15 @@ def modified_values(
     ]
 
 
-def _parameters_by_name(parameters: list[ParameterSpec]) -> dict[str, ParameterSpec]:
+def parameters_by_name(parameters: list[ParameterSpec]) -> dict[str, ParameterSpec]:
+    """Index a parameter space by parameter name, sub-parameters at any depth included.
+
+    Args:
+        parameters: The top-level parameters of a parameter space.
+
+    Returns:
+        Every parameter of the space, by name.
+    """
     by_name: dict[str, ParameterSpec] = {}
     for parameter in parameters:
         by_name[parameter.name] = parameter
@@ -152,7 +160,7 @@ def _parameters_by_name(parameters: list[ParameterSpec]) -> dict[str, ParameterS
                 *parameter.global_sub_parameters,
                 *(p for choice in parameter.choices for p in choice.conditional_parameters),
             ]
-            by_name.update(_parameters_by_name(children))
+            by_name.update(parameters_by_name(children))
     return by_name
 
 
