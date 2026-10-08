@@ -32,7 +32,7 @@ talks to it through files rather than a server:
 ```text
 Evolver-Studio (Streamlit)
   └─> writes request.yaml (+ reusable baseLevel / metaSearch files)
-       └─> java -cp Evolver-2.3-jar-with-dependencies.jar
+       └─> java -cp Evolver-2.4-jar-with-dependencies.jar
                 org.uma.evolver.cli.training.TrainingRunnerMain request.yaml status.yaml
             ├─> status.yaml   polled for progress (RUNNING / FINISHED / FAILED)
             └─> METADATA.txt, INDICATORS.csv, CONFIGURATIONS.csv, VAR_CONF.txt
@@ -95,7 +95,7 @@ cannot be launched yet. MOPSO is browsable only, until Evolver's command-line ru
 - Python 3.11+ and [Conda](https://docs.conda.io/)
 - Java 21 or newer, on the `PATH`
 
-Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.3** (the
+Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.4** (the
 release the app is built against) from Maven Central. Other
 versions are not supported; the expected version is set by `EVOLVER_VERSION` in
 `evolver_studio/evolver_client.py`.
@@ -104,7 +104,7 @@ Evolver-Studio is versioned on its own, and works with one Evolver release at a 
 
 | Evolver-Studio | Evolver |
 |---|---|
-| 0.1.0 (in development) | 2.3 |
+| 0.1.0 (in development) | 2.4 |
 
 ## Installation
 
@@ -120,7 +120,7 @@ make env   # creates (or updates) the 'evolver-studio' environment from environm
 make run   # streamlit run app.py
 ```
 
-1. The first time, click **Download Evolver 2.3** in the sidebar. The jar (about 130 MB) is
+1. The first time, click **Download Evolver 2.4** in the sidebar. The jar (about 130 MB) is
    downloaded from Maven Central into `lib/` and its checksum is verified.
 2. The home page shows the parts of the app. Open **Base algorithms**, under Explore, to browse the algorithms and their parameter spaces.
 3. Open **Training**, keep the default settings (NSGA-II on ZDT4) or edit them, and click
@@ -143,7 +143,7 @@ To run the app against another Evolver build, such as one made from Evolver's `d
 while working on Evolver itself, point the `EVOLVER_JAR` environment variable at its jar:
 
 ```bash
-EVOLVER_JAR=/path/to/Evolver-2.3-SNAPSHOT-jar-with-dependencies.jar make run
+EVOLVER_JAR=/path/to/Evolver-2.5-SNAPSHOT-jar-with-dependencies.jar make run
 ```
 
 Tests that use Evolver's jar (downloaded, or set by `EVOLVER_JAR`) are skipped without it. Among

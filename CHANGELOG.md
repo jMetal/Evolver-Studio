@@ -6,9 +6,9 @@ version works with.
 
 ## 0.1.0 (unreleased)
 
-Works with Evolver 2.3.
+Works with Evolver 2.4.
 
-### Evolver 3.0 sync (in progress, on `experiment/evolver-3-sync`; needs a newer jar than 2.3)
+### Moving to Evolver 2.4 (on `experiment/evolver-3-sync`)
 
 - **Base algorithms**: NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and SSMOEA can be launched from
   Training and Run algorithm, and MOEA/D also with its Binary and Permutation encodings, as
@@ -42,7 +42,7 @@ Works with Evolver 2.3.
   size, what the same comparison says with 5 to 15 runs, and the problems seen and not seen in the
   tuning; what the text says about the results is read from them, and one comparison that the test
   cannot settle is used as the example. "Open in Validation" fills Validation's form with the study.
-  It needs an Evolver newer than 2.3.
+  It needs Evolver 2.4 or later.
 - **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
   consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
   configurable algorithm* S2), and the planned ones are listed without one. Each pairs with

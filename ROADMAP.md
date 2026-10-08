@@ -75,11 +75,11 @@ below; revisit and reorder as real usage surfaces new ones.
   mirrors (`CATALOGUE_EVOLVER_VERSION`), and Explore and Training warn when the jar in use (its
   `pom.properties` version) is older.
 
-- **Catalogue synced with Evolver `develop` (2.4-SNAPSHOT, work towards Evolver 3.0)**: every base
+- **Catalogue synced with Evolver 2.4**: every base
   algorithm `DescribeMain` registers is runnable (NSGA-III, SMS-EMOA, RDE-MOEA, AGE-MOEA, PAES and
   SSMOEA join NSGA-II, MOEA/D and RVEA, MOEA/D gaining its Binary and Permutation encodings), with
   the default configurations the jar ships; MOPSO stays browsable only. Done on
-  `experiment/evolver-3-sync`, to land with the release (`/bump-evolver 3.0`).
+  `experiment/evolver-3-sync` against the `develop` jar, and confirmed with the 2.4 release.
 
 - **Problem catalogue (same branch)**: `DescribeMain`'s `problemCatalogue`
   (`evolver_studio/problem_catalogue.py`) gives each problem's encoding, dimensions and constructor
@@ -94,6 +94,12 @@ below; revisit and reorder as real usage surfaces new ones.
   updated every 1000 evaluations, `pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
   `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
   `frontDelayMillis`, unused by the page.
+
+- **Moved to Evolver 2.4 (October 2026)**: the app downloads Evolver 2.4 and its resources come from
+  tag `v2.4` (unchanged since 2.3). Everything of the sync with `develop` above holds with the
+  release: the 18 registered base algorithms, the problem catalogue (Explore › Problems, Run
+  algorithm, Training, Validation) and the tutorial S3 need Evolver 2.4 or later, and the two
+  drift-detection tests against `DescribeMain` pass with the release jar.
 
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
   tag `v2.3` (the exact front of ZDT5). The catalogue gains NSGA-II for binary problems, with the
@@ -189,7 +195,7 @@ Landing page now exists (`pages/analysis.py`), currently a placeholder pointing 
 
 ## Phase 4 — Validation runs
 
-First version shipped (`pages/validation.py`, same branch as the Evolver 3.0 sync): a study compares a
+First version shipped (`pages/validation.py`, same branch as the Evolver 2.4 sync): a study compares a
 tuned configuration, the pivot (from a finished training run's `VAR_CONF.txt`, or pasted), with the
 default configurations of Evolver's algorithms for the encoding of the problems. It needs no change
 in Evolver: a study is a `cli.solving` request per algorithm and problem
@@ -208,7 +214,7 @@ Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
   `tests/test_explore_*.py`.)*
-- Track Evolver's releases: the app is built against Evolver 2.3 (`evolver_client.EVOLVER_VERSION`)
+- Track Evolver's releases: the app is built against Evolver 2.4 (`evolver_client.EVOLVER_VERSION`)
   and follows stable releases only; moving to a newer release is the `/bump-evolver` command
   (bumping that constant, `make sync-resources`, `/sync-catalogue` and the drift-detection tests).
   Work against a `develop` jar set by `EVOLVER_JAR` goes on an `experiment/*` branch. The rename
