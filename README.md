@@ -70,9 +70,11 @@ The Training page provides:
 - A parameter editor for the base-level algorithm, with a **guided** mode (forms, valid by
   construction) and an **expert** mode (raw YAML, validated on every change).
 - Training sets of one or more problems, each with its reference front and evaluation budget.
-  Problems can be any jMetal problem, given by class name, optionally with its constructor's
-  arguments (e.g. DTLZ2 with 2 objectives); a problem of another encoding than the base
-  algorithm's is reported before launching.
+  The problems are chosen from a list (those of the base algorithm's encoding), or from the same
+  listing as Explore › Problems, with each problem's dimensions, arguments and fronts in view; any
+  other jMetal problem can be added by class name. A problem can be given its constructor's
+  arguments (e.g. DTLZ2 with 2 objectives), and one of another encoding than the base algorithm's
+  is reported before launching.
 - A choice of meta-optimizer, with its operator settings pre-filled from Evolver's example files.
 - A live plot of the indicator front as the run progresses.
 

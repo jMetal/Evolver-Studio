@@ -43,6 +43,11 @@ Works with Evolver 2.4.
   tuning; what the text says about the results is read from them, and one comparison that the test
   cannot settle is used as the example. "Open in Validation" fills Validation's form with the study.
   It needs Evolver 2.4 or later.
+- **Training**: the problems of the training set are chosen from a list instead of typed (the
+  problems of the base algorithm's encoding, with the option to type any other jMetal class name),
+  and a *Browse the problems* switch shows the listing of Explore › Problems, with its filters, to
+  select several rows at once and add them to the set. Each chosen problem gets its reference
+  front when there is no doubt about which one (DTLZ2's three-objective front, for instance).
 - **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
   consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
   configurable algorithm* S2), and the planned ones are listed without one. Each pairs with
