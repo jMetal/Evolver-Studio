@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from evolver_studio.training_runs import list_finished_trainings
+from evolver_studio.training_runs import list_finished_trainings, read_outcome
 
 VAR_CONF = "# Evaluation: 100\nEP=1 NHV=2 | --crossover SBX\nEP=3 NHV=4 | --crossover PCX\n"
 
@@ -101,3 +101,129 @@ class TestSeveralCheckpoints:
             "--crossover PCX",
             "--crossover blxAlpha",
         ]
+
+
+METADATA = """=== Meta-Optimization Experiment ===
+
+--- Execution ---
+Wall-clock time: 1h 2m 3s (3723456 ms)
+Meta-evaluations performed: 2000
+"""
+
+
+class TestWhatATrainingRecords:
+    def _complete(self, working_directory: Path, population: bool = False) -> None:
+        run_dir = _training(working_directory, "20261007-120000")
+        base_level = yaml.safe_load((run_dir / "base_level.yaml").read_text())
+        base_level.update(
+            {
+                "populationSize": 100,
+                "trainingReferenceFrontFileNames": [
+                    "resources/referenceFronts/ZDT4.csv",
+                    "resources/referenceFronts/DTLZ2.2D.csv",
+                ],
+                "trainingEvaluations": [12000, 8000],
+                "indicatorNames": ["Epsilon", "NormalizedHypervolume"],
+                "extraConfig": {"weightVectorFilesDirectory": "resources/weightVectors"},
+                "yamlParameterSpaceFile": "/runs/base_parameter_space.yaml",
+            }
+        )
+        (run_dir / "base_level.yaml").write_text(yaml.safe_dump(base_level))
+        (run_dir / "meta_search.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "algorithm": "AGE-MOEA",
+                    "encoding": "tree",
+                    "metaMaxComputingTimeMinutes": 90.0,
+                    "metaPopulationSize": 80,
+                }
+            )
+        )
+        output = working_directory / "results" / "20261007-120000"
+        output.mkdir(parents=True, exist_ok=True)
+        (output / "METADATA.txt").write_text(METADATA)
+        if population:
+            (output / "POPULATION_INDICATORS.csv").write_text("Evaluation,SolutionId,EP\n")
+
+    def test_should_say_what_was_tuned_and_with_what_budget(self, tmp_path: Path):
+        # Arrange
+        self._complete(tmp_path)
+
+        # Act
+        (training,) = list_finished_trainings(tmp_path)
+
+        # Assert
+        assert training.population_size == 100
+        assert training.reference_fronts[1] == "resources/referenceFronts/DTLZ2.2D.csv"
+        assert training.evaluations == (12000, 8000)
+        assert training.indicators == ("Epsilon", "NormalizedHypervolume")
+        assert training.extra_config == {"weightVectorFilesDirectory": "resources/weightVectors"}
+        assert training.problem_specs[1] == {"class": "DTLZ2", "args": [12, 2]}
+        assert training.parameter_space_file == Path("/runs/base_parameter_space.yaml")
+
+    def test_should_say_how_the_meta_optimizer_searched(self, tmp_path: Path):
+        # Arrange
+        self._complete(tmp_path)
+
+        # Act
+        (training,) = list_finished_trainings(tmp_path)
+
+        # Assert
+        assert (training.meta_algorithm, training.meta_encoding) == ("AGE-MOEA", "tree")
+        assert training.meta_population_size == 80
+        assert training.meta_limit == "90 min"
+
+    def test_should_say_the_limit_in_evaluations_otherwise(self, tmp_path: Path):
+        # Arrange
+        self._complete(tmp_path)
+        run_dir = tmp_path / "cli-runner-runs" / "20261007-120000"
+        (run_dir / "meta_search.yaml").write_text("algorithm: NSGA-II\nmetaMaxEvaluations: 2000\n")
+
+        # Act
+        (training,) = list_finished_trainings(tmp_path)
+
+        # Assert
+        assert training.meta_limit == "2,000 evaluations"
+        assert training.meta_population_size is None
+
+    def test_should_read_how_long_it_took_and_whether_it_wrote_its_population(self, tmp_path: Path):
+        # Arrange
+        self._complete(tmp_path, population=True)
+
+        # Act
+        (training,) = list_finished_trainings(tmp_path)
+
+        # Assert
+        assert training.outcome is not None
+        assert training.outcome.wall_clock_seconds == 3723
+        assert training.outcome.meta_evaluations == 2000
+        assert training.has_population
+
+    def test_should_still_list_a_training_whose_extra_files_are_missing(self, tmp_path: Path):
+        # Arrange: only what the earlier versions of the app kept
+        _training(tmp_path, "20261007-120000")
+
+        # Act
+        (training,) = list_finished_trainings(tmp_path)
+
+        # Assert
+        assert training.meta_algorithm is None and training.outcome is None
+        assert not training.has_population and training.reference_fronts == ()
+
+
+class TestReadOutcome:
+    def test_should_read_it_from_metadata(self, tmp_path: Path):
+        # Arrange
+        (tmp_path / "METADATA.txt").write_text(METADATA)
+
+        # Act / Assert
+        outcome = read_outcome(tmp_path / "METADATA.txt")
+        assert outcome is not None and outcome.wall_clock_seconds == 3723
+
+    def test_should_know_nothing_without_the_file_or_the_execution_section(self, tmp_path: Path):
+        # Arrange
+        (tmp_path / "METADATA.txt").write_text("=== Meta-Optimization Experiment ===\n")
+
+        # Act / Assert
+        assert read_outcome(tmp_path / "METADATA.txt") is None
+        assert read_outcome(tmp_path / "missing.txt") is None
