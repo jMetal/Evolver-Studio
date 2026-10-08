@@ -32,7 +32,8 @@ Works with Evolver 2.4.
   be cancelled); an algorithm that reads weight vectors is left out of the problems that have no
   file for the population size. The results show the median of each indicator per problem, a
   Wilcoxon rank-sum test and the A12 effect size of each algorithm against the tuned one, boxplots
-  per problem and every run, with CSV downloads. Studies are kept under `validation-runs/` and can
+  per problem and every run, with CSV downloads. The problems are chosen from a list or from the
+  listing of Explore › Problems, as in Training. Studies are kept under `validation-runs/` and can
   be reopened. Needs scipy.
 - **Tutorial S3, *Validating a configuration*** (pairs with E8): it runs a small validation study
   in the background and reads it step by step. The pivot is the NSGA-II that Evolver's tutorial E8
