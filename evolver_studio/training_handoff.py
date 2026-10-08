@@ -13,9 +13,6 @@ import pandas as pd
 from evolver_studio.catalogue import QUALITY_INDICATORS
 from evolver_studio.problem_catalogue import (
     Problem,
-    arguments_text,
-    problem_spec_arguments,
-    problem_spec_name,
 )
 from evolver_studio.solve_form import form_state_from_request
 from evolver_studio.training_results import TrainedConfiguration
@@ -43,20 +40,17 @@ DEFAULT_POPULATION_SIZE = 100
 def validation_form_state(
     training: FinishedTraining,
     configuration: TrainedConfiguration,
-    catalogue: Mapping[str, Problem] | None,
 ) -> dict[str, object] | None:
     """The values of the Validation form for validating a configuration of a training.
 
-    The tuned configuration is the one given; the problems are those the training used (the ones
-    Evolver describes, with their arguments and reference fronts), to which the user adds the ones
-    it never saw; the algorithm to compare it with is the base algorithm's own default
-    configuration, when it has a single one; and the population size and the indicators are the
-    training's.
+    The tuned configuration is the one given; the algorithm to compare it with is the base
+    algorithm's own default configuration, when it has a single one; and the population size and
+    the indicators are the training's. The problems are left empty: the user chooses them (those
+    of the training, or any others).
 
     Args:
         training: The training.
         configuration: One of its configurations.
-        catalogue: The problem catalogue, or None when the jar has none.
 
     Returns:
         The session state to set, widget keys to values; None when the base algorithm is not one
@@ -79,10 +73,8 @@ def validation_form_state(
     known = {indicator.registry_name for indicator in QUALITY_INDICATORS}
     if training.indicators and set(training.indicators) <= known:
         state[INDICATORS_KEY] = list(training.indicators)
-    rows = _problem_rows(training, catalogue)
-    if rows:
-        state[problems_key(training.encoding)] = [row["problem"] for row in rows]
-        state[PROBLEM_ROWS_KEY] = pd.DataFrame(rows, columns=list(PROBLEM_COLUMNS))
+    state[problems_key(training.encoding)] = []
+    state[PROBLEM_ROWS_KEY] = pd.DataFrame(columns=list(PROBLEM_COLUMNS))
     return state
 
 
@@ -128,27 +120,6 @@ def solve_form_state(
     return form_state_from_request(
         request, [algorithm], problem_names, configuration_version, catalogue
     )
-
-
-def _problem_rows(
-    training: FinishedTraining, catalogue: Mapping[str, Problem] | None
-) -> list[dict[str, object]]:
-    if catalogue is None:
-        return []
-    rows = []
-    for index, spec in enumerate(training.problem_specs):
-        name = problem_spec_name(spec)
-        problem = catalogue.get(name) if name else None
-        if problem is None or problem.encoding != training.encoding:
-            continue
-        rows.append(
-            {
-                "problem": name,
-                "arguments": arguments_text(problem_spec_arguments(spec)),
-                "reference_front": _at(training.reference_fronts, index, ""),
-            }
-        )
-    return rows
 
 
 def _at(values: tuple, index: int, default):

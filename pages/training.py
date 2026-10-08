@@ -357,11 +357,7 @@ def _validator(run_dir: Path) -> Callable[[TrainedConfiguration], None]:
 
     def validate(configuration: TrainedConfiguration) -> None:
         training = read_training(run_dir, WORKING_DIRECTORY, finished_only=False)
-        state = (
-            validation_form_state(training, configuration, registered_problems(str(jar)))
-            if training is not None
-            else None
-        )
+        state = validation_form_state(training, configuration) if training is not None else None
         if state is None:
             st.warning("Validation does not offer this algorithm.")
             return

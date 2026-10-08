@@ -117,9 +117,9 @@ def render_configurations(training: FinishedTraining, jar: Path, hand_off: bool 
         "Validate it",
         key=f"analysis_validate_{training.run_id}",
         help="Opens Validation with it as the tuned configuration, to compare with the default "
-        "of the same algorithm on the problems of this training (add some it never saw).",
+        "of the same algorithm, on the problems you choose there.",
     ):
-        state = validation_form_state(training, chosen, registered_problems(str(jar)))
+        state = validation_form_state(training, chosen)
         if state is None:
             st.warning("Validation does not offer this algorithm.")
         else:

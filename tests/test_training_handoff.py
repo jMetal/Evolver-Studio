@@ -73,7 +73,7 @@ def _training(**changes) -> FinishedTraining:
 class TestValidationFormState:
     def test_should_put_the_configuration_in_as_the_tuned_one(self):
         # Act
-        state = validation_form_state(_training(), CONFIGURATION, CATALOGUE)
+        state = validation_form_state(_training(), CONFIGURATION)
 
         # Assert
         assert state is not None
@@ -85,55 +85,30 @@ class TestValidationFormState:
 
     def test_should_compare_it_with_the_default_of_the_same_algorithm(self):
         # Act
-        state = validation_form_state(_training(), CONFIGURATION, CATALOGUE)
+        state = validation_form_state(_training(), CONFIGURATION)
 
         # Assert
         assert state is not None and state[defaults_key("Double")] == ["NSGA-II"]
 
     def test_should_not_choose_among_the_variants_of_an_algorithm_with_several_defaults(self):
         # Act: RVEA has three default configurations
-        state = validation_form_state(_training(algorithm="RVEA"), CONFIGURATION, CATALOGUE)
+        state = validation_form_state(_training(algorithm="RVEA"), CONFIGURATION)
 
         # Assert
         assert state is not None and defaults_key("Double") not in state
 
-    def test_should_validate_on_the_problems_of_the_training_with_their_arguments_and_fronts(self):
+    def test_should_leave_the_problems_for_the_user_to_choose(self):
         # Act
-        state = validation_form_state(_training(), CONFIGURATION, CATALOGUE)
+        state = validation_form_state(_training(), CONFIGURATION)
 
         # Assert
         assert state is not None
-        assert state[problems_key("Double")] == ["ZDT4", "DTLZ2"]
-        rows = state[PROBLEM_ROWS_KEY]
-        assert list(rows["arguments"]) == ["", "12, 2"]
-        assert rows["reference_front"].iloc[1] == "resources/referenceFronts/DTLZ2.2D.csv"
-
-    def test_should_leave_out_the_problems_the_catalogue_does_not_describe_or_of_another_encoding(
-        self,
-    ):
-        # Arrange: a class name, and a binary problem
-        training = _training(
-            problems=("org.example.Mine", "ZDT5", "ZDT4"),
-            problem_specs=("org.example.Mine", "ZDT5", "ZDT4"),
-            reference_fronts=("a.csv", "b.csv", "resources/referenceFronts/ZDT4.csv"),
-        )
-
-        # Act
-        state = validation_form_state(training, CONFIGURATION, CATALOGUE)
-
-        # Assert
-        assert state is not None and state[problems_key("Double")] == ["ZDT4"]
-
-    def test_should_not_choose_problems_when_the_jar_has_no_catalogue(self):
-        # Act
-        state = validation_form_state(_training(), CONFIGURATION, None)
-
-        # Assert
-        assert state is not None and problems_key("Double") not in state
+        assert state[problems_key("Double")] == []
+        assert state[PROBLEM_ROWS_KEY].empty
 
     def test_should_take_the_population_and_the_indicators_of_the_training(self):
         # Act
-        state = validation_form_state(_training(population_size=150), CONFIGURATION, CATALOGUE)
+        state = validation_form_state(_training(population_size=150), CONFIGURATION)
 
         # Assert
         assert state is not None
@@ -142,7 +117,7 @@ class TestValidationFormState:
 
     def test_should_not_fill_what_it_does_not_know(self):
         # Act
-        state = validation_form_state(_training(algorithm="Nope"), CONFIGURATION, CATALOGUE)
+        state = validation_form_state(_training(algorithm="Nope"), CONFIGURATION)
 
         # Assert
         assert state is None
