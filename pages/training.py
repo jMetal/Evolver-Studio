@@ -11,6 +11,7 @@ without it, a Cancel click couldn't be processed until the loop returned.
 
 import datetime as dt
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -70,7 +71,10 @@ from evolver_studio.results import (
     read_results_pointer,
 )
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
+from evolver_studio.training_handoff import validation_form_state
 from evolver_studio.training_monitor import tail_text
+from evolver_studio.training_results import TrainedConfiguration
+from evolver_studio.training_runs import read_training
 from evolver_studio.training_set import (
     TRAINING_SET_COLUMNS,
     TrainingSet,
@@ -348,6 +352,25 @@ def _render_output_directory(output_directory: Path, metadata_file: Path) -> Non
         st.text(read_metadata(metadata_file))
 
 
+def _validator(run_dir: Path) -> Callable[[TrainedConfiguration], None]:
+    """What to do when a configuration of a run is to be validated: open Validation with it."""
+
+    def validate(configuration: TrainedConfiguration) -> None:
+        training = read_training(run_dir, WORKING_DIRECTORY, finished_only=False)
+        state = (
+            validation_form_state(training, configuration, registered_problems(str(jar)))
+            if training is not None
+            else None
+        )
+        if state is None:
+            st.warning("Validation does not offer this algorithm.")
+            return
+        st.session_state.update(state)
+        st.switch_page("pages/validation.py")
+
+    return validate
+
+
 def _render_last_finished_run_if_any() -> None:
     """Show the most recently completed run's results, if one is pending display."""
     pending = st.session_state.get("last_finished_run")
@@ -382,7 +405,7 @@ def _render_last_finished_run_if_any() -> None:
         with next(tabs):
             render_population(state, f"{key}_population")
     with next(tabs):
-        render_best_configurations(state, f"{key}_best")
+        render_best_configurations(state, f"{key}_best", _validator(run_dir))
     with next(tabs):
         _render_output_directory(pointer.output_directory, pointer.metadata_file)
         render_log(state)
@@ -745,7 +768,7 @@ def _render_active_run(active_run: ActiveRun) -> None:
         with next(names):
             render_convergence(monitor, f"{key}_convergence")
         with next(names):
-            render_best_configurations(monitor, f"{key}_best")
+            render_best_configurations(monitor, f"{key}_best", _validator(active_run.run_dir))
         with next(names):
             render_log(monitor)
         if status is not None and status.state != RunState.RUNNING:

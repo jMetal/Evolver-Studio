@@ -106,17 +106,34 @@ def list_finished_trainings(working_directory: Path) -> list[FinishedTraining]:
         return []
     trainings = []
     for run_dir in sorted(runs_directory.iterdir(), reverse=True):
-        training = _read_training(run_dir, working_directory)
+        training = read_training(run_dir, working_directory)
         if training is not None:
             trainings.append(training)
     return trainings
 
 
-def _read_training(run_dir: Path, working_directory: Path) -> FinishedTraining | None:
+def read_training(
+    run_dir: Path, working_directory: Path, finished_only: bool = True
+) -> FinishedTraining | None:
+    """Read one training run.
+
+    Args:
+        run_dir: The run's directory under cli-runner-runs/.
+        working_directory: The JVM's working directory.
+        finished_only: Whether to leave out a run that has not finished. A run still going has
+            the configurations of its latest checkpoint, so its configurations can be taken to
+            Validation without waiting for it to end.
+
+    Returns:
+        The run; None when it was cancelled or failed, is not finished and `finished_only`, or its
+        files are missing or unreadable or hold no configuration.
+    """
     if (run_dir / CANCELLED_MARKER_NAME).exists():
         return None
     status = read_status(run_dir / "status.yaml")
-    if status is None or status.state != RunState.FINISHED:
+    if finished_only and (status is None or status.state != RunState.FINISHED):
+        return None
+    if status is not None and status.state == RunState.FAILED:
         return None
     try:
         request = yaml.safe_load((run_dir / "request.yaml").read_text())

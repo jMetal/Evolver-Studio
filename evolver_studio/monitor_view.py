@@ -6,6 +6,7 @@ it stopped reading, so that a run of hours does not slow the page down.
 
 import time
 from collections import deque
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from evolver_studio.training_monitor import (
     summarize_run,
     tail_text,
 )
+from evolver_studio.training_results import TrainedConfiguration
 
 SAMPLES_KEPT = 60
 LOG_LINES = 40
@@ -298,12 +300,16 @@ def render_convergence(state: MonitorState, key: str) -> None:
     st.plotly_chart(figure, width="stretch", key=f"{key}_chart")
 
 
-def render_best_configurations(state: MonitorState, key: str) -> None:
+def render_best_configurations(
+    state: MonitorState, key: str, on_validate: Callable[[TrainedConfiguration], None] | None = None
+) -> None:
     """List the configurations of the latest front, and let one be copied or downloaded.
 
     Args:
         state: The monitor's state.
         key: Prefixes the widgets' keys.
+        on_validate: Called with the chosen configuration when the viewer asks to validate it;
+            without it there is no such button.
     """
     latest = state.var_conf.latest
     if latest is None or not latest.configurations:
@@ -326,13 +332,22 @@ def render_best_configurations(state: MonitorState, key: str) -> None:
     )
     chosen = latest.configurations[index].configuration
     st.code(chosen, language=None, wrap_lines=True)
-    st.download_button(
+    columns = st.columns(2)
+    columns[0].download_button(
         "Download this configuration (.txt)",
         chosen + "\n",
         file_name=f"configuration_{index + 1}.txt",
         key=f"{key}_download",
         help="The format a solve request and Validation take: --parameter value pairs.",
     )
+    if on_validate is not None and columns[1].button(
+        "Validate this configuration",
+        key=f"{key}_validate",
+        help="Opens Validation with it as the tuned configuration, ready to compare with the "
+        "default configurations of other algorithms. (You can also copy it from the box above "
+        "and paste it there.)",
+    ):
+        on_validate(latest.configurations[index])
 
 
 def render_log(state: MonitorState) -> None:

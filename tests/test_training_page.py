@@ -418,7 +418,14 @@ class TestResultsOfAFinishedRun:
         if population:
             (output / "POPULATION_INDICATORS.csv").write_text(POPULATION)
         (run_dir / "runner.log").write_text("INFO: done\n")
+        (run_dir / "request.yaml").write_text(f"outputDirectory: {output}\n")
+        (run_dir / "base_level.yaml").write_text(
+            "algorithmName: NSGA-II\nencoding: Double\ntrainingProblemNames: [ZDT4]\n"
+        )
         self.state = (RunStatus(RunState.FINISHED, 1000, 1000, "x"), run_dir)
+        (run_dir / "status.yaml").write_text(
+            "status: FINISHED\nevaluationsDone: 1000\nmaxEvaluations: 1000\nupdatedAt: x\n"
+        )
 
     def test_should_show_the_convergence_and_the_final_configurations(
         self, app: AppTest, tmp_path: Path
@@ -440,6 +447,22 @@ class TestResultsOfAFinishedRun:
         ]
         assert any("--crossover PCX" in code.value for code in app.code)
         assert not any("--crossover SBX" in code.value for code in app.code)
+
+    def test_should_offer_to_validate_the_configuration_chosen(self, app: AppTest, tmp_path: Path):
+        # Arrange
+        self._finished(tmp_path, population=False)
+        app.session_state["last_finished_run"] = self.state
+        app.run()
+        button = next(b for b in app.button if b.label == "Validate this configuration")
+
+        # Act: the page switch itself is not available outside the app
+        button.click()
+        app.run()
+
+        # Assert: Validation's form is ready with the configuration chosen as the tuned one (the
+        # exception is the missing navigation of a lone page)
+        assert "Could not find page" in app.exception[0].message
+        assert any("--crossover" in str(v) for v in app.session_state.filtered_state.values())
 
     def test_should_add_the_population_when_the_run_wrote_it(self, app: AppTest, tmp_path: Path):
         # Arrange
