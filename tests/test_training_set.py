@@ -10,7 +10,6 @@ from evolver_studio.training_set import (
     DEFAULT_EVALUATIONS,
     TRAINING_SET_COLUMNS,
     TrainingSet,
-    add_problems,
     parse_training_set,
     training_problem_specs,
     training_set_table,
@@ -258,17 +257,3 @@ class TestTrainingSetTable:
         # Assert
         assert table.empty
         assert list(table.columns) == list(TRAINING_SET_COLUMNS)
-
-
-class TestAddProblems:
-    def test_should_add_the_new_ones_after_the_chosen(self):
-        # Act / Assert
-        assert add_problems(["ZDT4"], ["DTLZ2", "WFG1"]) == ["ZDT4", "DTLZ2", "WFG1"]
-
-    def test_should_leave_out_the_ones_already_chosen(self):
-        # Act / Assert
-        assert add_problems(["ZDT4", "DTLZ2"], ["DTLZ2", "WFG1", "WFG1"]) == [
-            "ZDT4",
-            "DTLZ2",
-            "WFG1",
-        ]

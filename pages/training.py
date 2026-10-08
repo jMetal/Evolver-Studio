@@ -38,8 +38,8 @@ from evolver_studio.evolver_client import (
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
-from evolver_studio.problem_browser import render_filters, render_table
-from evolver_studio.problem_catalogue import Problem, problems_with_encoding
+from evolver_studio.problem_browser import render_problem_adder
+from evolver_studio.problem_catalogue import problems_with_encoding
 from evolver_studio.request import (
     FLAT_META_SEARCH_SCALAR_KEYS,
     BaseLevelConfig,
@@ -63,7 +63,6 @@ from evolver_studio.slider_state import next_slider_value
 from evolver_studio.training_set import (
     TRAINING_SET_COLUMNS,
     TrainingSet,
-    add_problems,
     parse_training_set,
     training_problem_specs,
     training_set_table,
@@ -506,50 +505,6 @@ DEFAULT_TRAINING_PROBLEMS = {"Double": ["ZDT4"]}
 TRAINING_SET_ROWS_KEY = "training_set_rows"
 
 
-def _add_chosen_problems(key: str, added: list[str], browser_key: str) -> None:
-    """Add problems to the chosen ones, and clear the listing's selection.
-
-    A button's callback, which may set the selector's value. The listing's rows are unselected by
-    giving the table a new key: a selection cannot be cleared otherwise.
-    """
-    st.session_state[key] = add_problems(st.session_state.get(key) or [], added)
-    st.session_state[browser_key] = st.session_state.get(browser_key, 0) + 1
-
-
-def _render_problem_browser(
-    catalogue: dict[str, Problem], encoding: str, problems_key: str
-) -> None:
-    """Offer the listing of Explore › Problems, to add problems with their details in view.
-
-    Args:
-        catalogue: The problem catalogue.
-        encoding: The base algorithm's encoding: only its problems are listed.
-        problems_key: The key of the selector the chosen problems are added to.
-    """
-    if not st.toggle(
-        "Browse the problems",
-        key=f"train_browse_{encoding}",
-        help="The same listing as Explore › Problems, with each problem's objectives, variables, "
-        "arguments and reference fronts: select rows and add them to the training set.",
-    ):
-        return
-    shown = render_filters(catalogue, f"train_browser_{encoding}", fixed_encoding=encoding)
-    resets_key = f"train_browser_resets_{encoding}"
-    selected = render_table(
-        shown,
-        len(catalogue),
-        f"train_browser_table_{encoding}_{st.session_state.get(resets_key, 0)}",
-        selectable=True,
-    )
-    st.button(
-        f"Add the {len(selected)} selected" if selected else "Add the selected problems",
-        disabled=not selected,
-        on_click=_add_chosen_problems,
-        args=(problems_key, selected, resets_key),
-        key=f"train_browser_add_{encoding}",
-    )
-
-
 def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
     """Let the user choose the training problems, and edit what each one needs.
 
@@ -591,7 +546,7 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
         "reflection.",
     )
     if catalogue is not None:
-        _render_problem_browser(catalogue, encoding, problems_key)
+        render_problem_adder(catalogue, encoding, problems_key, "train")
     if not names:
         return pd.DataFrame(columns=list(TRAINING_SET_COLUMNS))
     st.caption(

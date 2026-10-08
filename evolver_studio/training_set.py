@@ -74,19 +74,6 @@ def training_set_table(
     return pd.DataFrame(rows, columns=list(TRAINING_SET_COLUMNS))
 
 
-def add_problems(current: list[str], added: list[str]) -> list[str]:
-    """Add problems to the chosen ones, keeping their order and leaving out the repeated.
-
-    Args:
-        current: The problems already chosen.
-        added: The problems to add.
-
-    Returns:
-        The chosen problems followed by the new ones.
-    """
-    return list(dict.fromkeys([*current, *added]))
-
-
 @dataclass(slots=True, frozen=True)
 class TrainingSet:
     """A validated training set, ready to become BaseLevelConfig's parallel lists.

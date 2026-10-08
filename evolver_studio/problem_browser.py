@@ -105,3 +105,64 @@ def render_table(shown: list[Problem], total: int, key: str, selectable: bool = 
         frame, hide_index=True, on_select="rerun", selection_mode="multi-row", key=key
     )
     return [shown[index].name for index in event.selection.rows]
+
+
+def add_problems(current: list[str], added: list[str]) -> list[str]:
+    """Add problems to the chosen ones, keeping their order and leaving out the repeated.
+
+    Args:
+        current: The problems already chosen.
+        added: The problems to add.
+
+    Returns:
+        The chosen problems followed by the new ones.
+    """
+    return list(dict.fromkeys([*current, *added]))
+
+
+def _add_chosen_problems(selector_key: str, added: list[str], resets_key: str) -> None:
+    """Add problems to the chosen ones, and clear the listing's selection.
+
+    A button's callback, which may set the selector's value. The listing's rows are unselected by
+    giving the table a new key: a selection cannot be cleared otherwise.
+    """
+    st.session_state[selector_key] = add_problems(st.session_state.get(selector_key) or [], added)
+    st.session_state[resets_key] = st.session_state.get(resets_key, 0) + 1
+
+
+def render_problem_adder(
+    catalogue: Mapping[str, Problem], encoding: str, selector_key: str, key_prefix: str
+) -> None:
+    """Offer the listing, to add problems to a selector with their details in view.
+
+    A switch shows the listing of Explore › Problems for an encoding; selecting rows and pressing
+    the button adds them to the selector that holds the chosen problems.
+
+    Args:
+        catalogue: The problem catalogue.
+        encoding: The encoding whose problems are listed.
+        selector_key: The widget key of the selector the problems are added to.
+        key_prefix: Prefixes the widgets' keys, so that pages do not share them.
+    """
+    if not st.toggle(
+        "Browse the problems",
+        key=f"{key_prefix}_browse_{encoding}",
+        help="The same listing as Explore › Problems, with each problem's objectives, variables, "
+        "arguments and reference fronts: select rows and add them.",
+    ):
+        return
+    shown = render_filters(catalogue, f"{key_prefix}_browser_{encoding}", fixed_encoding=encoding)
+    resets_key = f"{key_prefix}_browser_resets_{encoding}"
+    selected = render_table(
+        shown,
+        len(catalogue),
+        f"{key_prefix}_browser_table_{encoding}_{st.session_state.get(resets_key, 0)}",
+        selectable=True,
+    )
+    st.button(
+        f"Add the {len(selected)} selected" if selected else "Add the selected problems",
+        disabled=not selected,
+        on_click=_add_chosen_problems,
+        args=(selector_key, selected, resets_key),
+        key=f"{key_prefix}_browser_add_{encoding}",
+    )
