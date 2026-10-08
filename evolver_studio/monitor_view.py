@@ -13,8 +13,16 @@ import pandas as pd
 import streamlit as st
 
 from evolver_studio.evolver_client import RunStatus
+from evolver_studio.live_front import build_front_figure
 from evolver_studio.progress import training_progress
+from evolver_studio.results import (
+    deduplicate_consecutive_checkpoints,
+    last_n_checkpoints,
+    load_indicators,
+)
+from evolver_studio.slider_state import next_slider_value
 from evolver_studio.training_monitor import (
+    KEPT_RECENT_CHECKPOINTS,
     CheckpointReader,
     VarConfFollower,
     build_convergence_figure,
@@ -39,6 +47,8 @@ class MonitorState:
             write its population.
         var_conf: The follower of VAR_CONF.txt.
         log_file: The runner's log.
+        kept_checkpoints: How many of the latest checkpoints are kept whole to browse; a finished
+            run can keep all of them.
         samples: What the polls saw each time the evaluations changed: the monotonic time and
             the evaluations done.
     """
@@ -50,10 +60,13 @@ class MonitorState:
         population_csv: Path | None,
         var_conf_file: Path,
         log_file: Path,
+        kept_checkpoints: int = KEPT_RECENT_CHECKPOINTS,
     ) -> None:
         self.started_at = started_at
-        self.front = CheckpointReader(indicators_csv)
-        self.population = CheckpointReader(population_csv) if population_csv else None
+        self.front = CheckpointReader(indicators_csv, kept_checkpoints)
+        self.population = (
+            CheckpointReader(population_csv, kept_checkpoints) if population_csv else None
+        )
         self.var_conf = VarConfFollower(var_conf_file)
         self.log_file = log_file
         self.samples: deque[tuple[float, int]] = deque(maxlen=SAMPLES_KEPT)
@@ -69,6 +82,63 @@ class MonitorState:
         """Remember the evaluations a poll saw, when they are not the ones of the last one."""
         if not self.samples or self.samples[-1][1] != status.evaluations_done:
             self.samples.append((time.monotonic(), status.evaluations_done))
+
+
+def sync_last_n_slider_value(slider_key: str, available: int) -> None:
+    """Pre-seed the "last N" slider's session-state value before it's created.
+
+    Called with no `value=` kwarg on the slider itself, since Streamlit
+    re-applies `value=` whenever `max_value` changes (not only on first
+    creation), which would silently override a value the user had chosen.
+
+    Args:
+        slider_key: The slider's widget key.
+        available: The current number of distinct checkpoints to show by
+            default, before the user narrows it.
+    """
+    tracked_key = f"{slider_key}_auto_tracked_available"
+    next_value, next_tracked = next_slider_value(
+        st.session_state.get(slider_key), st.session_state.get(tracked_key), available
+    )
+    st.session_state[slider_key] = next_value
+    st.session_state[tracked_key] = next_tracked
+
+
+def render_front_with_slider(history: pd.DataFrame, slider_key: str, chart_key: str) -> None:
+    """Draw the front evolution, letting the viewer narrow it to the last N checkpoints.
+
+    Early checkpoints often have much larger indicator values than later,
+    converged ones, which can swamp the late-stage detail in a combined plot.
+
+    Args:
+        history: Deduplicated checkpoint history to show.
+        slider_key: Stable widget key so the chosen N persists across reruns.
+        chart_key: Stable widget key for the chart itself.
+    """
+    available = history["Evaluation"].nunique()
+    if available <= 1:
+        # st.slider rejects min_value == max_value; nothing to narrow down yet anyway.
+        st.plotly_chart(build_front_figure(history), width="stretch", key=chart_key)
+        return
+    sync_last_n_slider_value(slider_key, available)
+    n = st.slider("Show last N fronts", min_value=1, max_value=available, key=slider_key)
+    figure = build_front_figure(last_n_checkpoints(history, n))
+    st.plotly_chart(figure, width="stretch", key=chart_key)
+
+
+def render_indicator_front(indicators_csv: Path, run_id: str) -> None:
+    """Plot the indicator front's evolution across all checkpoints written.
+
+    Args:
+        indicators_csv: Path to the completed run's INDICATORS.csv.
+        run_id: The run's identifier, to key the "last N" slider.
+    """
+    history = load_indicators(indicators_csv)
+    if history.empty:
+        st.info("No indicator data was written.")
+        return
+    deduplicated = deduplicate_consecutive_checkpoints(history)
+    render_front_with_slider(deduplicated, f"final_last_n_slider_{run_id}", "final_indicator_front")
 
 
 def run_started_at(run_id: str) -> datetime | None:

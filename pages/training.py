@@ -35,11 +35,13 @@ from evolver_studio.evolver_client import (
     start_training,
     write_pid_file,
 )
-from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
+from evolver_studio.live_front import LiveFrontRenderer
 from evolver_studio.monitor_view import (
     MonitorState,
     render_best_configurations,
     render_convergence,
+    render_front_with_slider,
+    render_indicator_front,
     render_log,
     render_overview,
     render_population,
@@ -63,15 +65,11 @@ from evolver_studio.request import (
 )
 from evolver_studio.resource_files import meta_optimizer_configuration_text, parameter_space_text
 from evolver_studio.results import (
-    deduplicate_consecutive_checkpoints,
-    last_n_checkpoints,
     list_output_dir,
-    load_indicators,
     read_metadata,
     read_results_pointer,
 )
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
-from evolver_studio.slider_state import next_slider_value
 from evolver_studio.training_monitor import tail_text
 from evolver_studio.training_set import (
     TRAINING_SET_COLUMNS,
@@ -309,48 +307,6 @@ def _live_state(
     return st.session_state[key]
 
 
-def _sync_last_n_slider_value(slider_key: str, available: int) -> None:
-    """Pre-seed the "last N" slider's session-state value before it's created.
-
-    Called with no `value=` kwarg on the slider itself, since Streamlit
-    re-applies `value=` whenever `max_value` changes (not only on first
-    creation), which would silently override a value the user had chosen.
-
-    Args:
-        slider_key: The slider's widget key.
-        available: The current number of distinct checkpoints to show by
-            default, before the user narrows it.
-    """
-    tracked_key = f"{slider_key}_auto_tracked_available"
-    next_value, next_tracked = next_slider_value(
-        st.session_state.get(slider_key), st.session_state.get(tracked_key), available
-    )
-    st.session_state[slider_key] = next_value
-    st.session_state[tracked_key] = next_tracked
-
-
-def _render_front_with_slider(history: pd.DataFrame, slider_key: str, chart_key: str) -> None:
-    """Draw the front evolution, letting the viewer narrow it to the last N checkpoints.
-
-    Early checkpoints often have much larger indicator values than later,
-    converged ones, which can swamp the late-stage detail in a combined plot.
-
-    Args:
-        history: Deduplicated checkpoint history to show.
-        slider_key: Stable widget key so the chosen N persists across reruns.
-        chart_key: Stable widget key for the chart itself.
-    """
-    available = history["Evaluation"].nunique()
-    if available <= 1:
-        # st.slider rejects min_value == max_value; nothing to narrow down yet anyway.
-        st.plotly_chart(build_front_figure(history), width="stretch", key=chart_key)
-        return
-    _sync_last_n_slider_value(slider_key, available)
-    n = st.slider("Show last N fronts", min_value=1, max_value=available, key=slider_key)
-    figure = build_front_figure(last_n_checkpoints(history, n))
-    st.plotly_chart(figure, width="stretch", key=chart_key)
-
-
 def _render_front_tab(
     indicators_csv: Path,
     renderer: LiveFrontRenderer,
@@ -373,26 +329,9 @@ def _render_front_tab(
     update = renderer.poll(indicators_csv)
     interval.record_poll(update.changed, time.monotonic())
     if renderer.last_history is not None:
-        _render_front_with_slider(renderer.last_history, slider_key, f"{slider_key}_chart")
+        render_front_with_slider(renderer.last_history, slider_key, f"{slider_key}_chart")
     else:
         st.caption("No checkpoint yet: Evolver writes the first one after the update frequency.")
-
-
-def _render_indicator_front(indicators_csv: Path, run_id: str) -> None:
-    """Plot the indicator front's evolution across all checkpoints written.
-
-    Args:
-        indicators_csv: Path to the completed run's INDICATORS.csv.
-        run_id: The run's identifier, to key the "last N" slider.
-    """
-    history = load_indicators(indicators_csv)
-    if history.empty:
-        st.info("No indicator data was written.")
-        return
-    deduplicated = deduplicate_consecutive_checkpoints(history)
-    _render_front_with_slider(
-        deduplicated, f"final_last_n_slider_{run_id}", "final_indicator_front"
-    )
 
 
 def _render_output_directory(output_directory: Path, metadata_file: Path) -> None:
@@ -436,7 +375,7 @@ def _render_last_finished_run_if_any() -> None:
     names += ["Best configurations", "Files"]
     tabs = iter(st.tabs(names))
     with next(tabs):
-        _render_indicator_front(pointer.indicators_file, run_dir.name)
+        render_indicator_front(pointer.indicators_file, run_dir.name)
     with next(tabs):
         render_convergence(state, f"{key}_convergence")
     if state.population is not None:
