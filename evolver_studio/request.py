@@ -27,6 +27,37 @@ META_SEARCH_SCALAR_KEYS = frozenset(
 )
 
 
+# The meta-optimizer's population size when the request leaves it to Evolver
+# (MetaAlgorithmRegistry.DEFAULT_POPULATION_SIZE).
+DEFAULT_META_POPULATION_SIZE = 50
+
+
+def checkpoint_frequency_error(
+    frequency: int, meta_population_size: int = DEFAULT_META_POPULATION_SIZE
+) -> str | None:
+    """Say why a checkpoint frequency would leave a training run without checkpoints.
+
+    Evolver writes its result files and its status when the evaluations are a multiple of the
+    frequency, and the generational meta-optimizers only publish them in multiples of their
+    population size: any other frequency writes nothing until the very end.
+
+    Args:
+        frequency: The `writeFrequency` and `statusFrequency` of the request, in meta-evaluations.
+        meta_population_size: The meta-optimizer's population size.
+
+    Returns:
+        The message, or None when the frequency is fine.
+    """
+    if frequency >= meta_population_size and frequency % meta_population_size == 0:
+        return None
+    return (
+        f"Update every {meta_population_size}, {2 * meta_population_size}, ... evaluations: "
+        f"Evolver writes a checkpoint only when the evaluations are a multiple of the frequency, "
+        f"and the meta-optimizer completes them in multiples of its population size "
+        f"({meta_population_size}); {frequency} would give no checkpoint until the end."
+    )
+
+
 @dataclass(slots=True, frozen=True)
 class BaseLevelConfig:
     """What is being tuned and on which training set.

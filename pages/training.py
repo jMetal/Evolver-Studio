@@ -42,10 +42,12 @@ from evolver_studio.problem_browser import render_problem_adder
 from evolver_studio.problem_catalogue import problems_with_encoding
 from evolver_studio.progress import training_progress
 from evolver_studio.request import (
+    DEFAULT_META_POPULATION_SIZE,
     META_SEARCH_SCALAR_KEYS,
     BaseLevelConfig,
     MetaSearchConfig,
     base_level_to_yaml,
+    checkpoint_frequency_error,
     meta_search_to_yaml,
     parse_operator_flags_yaml,
     request_to_yaml,
@@ -249,7 +251,9 @@ def _launch_run(
             status_frequency=update_every_evaluations,
         )
     )
-    process = start_training(WORKING_DIRECTORY, jar, request_yaml, run_dir / "status.yaml")
+    process = start_training(
+        WORKING_DIRECTORY, jar, request_yaml, run_dir / "status.yaml", run_dir / "runner.log"
+    )
     write_pid_file(run_dir / "pid.txt", process.pid)
     st.session_state[f"update_every_evaluations_{run_id}"] = update_every_evaluations
     st.session_state.pop("last_finished_run", None)
@@ -747,9 +751,16 @@ else:
     update_every_evaluations = st.number_input(
         "Update every N evaluations",
         value=DEFAULT_UPDATE_EVERY_EVALUATIONS,
-        min_value=1,
-        step=100,
+        min_value=DEFAULT_META_POPULATION_SIZE,
+        step=DEFAULT_META_POPULATION_SIZE,
+        key="train_update_every",
+        help="How often Evolver writes its result files and its status, and so how often the "
+        "monitor below can show something new. It must be a multiple of the meta-optimizer's "
+        "population size (50).",
     )
+    frequency_error = checkpoint_frequency_error(int(update_every_evaluations))
+    if frequency_error is not None:
+        st.error(frequency_error)
 
     default_base_text = parameter_space_text(jar, algorithm.encodings[encoding])
     parameter_space_text_value = _render_parameter_space_editor(
@@ -787,7 +798,8 @@ else:
             st.error(error)
 
     can_launch = (
-        parameter_space_text_value is not None
+        frequency_error is None
+        and parameter_space_text_value is not None
         and operator_flags is not None
         and training_set is not None
         and not problem_errors

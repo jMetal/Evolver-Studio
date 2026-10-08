@@ -21,6 +21,7 @@ from evolver_studio.evolver_client import (
     read_pid,
     read_status,
     start_solve,
+    start_training,
     write_pid_file,
 )
 from evolver_studio.result import Err, Ok
@@ -329,3 +330,21 @@ class TestStartSolve:
 
         # Assert
         assert not is_alive(process.pid)
+
+
+class TestStartTraining:
+    def test_should_write_the_runners_output_to_a_log_file_instead_of_a_pipe(self, tmp_path: Path):
+        """A pipe nobody reads would fill up and block a long training."""
+        # Arrange: a jar that does not exist makes Java complain, which is output to capture
+        log_file = tmp_path / "runner.log"
+
+        # Act
+        process = start_training(
+            tmp_path, tmp_path / "missing.jar", tmp_path / "r.yaml", tmp_path / "s.yaml", log_file
+        )
+        process.wait(timeout=60)
+
+        # Assert
+        assert process.stdout is None
+        assert process.returncode != 0
+        assert "TrainingRunnerMain" in log_file.read_text()

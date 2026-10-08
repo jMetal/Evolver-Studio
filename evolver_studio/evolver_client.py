@@ -143,26 +143,43 @@ def _download_to(url: str, target: Path, on_progress: Callable[[float], None] | 
 
 
 def start_training(
-    working_directory: Path, jar: Path, request_yaml: Path, status_yaml: Path
+    working_directory: Path, jar: Path, request_yaml: Path, status_yaml: Path, log_file: Path
 ) -> subprocess.Popen:
     """Launch TrainingRunnerMain as a background subprocess.
+
+    The runner's output goes to a log file. A pipe that nobody reads fills up (Evolver logs a line
+    every `statusFrequency` evaluations) and, in a training of hours, would block the JVM; a file
+    also keeps the log for the page to show, and tells why a run that never wrote its status
+    (Java missing, a bad jar) did not start. The process is reaped when it ends, so that a
+    finished run is not mistaken for a live one.
 
     Args:
         working_directory: Working directory the JVM resolves relative paths against.
         jar: Path to Evolver's fat jar.
         request_yaml: Path to the training request YAML.
         status_yaml: Path where the run's status is written.
+        log_file: Path where the runner's standard output and error are written.
 
     Returns:
         The launched subprocess, not yet awaited.
     """
-    return subprocess.Popen(
-        ["java", "-cp", str(jar), TRAINING_RUNNER_MAIN_CLASS, str(request_yaml), str(status_yaml)],
-        cwd=working_directory,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+    with log_file.open("w") as log:
+        process = subprocess.Popen(
+            [
+                "java",
+                "-cp",
+                str(jar),
+                TRAINING_RUNNER_MAIN_CLASS,
+                str(request_yaml),
+                str(status_yaml),
+            ],
+            cwd=working_directory,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    threading.Thread(target=process.wait, daemon=True).start()
+    return process
 
 
 def start_solve(
@@ -170,9 +187,9 @@ def start_solve(
 ) -> subprocess.Popen:
     """Launch SolveRunnerMain as a background subprocess.
 
-    Unlike `start_training`, the runner's output goes to a log file, which is what tells the user
-    why a run that never wrote its status (Java missing, a bad jar) did not start, and the process
-    is reaped when it ends, so that a finished run is not mistaken for a live one.
+    The runner's output goes to a log file, which is what tells the user why a run that never
+    wrote its status (Java missing, a bad jar) did not start, and the process is reaped when it
+    ends, so that a finished run is not mistaken for a live one.
 
     Args:
         working_directory: Working directory the JVM resolves relative paths against.

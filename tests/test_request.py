@@ -7,6 +7,7 @@ from evolver_studio.request import (
     BaseLevelConfig,
     MetaSearchConfig,
     base_level_to_yaml,
+    checkpoint_frequency_error,
     meta_search_to_yaml,
     parse_operator_flags_yaml,
     request_to_yaml,
@@ -279,3 +280,23 @@ class TestParseOperatorFlagsYaml:
         # Act & Assert
         with pytest.raises(ValueError, match="mapping"):
             parse_operator_flags_yaml("- SBX\n- Polynomial\n")
+
+
+class TestCheckpointFrequencyError:
+    @pytest.mark.parametrize("frequency", [50, 100, 150, 1000])
+    def test_should_accept_a_multiple_of_the_meta_population_size(self, frequency: int):
+        # Act / Assert
+        assert checkpoint_frequency_error(frequency) is None
+
+    @pytest.mark.parametrize("frequency", [1, 25, 75, 120])
+    def test_should_reject_a_frequency_that_would_give_no_checkpoint(self, frequency: int):
+        # Act
+        message = checkpoint_frequency_error(frequency)
+
+        # Assert
+        assert message is not None and str(frequency) in message and "multiple" in message
+
+    def test_should_follow_the_meta_population_size_given(self):
+        # Act / Assert
+        assert checkpoint_frequency_error(100, meta_population_size=30) is not None
+        assert checkpoint_frequency_error(90, meta_population_size=30) is None

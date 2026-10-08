@@ -241,3 +241,20 @@ class TestMetaStoppingCondition:
         assert meta["encoding"] == "tree"
         assert meta["metaMaxComputingTimeMinutes"] == 10.0
         assert not _launch_button(app).disabled
+
+
+class TestCheckpointFrequency:
+    def test_should_start_with_a_frequency_that_gives_checkpoints(self, app: AppTest):
+        # Assert
+        assert app.number_input(key="train_update_every").value == 100
+        assert not _launch_button(app).disabled
+
+    def test_should_refuse_a_frequency_that_is_not_a_multiple_of_the_meta_population(
+        self, app: AppTest
+    ):
+        # Act
+        app.number_input(key="train_update_every").set_value(75).run()
+
+        # Assert
+        assert any("multiple of the frequency" in e.value for e in app.error)
+        assert _launch_button(app).disabled

@@ -29,6 +29,7 @@ class ActiveRun:
         status_yaml: Path to the run's status file.
         pid_file: Path to the launched subprocess's PID file.
         indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
+        log_file: Path to the runner's log, `runner.log` in the run's directory.
     """
 
     run_id: str
@@ -36,6 +37,7 @@ class ActiveRun:
     status_yaml: Path
     pid_file: Path
     indicators_csv: Path
+    log_file: Path
 
 
 def mark_cancelled(run_dir: Path) -> None:
@@ -93,6 +95,7 @@ def _active_run_in(run_dir: Path) -> ActiveRun | None:
         status_yaml=status_yaml,
         pid_file=pid_file,
         indicators_csv=run_dir.parent.parent / output_directory / "INDICATORS.csv",
+        log_file=run_dir / "runner.log",
     )
 
 
