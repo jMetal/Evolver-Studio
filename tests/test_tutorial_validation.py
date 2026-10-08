@@ -1,4 +1,4 @@
-"""Tests for tutorial S3, "Validating a configuration", with the real study it runs."""
+"""Tests for tutorial S5, "Validating a configuration", with the real study it runs."""
 
 import time
 from pathlib import Path
@@ -110,7 +110,7 @@ class TestOpenInValidation:
 
 
 class TestWalkThrough:
-    """Runs the real app through S3, with its study in a temporary working directory."""
+    """Runs the real app through S5, with its study in a temporary working directory."""
 
     @pytest.fixture
     def app(self, newer_jar: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:

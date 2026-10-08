@@ -1,4 +1,4 @@
-"""Tutorial S3, "Validating a configuration": its steps.
+"""Tutorial S5, "Validating a configuration": its steps.
 
 The interactive counterpart of Evolver's tutorial E8
 (docs/tutorials/validating_a_configuration.rst): a configuration found by a training is run again,

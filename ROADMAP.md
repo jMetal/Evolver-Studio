@@ -98,7 +98,7 @@ below; revisit and reorder as real usage surfaces new ones.
 - **Moved to Evolver 2.4 (October 2026)**: the app downloads Evolver 2.4 and its resources come from
   tag `v2.4` (unchanged since 2.3). Everything of the sync with `develop` above holds with the
   release: the 18 registered base algorithms, the problem catalogue (Explore › Problems, Run
-  algorithm, Training, Validation) and the tutorial S3 need Evolver 2.4 or later, and the two
+  algorithm, Training, Validation) and the tutorial S5 need Evolver 2.4 or later, and the two
   drift-detection tests against `DescribeMain` pass with the release jar.
 
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
@@ -144,15 +144,15 @@ below; revisit and reorder as real usage surfaces new ones.
   cards are built from the same list of pages (`evolver_studio/sections.py`).
 - **Tutorials page with the first interactive tutorial**: the page lists Evolver-Studio's tutorials
   by level (`evolver_studio/tutorials.py`, each paired with tutorials of Evolver's documentation) and
-  guides the selected one step by step. **S1, "Exploring a parameter space"**
+  guides the selected one step by step. **S2, "Exploring a parameter space"**
   (`evolver_studio/tutorial_parameter_spaces.py`), the companion of Evolver's tutorial E1, is the
   first available: reading the tree view, global and conditional sub-parameters, an interactive
   view of the parameters a configuration activates, and two encodings side by side; its version 1.1
   reads the spaces in the table of the Explore pages and ends with the meta-optimizers and the
-  quality indicators. **S2, "Solving a problem with a configurable algorithm"**
+  quality indicators. **S3, "Solving a problem with a configurable algorithm"**
   (`evolver_studio/tutorial_solving.py`), the companion of E2, is the first of the solving track:
   each step has a prepared run (`PreparedRun`: fixed seed, the values the text announces) that runs
-  in the tutorial or opens in Run algorithm. **S3, "Validating a configuration"**
+  in the tutorial or opens in Run algorithm. **S5, "Validating a configuration"**
   (`evolver_studio/tutorial_validation.py`), the companion of E8, runs one validation study in the
   background (kept as `validation-runs/tutorial-validation`, reused while it is current) and reads
   its results; the text about them is computed from the data. `tests/test_tutorials.py`,
@@ -184,8 +184,8 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
-  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time (S1, S2
-  and S3 are done). As in Evolver, only the written ones are numbered, consecutively by level: writing
+  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time (S1 to S5
+  are done). As in Evolver, only the written ones are numbered, consecutively by level: writing
   a new one renumbers those after it.
 
 ## Phase 3 — Analysis layer

@@ -1,0 +1,28 @@
+=== Meta-Optimization Experiment ===
+Date: 2026-10-08T12:30:45.298067
+
+--- Meta-Optimizer ---
+Algorithm: NSGA-II
+Max Evaluations: 3000
+Stopping condition: evaluations
+Population Size: 50
+Cores: 8
+
+--- Base-Level Algorithm ---
+Algorithm: NSGA-II
+Population/Swarm Size: 100
+Max Evaluations: 12000
+Evaluation Strategy: Fixed evaluations [12000]
+Parameter Space: base_parameter_space.yaml
+Optimizable Parameters: 34
+
+--- Training Set ---
+Problem Family: ZDT4
+Problems: ZDT4
+
+--- Quality Indicators ---
+Indicators: EP, NHV
+
+--- Execution ---
+Wall-clock time: 0h 4m 43s (283316 ms)
+Meta-evaluations performed: 3000

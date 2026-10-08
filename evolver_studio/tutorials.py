@@ -29,7 +29,7 @@ class Tutorial:
 
     Attributes:
         slug: Its topic, which identifies it (e.g. "solving").
-        number: Its number (e.g. "S2") when it is written, None while it is only planned.
+        number: Its number (e.g. "S3") when it is written, None while it is only planned.
         title: Its title.
         level: Its level.
         track: "Solving", "Meta-optimization" or "Both".
@@ -52,7 +52,7 @@ class Tutorial:
 
     @property
     def label(self) -> str:
-        """Its number and title (e.g. "S2. Solving a problem..."), or the title alone."""
+        """Its number and title (e.g. "S3. Solving a problem..."), or the title alone."""
         return f"{self.number}. {self.title}" if self.number else self.title
 
 
@@ -76,7 +76,7 @@ _ADVANCED = TutorialLevel.ADVANCED
 TUTORIALS: tuple[Tutorial, ...] = (
     Tutorial(
         "tour",
-        None,
+        "S1",
         "A tour of Evolver-Studio",
         _INTRO,
         "Both",
@@ -85,7 +85,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "parameter_spaces",
-        "S1",
+        "S2",
         "Exploring a parameter space",
         _INTRO,
         "Both",
@@ -95,7 +95,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "solving",
-        "S2",
+        "S3",
         "Solving a problem with a configurable algorithm",
         _INTRO,
         "Solving",
@@ -140,16 +140,17 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "analyzing_training_results",
-        None,
+        "S4",
         "Analyzing training results",
         _MID,
         "Meta-optimization",
-        "Checkpoints, fronts and choosing a configuration.",
+        "Read what a training left: how it converged, its front and population, the configurations "
+        "of its final front and what they have in common.",
         ("E7",),
     ),
     Tutorial(
         "validating_a_configuration",
-        "S3",
+        "S5",
         "Validating a configuration",
         _MID,
         "Meta-optimization",

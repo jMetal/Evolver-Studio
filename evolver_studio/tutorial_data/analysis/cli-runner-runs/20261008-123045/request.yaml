@@ -1,0 +1,4 @@
+outputDirectory: results
+writeFrequency: 100
+statusFrequency: 100
+writePopulation: true

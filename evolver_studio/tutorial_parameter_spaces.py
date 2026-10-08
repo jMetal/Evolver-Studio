@@ -1,4 +1,4 @@
-"""Tutorial S1, "Exploring a parameter space": its steps.
+"""Tutorial S2, "Exploring a parameter space": its steps.
 
 The interactive counterpart of Evolver's tutorial E1 (docs/tutorials/parameter_spaces.rst): the
 same concepts, on the same parameter spaces (NSGA-II for continuous and binary problems), read
@@ -58,7 +58,7 @@ def _render_introduction(jar: Path) -> None:
         "the same ideas with Java code.\n\n"
         "The spaces you will read here are the ones you can browse yourself in **Explore › Base "
         "algorithms**, and the ones the form of **Run algorithm** adjusts when you configure an "
-        "algorithm (tutorial S2)."
+        "algorithm (tutorial S3)."
     )
 
 
@@ -242,7 +242,7 @@ def _render_next_steps(jar: Path) -> None:
         "- Open **NSGA-II** with the Permutation encoding. Which operators does it offer?\n"
         "- In **Meta-optimizers**, open **AsyncNSGA-II**: how does its flat catalogue differ from "
         "NSGA-II's?\n\n"
-        "**Next:** tutorial **S2** configures one of these algorithms, runs it on a problem and "
+        "**Next:** tutorial **S3** configures one of these algorithms, runs it on a problem and "
         "reads the front it finds; the form you will use shows the parameters you have just "
         "learned to read. For the same concepts with Java code, see Evolver's tutorial "
         f"[E1]({E1_TUTORIAL_URL})."

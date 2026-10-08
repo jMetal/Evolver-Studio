@@ -1,4 +1,4 @@
-"""Tutorial S2, "Solving a problem with a configurable algorithm": its steps.
+"""Tutorial S3, "Solving a problem with a configurable algorithm": its steps.
 
 The interactive counterpart of Evolver's tutorial E2 (docs/tutorials/base_level_algorithms.rst): the
 same story (configure an algorithm, run it, read its results, change its configuration, run it on
@@ -385,7 +385,7 @@ def _render_introduction(jar: Path) -> None:
         "front and the indicators it gives;\n"
         "- see what else a run leaves: the solutions with their variables, and the files;\n"
         "- run it again with a very different configuration, adjusting the parameters you "
-        "learned to read in tutorial S1;\n"
+        "learned to read in tutorial S2;\n"
         "- repeat a run several times, and try a problem with three objectives and other "
         "algorithms;\n"
         "- take a run out of the app, to run it from a terminal.\n\n"
@@ -515,7 +515,7 @@ def _render_other_configuration(jar: Path) -> None:
         "| `crossover` | `blxAlpha` (`sbxDistributionIndex` disappears and "
         "`blxAlphaCrossoverAlpha` 0.5 appears) |\n"
         "| `mutation` | `uniform` (`uniformMutationPerturbation` 0.5) |\n\n"
-        "Notice how the parameters appear and disappear (the *active* parameters of tutorial S1), "
+        "Notice how the parameters appear and disappear (the *active* parameters of tutorial S2), "
         "the ✏️ that marks each changed parameter and the count of parameters changed. "
         "**Reset to the default configuration** undoes everything."
     )
@@ -540,7 +540,7 @@ def _render_other_configuration(jar: Path) -> None:
             "archive**, which keeps the solutions that are farthest apart from each other. In this "
             "run it also gets better values of both indicators. One run is not enough to conclude "
             "that it is better, though; that needs several runs and a statistical test "
-            "(tutorial **S3** does it), but it shows how much the configuration matters, and why "
+            "(tutorial **S5** does it), but it shows how much the configuration matters, and why "
             "finding good ones automatically, which is what meta-optimization does, is "
             "worthwhile."
         )
@@ -565,7 +565,7 @@ def _render_more_runs(jar: Path) -> None:
         "mean, the standard deviation, the minimum and the maximum over the runs. The values "
         "change from run to run: the spread says how much of a difference between two "
         "configurations may be luck. Comparing configurations with several runs and a test is the "
-        "subject of tutorial **S3** and of the coming tutorial *Comparing configurations on a "
+        "subject of tutorial **S5** and of the coming tutorial *Comparing configurations on a "
         "problem*."
     )
 

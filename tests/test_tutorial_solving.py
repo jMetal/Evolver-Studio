@@ -1,4 +1,4 @@
-"""Tests for tutorial S2, "Solving a problem with a configurable algorithm"."""
+"""Tests for tutorial S3, "Solving a problem with a configurable algorithm"."""
 
 from pathlib import Path
 
@@ -87,8 +87,8 @@ class TestPreparedRuns:
         assert "--replacement iRVEA" in configurations["iRVEA"]
 
 
-class TestTutorialS2WalkThrough:
-    """Runs the real app through S2, with its runs in a temporary working directory."""
+class TestTutorialS3WalkThrough:
+    """Runs the real app through S3, with its runs in a temporary working directory."""
 
     @pytest.fixture
     def app(self, jar: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:

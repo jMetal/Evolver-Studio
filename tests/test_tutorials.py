@@ -1,4 +1,4 @@
-"""Tests for the tutorials catalogue and tutorial S1's walk-through in the app."""
+"""Tests for the tutorials catalogue and tutorial S2's walk-through in the app."""
 
 from pathlib import Path
 
@@ -26,7 +26,13 @@ class TestTutorialsCatalogue:
         available = [tutorial.slug for tutorial in TUTORIALS if tutorial.available]
 
         # Assert
-        assert available == ["parameter_spaces", "solving", "validating_a_configuration"]
+        assert available == [
+            "tour",
+            "parameter_spaces",
+            "solving",
+            "analyzing_training_results",
+            "validating_a_configuration",
+        ]
 
     def test_should_identify_every_tutorial_by_a_distinct_topic(self):
         # Act
@@ -62,8 +68,8 @@ class TestTutorialsCatalogue:
         assert len(titles) == 7
 
 
-class TestTutorialS1WalkThrough:
-    """Runs the real app (app.py, so st.page_link resolves) through every step of S1."""
+class TestTutorialS2WalkThrough:
+    """Runs the real app (app.py, so st.page_link resolves) through every step of S2."""
 
     @pytest.fixture
     def app(self) -> AppTest:
@@ -71,7 +77,9 @@ class TestTutorialS1WalkThrough:
             pytest.skip(f"Evolver jar not found at {jar_path()}")
         app = AppTest.from_file(str(APP_SCRIPT), default_timeout=60).run()
         app.switch_page("pages/tutorials.py").run()
-        next(button for button in app.button if button.label == "Start").click().run()
+        next(
+            button for button in app.button if button.key == "tutorial_open_parameter_spaces"
+        ).click().run()
         return app
 
     def test_should_render_every_step_without_exceptions(self, app: AppTest):

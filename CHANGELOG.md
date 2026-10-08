@@ -8,6 +8,17 @@ version works with.
 
 Works with Evolver 2.4.
 
+### Tutorials
+
+- **Tutorial S1, *A tour of Evolver-Studio*** (pairs with E4): how the app connects to Evolver (Java
+  and the jar, checked live), what Evolver offers (read from the jar's manifest), what each page is
+  for, and where runs and results are kept.
+- **Tutorial S4, *Analyzing training results*** (pairs with E7): reads a real training that ships
+  with the app (`evolver_studio/tutorial_data/analysis/`) with the views of the Analysis page —
+  summary, convergence, front and population, final-front configurations, parameter agreement.
+- The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
+  S4 analysis, S5 validation.
+
 ### Analysis
 
 - *Training*'s best configurations, while it runs and once it has finished, have a **Validate this
@@ -48,7 +59,7 @@ Works with Evolver 2.4.
   per problem and every run, with CSV downloads. The problems are chosen from a list or from the
   listing of Explore › Problems, as in Training. Studies are kept under `validation-runs/` and can
   be reopened. Needs scipy.
-- **Tutorial S3, *Validating a configuration*** (pairs with E8): it runs a small validation study
+- **Tutorial S5, *Validating a configuration**** (pairs with E8): it runs a small validation study
   in the background and reads it step by step. The pivot is the NSGA-II that Evolver's tutorial E8
   tuned for the nine bi-objective WFG problems (bundled in Evolver's jar), against the default
   NSGA-II, MOEA/D and RVEA, on two WFG problems it was tuned for and on ZDT1 and DTLZ2 with two
@@ -88,8 +99,8 @@ Works with Evolver 2.4.
   select several rows at once and add them to the set. Each chosen problem gets its reference
   front when there is no doubt about which one (DTLZ2's three-objective front, for instance).
 - **Tutorials** numbered as Evolver numbers its own: only the written ones have a number,
-  consecutive by level (*Exploring a parameter space* is now S1 and *Solving a problem with a
-  configurable algorithm* S2), and the planned ones are listed without one. Each pairs with
+  consecutive by level (*Exploring a parameter space* is now S2 and *Solving a problem with a
+  configurable algorithm* S3), and the planned ones are listed without one. Each pairs with
   Evolver's tutorials by their new numbers, and the catalogue links to Evolver's tutorials index.
 
 ### Added

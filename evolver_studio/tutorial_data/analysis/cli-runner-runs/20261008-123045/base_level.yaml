@@ -1,0 +1,14 @@
+algorithmName: NSGA-II
+encoding: Double
+populationSize: 100
+numberOfIndependentRuns: 1
+extraConfig: null
+trainingProblemNames:
+- ZDT4
+trainingReferenceFrontFileNames:
+- resources/referenceFronts/ZDT4.csv
+trainingEvaluations:
+- 12000
+indicatorNames:
+- Epsilon
+- NormalizedHypervolume

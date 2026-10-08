@@ -4,7 +4,13 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio import tutorial_parameter_spaces, tutorial_solving, tutorial_validation
+from evolver_studio import (
+    tutorial_analysis,
+    tutorial_parameter_spaces,
+    tutorial_solving,
+    tutorial_tour,
+    tutorial_validation,
+)
 from evolver_studio.app_state import render_sidebar, require_evolver_jar
 from evolver_studio.tutorial_navigation import (
     SELECTED_KEY,
@@ -22,8 +28,10 @@ from evolver_studio.tutorials import (
 
 # Steps of every tutorial with content in this app, by topic (see Tutorial.available).
 TUTORIAL_STEPS = {
+    "tour": tutorial_tour.STEPS,
     "parameter_spaces": tutorial_parameter_spaces.STEPS,
     "solving": tutorial_solving.STEPS,
+    "analyzing_training_results": tutorial_analysis.STEPS,
     "validating_a_configuration": tutorial_validation.STEPS,
 }
 
