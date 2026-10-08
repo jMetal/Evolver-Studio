@@ -1,5 +1,6 @@
 """Tests for detecting an in-progress training run across app restarts."""
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,6 +35,34 @@ def _write_run(
         f"outputDirectory: {output_directory}\n"
     )
     return run_dir
+
+
+class TestRunThatIsStarting:
+    def test_should_find_a_run_whose_process_is_alive_and_has_written_no_status_yet(
+        self, tmp_path: Path
+    ):
+        """Evolver writes its first status after the JVM starts: the run is starting, not absent."""
+        # Arrange
+        run_dir = tmp_path / "cli-runner-runs" / "20260101-000000"
+        run_dir.mkdir(parents=True)
+        (run_dir / "request.yaml").write_text("outputDirectory: results/x\n")
+        write_pid_file(run_dir / "pid.txt", os.getpid())
+
+        # Act
+        active_run = find_active_run(tmp_path)
+
+        # Assert
+        assert active_run is not None and active_run.run_id == "20260101-000000"
+
+    def test_should_not_find_a_run_that_has_no_status_and_no_live_process(self, tmp_path: Path):
+        """A launch that failed at once (no Java, a bad jar) leaves nothing to monitor."""
+        # Arrange
+        run_dir = tmp_path / "cli-runner-runs" / "20260101-000000"
+        run_dir.mkdir(parents=True)
+        (run_dir / "request.yaml").write_text("outputDirectory: results/x\n")
+
+        # Act / Assert
+        assert find_active_run(tmp_path) is None
 
 
 class TestActiveRunMonitoredFiles:

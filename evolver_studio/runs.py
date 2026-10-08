@@ -79,16 +79,25 @@ def _active_run_in(run_dir: Path) -> ActiveRun | None:
     out-of-memory, `kill -9`) never gets to write a terminal state, leaving
     a stale "RUNNING" forever. Where a PID was recorded, its liveness is
     checked directly rather than trusting status.yaml alone.
+
+    It also lags at the start: Evolver writes the first status a second or two after the process
+    is launched (the JVM has to start), and a run whose process is alive and has no status yet is
+    starting, not absent. Taking it for absent would show the launch form again right after the
+    user pressed Launch, with nothing to say that a run had started.
     """
     if (run_dir / CANCELLED_MARKER_NAME).exists():
         return None
     status_yaml = run_dir / "status.yaml"
     status = read_status(status_yaml)
-    if status is None or status.state != RunState.RUNNING:
-        return None
     pid_file = run_dir / "pid.txt"
     pid = read_pid(pid_file)
-    if pid is not None and not is_alive(pid):
+    alive = pid is not None and is_alive(pid)
+    if status is None:
+        if not alive:
+            return None
+    elif status.state != RunState.RUNNING:
+        return None
+    elif pid is not None and not alive:
         return None
     request_yaml = run_dir / "request.yaml"
     request = yaml.safe_load(request_yaml.read_text())
