@@ -89,6 +89,12 @@ class MetaAlgorithm:
             not `wired_into_cli_runner` (nothing to launch).
         tree_example_config_file: The same for the tree encoding, or None when the algorithm does
             not support it (`supports_tree` is False).
+        uses_population: Whether the algorithm has a population whose size is chosen
+            (`metaPopulationSize`); False for Random Search, which has none.
+        fixed_operators_note: What to tell the user about the operators the algorithm hardcodes
+            (and so cannot be chosen), or None when it has a catalogue of them.
+        flat_only_reason: Why the algorithm does not support the tree encoding, or None when it
+            does.
         operator_parameter_space_file: Filename of the real ParameterSpace YAML
             backing this algorithm's flat-encoding operator catalogue, under
             src/main/resources/parameterSpaces/ (same format/parser as a base
@@ -110,6 +116,9 @@ class MetaAlgorithm:
     wired_into_cli_runner: bool
     example_config_file: str | None = None
     tree_example_config_file: str | None = None
+    uses_population: bool = True
+    fixed_operators_note: str | None = None
+    flat_only_reason: str | None = None
     operator_parameter_space_file: str | None = None
     tree_operator_parameter_space_file: str | None = None
 
@@ -336,6 +345,17 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=(),
         wired_into_cli_runner=True,
         example_config_file="MetaSPEA2FlatConfiguration.yaml",
+        fixed_operators_note=(
+            "SPEA2 hardcodes its operators (SBX crossover, polynomial mutation, strength "
+            "ranking, KNN density estimator and tournament selection): there is no catalogue to "
+            "choose from. The only flag it takes is the optional `mutationProbabilityFactor` "
+            "(1.0 if left out), e.g. `mutationProbabilityFactor: 1.5`."
+        ),
+        flat_only_reason=(
+            "its operators are written for real-valued solutions, and Evolver has no tree "
+            "version of it (the tree encoding has NSGA-II, AGE-MOEA, AsyncNSGA-II and Random "
+            "Search)"
+        ),
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SMPSO") — built via MetaSMPSOBuilder,
     # which exposes no operator catalogue at all (swarm size/evaluations/cores only); structurally
@@ -349,6 +369,14 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         tree_parameters=(),
         wired_into_cli_runner=True,
         example_config_file="MetaSMPSOFlatConfiguration.yaml",
+        fixed_operators_note=(
+            "SMPSO hardcodes everything (perturbation mutation, velocity update, selection and "
+            "archive): there is nothing to set here, and Evolver rejects any flag."
+        ),
+        flat_only_reason=(
+            "a particle swarm moves real-valued vectors with a velocity, and a derivation tree "
+            "is not one"
+        ),
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("AsyncNSGA-II") — built via
     # MetaAsyncNSGAIIBuilder (flat) and on DerivationTreeSolution (tree), hardcoding its own
@@ -400,6 +428,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
         wired_into_cli_runner=True,
         example_config_file="MetaRandomSearchFlatConfiguration.yaml",
         tree_example_config_file="MetaRandomSearchTreeConfiguration.yaml",
+        uses_population=False,
     ),
 )
 

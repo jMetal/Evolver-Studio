@@ -28,19 +28,28 @@ from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgor
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
     RunState,
-    RunStatus,
     cancel_training,
+    is_alive,
     read_pid,
     read_status,
     start_training,
     write_pid_file,
 )
 from evolver_studio.live_front import LiveFrontRenderer, build_front_figure
+from evolver_studio.monitor_view import (
+    MonitorState,
+    render_best_configurations,
+    render_convergence,
+    render_log,
+    render_overview,
+    render_population,
+    run_started_at,
+    tab_names,
+)
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
 from evolver_studio.problem_browser import render_problem_adder
 from evolver_studio.problem_catalogue import problems_with_encoding
-from evolver_studio.progress import training_progress
 from evolver_studio.request import (
     DEFAULT_META_POPULATION_SIZE,
     META_SEARCH_SCALAR_KEYS,
@@ -63,6 +72,7 @@ from evolver_studio.results import (
 )
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
 from evolver_studio.slider_state import next_slider_value
+from evolver_studio.training_monitor import tail_text
 from evolver_studio.training_set import (
     TRAINING_SET_COLUMNS,
     TrainingSet,
@@ -72,6 +82,7 @@ from evolver_studio.training_set import (
 )
 
 DEFAULT_UPDATE_EVERY_EVALUATIONS = 100
+PARAMETER_SPACE_FILE_NAME = "base_parameter_space.yaml"
 LIVE_FRAGMENT_RUN_EVERY_SECONDS = 2
 
 
@@ -125,13 +136,11 @@ def _meta_search_config(
     meta_encoding: str,
     meta_max_evaluations: int,
     meta_max_minutes: float | None,
+    meta_population_size: int | None,
     number_of_cores: int,
     operator_flags: dict[str, object],
 ) -> MetaSearchConfig:
     """Build the meta-search config for the selected meta-optimizer and encoding.
-
-    The meta population size is left to Evolver's own default (50, see
-    MetaAlgorithmRegistry.DEFAULT_POPULATION_SIZE), rather than duplicated here.
 
     Args:
         algorithm: The selected meta-optimizer's name (catalogue.MetaAlgorithm.name).
@@ -139,6 +148,8 @@ def _meta_search_config(
         meta_max_evaluations: Meta-level evaluation budget.
         meta_max_minutes: Stop after this many minutes of computing time instead of after
             `meta_max_evaluations`, or None to stop by evaluations.
+        meta_population_size: The meta-optimizer's population size, or None to leave it out of
+            the file (Random Search has none).
         number_of_cores: Cores used to parallelize base-level runs.
         operator_flags: The meta-optimizer's own operator configuration
             (possibly user-edited), as plain key/value pairs.
@@ -149,8 +160,7 @@ def _meta_search_config(
     return MetaSearchConfig(
         algorithm=algorithm,
         meta_max_evaluations=meta_max_evaluations,
-        # None omits metaPopulationSize, so Evolver applies its own default (50).
-        meta_population_size=None,
+        meta_population_size=meta_population_size,
         number_of_cores=number_of_cores,
         operator_flags=operator_flags,
         encoding=meta_encoding,
@@ -173,6 +183,7 @@ def _launch_run(
     operator_flags: dict[str, object],
     meta_max_evaluations: int,
     meta_max_minutes: float | None,
+    meta_population_size: int | None,
     number_of_cores: int,
     update_every_evaluations: int,
     write_population: bool,
@@ -210,6 +221,7 @@ def _launch_run(
         meta_max_evaluations: Meta-level evaluation budget.
         meta_max_minutes: The computing time limit in minutes, when the meta-optimizer stops by
             time instead of by evaluations; else None.
+        meta_population_size: The meta-optimizer's population size, or None when it has none.
         number_of_cores: Cores used to parallelize base-level runs.
         write_population: Whether Evolver also writes the meta-optimizer's whole population at
             every checkpoint, for the population viewer of the monitor.
@@ -219,7 +231,7 @@ def _launch_run(
     run_dir = WORKING_DIRECTORY / RUNS_DIRECTORY_NAME / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    parameter_space_file = run_dir / "base_parameter_space.yaml"
+    parameter_space_file = run_dir / PARAMETER_SPACE_FILE_NAME
     parameter_space_file.write_text(parameter_space_text_)
 
     base_level = _base_level_config(
@@ -238,6 +250,7 @@ def _launch_run(
         meta_encoding,
         meta_max_evaluations,
         meta_max_minutes,
+        meta_population_size,
         number_of_cores,
         operator_flags,
     )
@@ -338,41 +351,31 @@ def _render_front_with_slider(history: pd.DataFrame, slider_key: str, chart_key:
     st.plotly_chart(figure, width="stretch", key=chart_key)
 
 
-def _poll_tick(
-    status_yaml: Path,
+def _render_front_tab(
     indicators_csv: Path,
     renderer: LiveFrontRenderer,
     interval: AdaptivePollInterval,
     slider_key: str,
-) -> RunStatus | None:
-    """Read the latest status, redraw the live front, and adapt the poll interval.
+) -> None:
+    """Redraw the live front and adapt the poll interval.
 
-    Draws directly into whatever container is active when called — meant to
-    run inside a fragment, which fully replaces its own contents each time it
-    reruns, so both the progress bar and the front preview (from the last due
-    history, not just a newly-due one, to avoid it flickering away between
-    throttled redraws) are (re)drawn unconditionally on every call.
+    Draws directly into whatever container is active when called — meant to run inside a
+    fragment, which fully replaces its own contents each time it reruns, so the front preview is
+    redrawn from the last due history, not just a newly-due one, to avoid it flickering away
+    between throttled redraws.
 
     Args:
-        status_yaml: Path to the run's status file.
         indicators_csv: Path to the run's (still-growing) INDICATORS.csv.
-        renderer: Tracks render-throttling state across polls.
-        interval: Tracks the adaptive sleep interval across polls.
+        renderer: Tracks the checkpoint history available for display, throttled.
+        interval: Tracks how long to sleep before the next poll.
         slider_key: Stable widget key for the "last N checkpoints" slider.
-
-    Returns:
-        The latest parsed status, or None if not yet available.
     """
-    status = read_status(status_yaml)
-    if status is not None:
-        st.progress(*training_progress(status))
-    else:
-        st.progress(0.0, text="Starting…")
     update = renderer.poll(indicators_csv)
     interval.record_poll(update.changed, time.monotonic())
     if renderer.last_history is not None:
         _render_front_with_slider(renderer.last_history, slider_key, f"{slider_key}_chart")
-    return status
+    else:
+        st.caption("No checkpoint yet: Evolver writes the first one after the update frequency.")
 
 
 def _render_indicator_front(indicators_csv: Path, run_id: str) -> None:
@@ -414,12 +417,44 @@ def _render_last_finished_run_if_any() -> None:
     status, run_dir = pending
     if status.state == RunState.FAILED:
         st.error(status.error_message)
+        _render_finished_log(run_dir)
         return
     pointer = read_results_pointer(run_dir / "results.yaml", WORKING_DIRECTORY)
     st.success("Training finished.")
-    if st.checkbox("Show indicator front", value=True):
+    state = MonitorState(
+        run_started_at(run_dir.name),
+        pointer.indicators_file,
+        pointer.population_indicators_file,
+        pointer.var_conf_file,
+        run_dir / "runner.log",
+    )
+    state.poll()
+    key = f"finished_{run_dir.name}"
+    names = ["Front", "Convergence"]
+    if state.population is not None:
+        names.append("Population")
+    names += ["Best configurations", "Files"]
+    tabs = iter(st.tabs(names))
+    with next(tabs):
         _render_indicator_front(pointer.indicators_file, run_dir.name)
-    _render_output_directory(pointer.output_directory, pointer.metadata_file)
+    with next(tabs):
+        render_convergence(state, f"{key}_convergence")
+    if state.population is not None:
+        with next(tabs):
+            render_population(state, f"{key}_population")
+    with next(tabs):
+        render_best_configurations(state, f"{key}_best")
+    with next(tabs):
+        _render_output_directory(pointer.output_directory, pointer.metadata_file)
+        render_log(state)
+
+
+def _render_finished_log(run_dir: Path) -> None:
+    """Show the log of a run that failed, which says why."""
+    text = tail_text(run_dir / "runner.log", 40)
+    if text:
+        with st.expander("Runner output", expanded=True):
+            st.code(text, language=None, wrap_lines=True)
 
 
 def _render_expert_editor(default_text: str, key: str) -> str | None:
@@ -465,6 +500,37 @@ STOP_BY_EVALUATIONS = "Evaluations"
 STOP_BY_TIME = "Computing time"
 DEFAULT_META_EVALUATIONS = 2000
 DEFAULT_META_MINUTES = 10.0
+
+
+def _default_update_every(population_size: int) -> int:
+    """The multiple of the meta population size closest to the default update frequency."""
+    return population_size * max(round(DEFAULT_UPDATE_EVERY_EVALUATIONS / population_size), 1)
+
+
+def _render_meta_population(meta_algorithm: MetaAlgorithm) -> int | None:
+    """Choose the size of the meta-optimizer's population.
+
+    Args:
+        meta_algorithm: The selected meta-optimizer.
+
+    Returns:
+        The size, or None for a meta-optimizer that has no population (Random Search).
+    """
+    if not meta_algorithm.uses_population:
+        st.caption(f"{meta_algorithm.name} has no population: it samples configurations at random.")
+        return None
+    return int(
+        st.number_input(
+            "Meta-optimizer population size",
+            value=DEFAULT_META_POPULATION_SIZE,
+            min_value=2,
+            step=10,
+            key=f"train_meta_population_{meta_algorithm.name}",
+            help="The configurations the meta-optimizer evolves at once; its offspring is as "
+            "large. A larger population explores more but needs more evaluations to converge. "
+            "Evolver's default is 50.",
+        )
+    )
 
 
 def _render_meta_limit() -> tuple[int, float | None]:
@@ -528,7 +594,11 @@ def _render_meta_encoding(meta_algorithm: MetaAlgorithm) -> str:
         "parameters. Each has its own operators.",
     )
     if not supports_tree:
-        st.caption(f"{meta_algorithm.name} supports only the flat encoding.")
+        reason = meta_algorithm.flat_only_reason
+        st.caption(
+            f"{meta_algorithm.name} supports only the flat encoding"
+            + (f": {reason}." if reason else ".")
+        )
     return META_ENCODINGS[choice]
 
 
@@ -681,8 +751,22 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
     return edited
 
 
+def _monitor_state(active_run: ActiveRun) -> MonitorState:
+    """Get or create what the monitor of a run remembers, persisted across fragment reruns."""
+    key = f"monitor_{active_run.run_id}"
+    if key not in st.session_state:
+        st.session_state[key] = MonitorState(
+            run_started_at(active_run.run_id),
+            active_run.indicators_csv,
+            active_run.population_indicators_csv,
+            active_run.indicators_csv.parent / "VAR_CONF.txt",
+            active_run.log_file,
+        )
+    return st.session_state[key]
+
+
 def _render_active_run(active_run: ActiveRun) -> None:
-    """Show progress and a live front preview for an in-progress run.
+    """Monitor an in-progress run: its progress, front, population, convergence and log.
 
     Args:
         active_run: The run currently in progress.
@@ -696,18 +780,35 @@ def _render_active_run(active_run: ActiveRun) -> None:
         f"update_every_evaluations_{active_run.run_id}", DEFAULT_UPDATE_EVERY_EVALUATIONS
     )
     renderer, interval = _live_state(active_run.run_id, default_n)
+    monitor = _monitor_state(active_run)
+    key = f"monitor_{active_run.run_id}"
 
     @st.fragment(
         run_every=LIVE_FRAGMENT_RUN_EVERY_SECONDS, key=f"poll_fragment_{active_run.run_id}"
     )
     def _poll() -> None:
-        status = _poll_tick(
-            active_run.status_yaml,
-            active_run.indicators_csv,
-            renderer,
-            interval,
-            f"last_n_slider_{active_run.run_id}",
-        )
+        status = read_status(active_run.status_yaml)
+        if status is not None:
+            monitor.record(status)
+        monitor.poll()
+        pid = read_pid(active_run.pid_file)
+        tabs = st.tabs(tab_names(monitor.population is not None))
+        names = iter(tabs)
+        with next(names):
+            render_overview(monitor, status, pid is not None and is_alive(pid))
+        with next(names):
+            _render_front_tab(
+                active_run.indicators_csv, renderer, interval, f"last_n_slider_{active_run.run_id}"
+            )
+        if monitor.population is not None:
+            with next(names):
+                render_population(monitor, f"{key}_population")
+        with next(names):
+            render_convergence(monitor, f"{key}_convergence")
+        with next(names):
+            render_best_configurations(monitor, f"{key}_best")
+        with next(names):
+            render_log(monitor)
         if status is not None and status.state != RunState.RUNNING:
             st.session_state["last_finished_run"] = (status, active_run.run_dir)
             st.rerun()
@@ -751,18 +852,20 @@ else:
 
     output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
     meta_max_evaluations, meta_max_minutes = _render_meta_limit()
+    meta_population_size = _render_meta_population(meta_algorithm)
     number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
+    checkpoint_unit = meta_population_size or DEFAULT_META_POPULATION_SIZE
     update_every_evaluations = st.number_input(
         "Update every N evaluations",
-        value=DEFAULT_UPDATE_EVERY_EVALUATIONS,
-        min_value=DEFAULT_META_POPULATION_SIZE,
-        step=DEFAULT_META_POPULATION_SIZE,
-        key="train_update_every",
+        value=_default_update_every(checkpoint_unit),
+        min_value=1,
+        step=checkpoint_unit,
+        key=f"train_update_every_{checkpoint_unit}",
         help="How often Evolver writes its result files and its status, and so how often the "
         "monitor below can show something new. It must be a multiple of the meta-optimizer's "
-        "population size (50).",
+        f"population size ({checkpoint_unit}).",
     )
-    frequency_error = checkpoint_frequency_error(int(update_every_evaluations))
+    frequency_error = checkpoint_frequency_error(int(update_every_evaluations), checkpoint_unit)
     if frequency_error is not None:
         st.error(frequency_error)
     write_population = st.checkbox(
@@ -787,6 +890,8 @@ else:
         else meta_algorithm.example_config_file
     )
     with st.expander(f"Meta-optimizer operator flags ({meta_algorithm.name}, {meta_encoding})"):
+        if meta_algorithm.fixed_operators_note:
+            st.info(meta_algorithm.fixed_operators_note)
         operator_flags = _render_operator_flags_editor(
             _default_operator_flags_text(jar, example_file),
             f"meta_operator_flags_{meta_algorithm.name}_{meta_encoding}",
@@ -819,7 +924,7 @@ else:
         base_level = _base_level_config(
             algorithm.registry_name,
             encoding,
-            "<written to disk at launch>",
+            f"<run folder>/{PARAMETER_SPACE_FILE_NAME}",
             extra_config,
             training_set,
             problem_specs,
@@ -829,8 +934,15 @@ else:
             meta_encoding,
             meta_max_evaluations,
             meta_max_minutes,
+            meta_population_size,
             int(number_of_cores),
             operator_flags or {},
+        )
+        st.caption(
+            "The two files Evolver will read, as written into the run's folder when you launch. "
+            f"`yamlParameterSpaceFile` is the base algorithm's parameter space as edited above, "
+            f"saved there as `{PARAMETER_SPACE_FILE_NAME}`: the folder is named after the launch "
+            "time, so its path is only known then."
         )
         st.code(base_level_to_yaml(base_level), language="yaml")
         st.code(meta_search_to_yaml(meta_search), language="yaml")
@@ -852,6 +964,7 @@ else:
             operator_flags,
             meta_max_evaluations,
             meta_max_minutes,
+            meta_population_size,
             int(number_of_cores),
             int(update_every_evaluations),
             write_population,

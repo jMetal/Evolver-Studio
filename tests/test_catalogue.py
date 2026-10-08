@@ -249,6 +249,35 @@ class TestIsAtLeast:
         assert is_at_least(version, minimum) is expected
 
 
+class TestMetaAlgorithmPopulation:
+    def test_should_give_a_population_to_every_meta_optimizer_but_random_search(self):
+        """MetaAlgorithmRegistry takes metaPopulationSize for all of them, Random Search apart."""
+        # Act
+        without = {m.name for m in META_ALGORITHMS if not m.uses_population}
+
+        # Assert
+        assert without == {"RandomSearch"}
+
+
+class TestMetaAlgorithmFlatOnly:
+    def test_should_explain_why_an_algorithm_without_tree_support_has_none(self):
+        """The Training page tells the user why the tree encoding is not offered."""
+        # Act / Assert
+        for meta in META_ALGORITHMS:
+            if meta.wired_into_cli_runner:
+                assert (meta.flat_only_reason is not None) is (not meta.supports_tree), meta.name
+
+    def test_should_say_which_algorithms_hardcode_their_operators(self):
+        # Act
+        fixed = {m.name for m in META_ALGORITHMS if m.fixed_operators_note}
+
+        # Assert: they have no operator parameter space, which is what makes them fixed
+        assert fixed == {"SPEA2", "SMPSO"}
+        for meta in META_ALGORITHMS:
+            if meta.name in fixed:
+                assert meta.operator_parameter_space_file is None
+
+
 class TestMetaAlgorithmExampleFiles:
     def test_should_have_a_tree_example_exactly_for_the_algorithms_that_support_tree(self):
         """Training offers the tree encoding only with a file to start its operator flags from."""
