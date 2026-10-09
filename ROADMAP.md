@@ -209,8 +209,9 @@ in Evolver: a study is a `cli.solving` request per algorithm and problem
 Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum, A12). Still to do:
 
 - Friedman test with Holm's procedure over the problems, critical difference plots and the Bayesian
-  sign test (Evolver's scripts use SAES for them), and LaTeX tables.
-- Adjusting an algorithm's configuration for the study (the form of Run algorithm, per contender).
+  sign test (Evolver's scripts use SAES for them). The median and the Wilcoxon pivot tables are
+  already saved as LaTeX (`latex_tables.py`), in the format of Evolver's
+  `scripts/wilcoxon_pivot_tables.py`.
 - An estimate of how long a study takes: an algorithm such as SMS-EMOA with three objectives is
   orders of magnitude slower than NSGA-II, which one only learns by running it.
 

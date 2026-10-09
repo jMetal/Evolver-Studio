@@ -32,6 +32,7 @@ from evolver_studio.configuration import (
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
 from evolver_studio.figure_export import render_chart
+from evolver_studio.latex_tables import median_table, wilcoxon_pivot_table
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
@@ -474,6 +475,18 @@ def _render_summary(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
     )
     with st.expander("Interquartile range"):
         st.dataframe(interquartile_ranges(runs, indicator).style.format("{:.4g}"), width="stretch")
+    st.download_button(
+        "Download the medians (LaTeX)",
+        median_table(runs, indicator, pivot),
+        file_name=f"median_{indicator}.tex",
+        mime="application/x-tex",
+        key=f"validation_median_latex_{indicator}",
+        on_click="ignore",
+        icon=":material/download:",
+        help="Median and interquartile range of every algorithm on every problem, with the "
+        "pivot in the last column and the best two medians of each problem shaded, as in "
+        "Evolver's tables. A LaTeX document that compiles on its own.",
+    )
 
 
 def _render_comparison(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
@@ -508,6 +521,19 @@ def _render_comparison(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
         file_name=f"comparison_{indicator}.csv",
         mime="text/csv",
         key=f"validation_comparison_{indicator}",
+    )
+    st.download_button(
+        "Download the Wilcoxon pivot table (LaTeX)",
+        wilcoxon_pivot_table(runs, indicator, pivot),
+        file_name=f"wilcoxon_pivot_{indicator}.tex",
+        mime="application/x-tex",
+        key=f"validation_wilcoxon_latex_{indicator}",
+        on_click="ignore",
+        icon=":material/download:",
+        help="The medians and interquartile ranges, each algorithm marked against the pivot: + "
+        "the pivot is significantly better, - significantly worse, = no significant difference; "
+        "the last row counts them. The table of Evolver's scripts/wilcoxon_pivot_tables.py, as "
+        "a LaTeX document that compiles on its own.",
     )
 
 

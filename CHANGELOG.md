@@ -19,6 +19,17 @@ Works with Evolver 2.4.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
   S4 analysis, S5 validation.
 
+### Saving tables and charts
+
+- *Validation* saves its **median table** and its **Wilcoxon pivot table** as LaTeX, in the format
+  of Evolver's `scripts/wilcoxon_pivot_tables.py`: median with the interquartile range as a
+  subscript, the pivot in the last column, the best and second-best median of each problem shaded,
+  `+`/`-`/`=` against the pivot and a last row that counts them. Each is a LaTeX document that
+  compiles on its own.
+- **Every chart** of the app (fronts, solutions, boxplots, convergence, population, parameters, in
+  the pages and in the tutorials) has **PNG** and **PDF** buttons. The images are made with Kaleido
+  (a new dependency) in the Chrome installed on the computer, only when a button is pressed.
+
 ### Validation
 
 - The algorithms the tuned configuration is compared with start from their default configuration,
