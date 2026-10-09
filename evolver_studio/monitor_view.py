@@ -14,6 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from evolver_studio.evolver_client import RunStatus
+from evolver_studio.figure_export import render_chart
 from evolver_studio.live_front import build_front_figure
 from evolver_studio.progress import training_progress
 from evolver_studio.results import (
@@ -120,12 +121,12 @@ def render_front_with_slider(history: pd.DataFrame, slider_key: str, chart_key: 
     available = history["Evaluation"].nunique()
     if available <= 1:
         # st.slider rejects min_value == max_value; nothing to narrow down yet anyway.
-        st.plotly_chart(build_front_figure(history), width="stretch", key=chart_key)
+        render_chart(build_front_figure(history), chart_key, "indicator_front", width="stretch")
         return
     sync_last_n_slider_value(slider_key, available)
     n = st.slider("Show last N fronts", min_value=1, max_value=available, key=slider_key)
     figure = build_front_figure(last_n_checkpoints(history, n))
-    st.plotly_chart(figure, width="stretch", key=chart_key)
+    render_chart(figure, chart_key, "indicator_front", width="stretch")
 
 
 def render_indicator_front(indicators_csv: Path, run_id: str) -> None:
@@ -267,7 +268,7 @@ def render_population(state: MonitorState, key: str) -> None:
         (indicators[0], indicators[1]),
         log_scale=log_scale,
     )
-    st.plotly_chart(figure, width="stretch", key=f"{key}_chart")
+    render_chart(figure, f"{key}_chart", f"population_{evaluation}", width="stretch")
     st.caption(
         f"{len(summaries)} checkpoints of the population; the latest {len(kept) - 1} and the "
         "first are kept to browse."
@@ -297,7 +298,7 @@ def render_convergence(state: MonitorState, key: str) -> None:
     log_scale = columns[1].checkbox("Logarithmic values", key=f"{key}_log")
     minutes = state.var_conf.minutes if by_time == "Computing time" else None
     figure = build_convergence_figure(summaries, minutes=minutes, log_scale=log_scale)
-    st.plotly_chart(figure, width="stretch", key=f"{key}_chart")
+    render_chart(figure, f"{key}_chart", "convergence", width="stretch")
 
 
 def render_best_configurations(

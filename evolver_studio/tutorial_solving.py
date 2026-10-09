@@ -24,6 +24,7 @@ from evolver_studio import evolver_client
 from evolver_studio.app_state import registered_problem_names
 from evolver_studio.catalogue import BASE_ALGORITHMS
 from evolver_studio.evolver_client import EVOLVER_VERSION, start_solve, write_pid_file
+from evolver_studio.figure_export import render_chart
 from evolver_studio.resource_files import default_configuration_text
 from evolver_studio.runs import SOLVE_RUNS_DIRECTORY_NAME, RunPhase, run_phase
 from evolver_studio.solve_figures import build_front_figure
@@ -337,10 +338,11 @@ def _render_outcome(prepared: PreparedRun, run_dir: Path, show_front: bool) -> N
     if show_front:
         fronts = read_run_fronts(output)
         reference = read_front(evolver_client.WORKING_DIRECTORY / prepared.reference_front)
-        st.plotly_chart(
+        render_chart(
             build_front_figure(fronts, reference),
+            f"{KEY_PREFIX}_front_{prepared.key}",
+            f"front_{prepared.key}",
             width="stretch",
-            key=f"{KEY_PREFIX}_front_{prepared.key}",
         )
     indicators = read_indicators(output)
     st.dataframe(indicators, hide_index=True, width="stretch")

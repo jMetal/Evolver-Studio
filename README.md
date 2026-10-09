@@ -100,6 +100,9 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 
 - Python 3.11+ and [Conda](https://docs.conda.io/)
 - Java 21 or newer, on the `PATH`
+- Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF (Kaleido draws them in
+  it). Without it the PNG/PDF buttons are not offered, and each chart's camera icon still saves it
+  as PNG.
 
 Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.4** (the
 release the app is built against) from Maven Central. Other

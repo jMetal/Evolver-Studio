@@ -31,6 +31,7 @@ from evolver_studio.configuration import (
     values_outside_the_space,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
+from evolver_studio.figure_export import render_chart
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
@@ -523,7 +524,9 @@ def _render_boxplots(runs: pd.DataFrame, indicator: str) -> None:
     figure.update_yaxes(matches=None, showticklabels=True)
     figure.update_xaxes(showticklabels=False)
     figure.update_layout(showlegend=True, height=320 * -(-runs["problem"].nunique() // 3))
-    st.plotly_chart(figure, width="stretch", key=f"validation_boxplot_{indicator}")
+    render_chart(
+        figure, f"validation_boxplot_{indicator}", f"boxplots_{indicator}", width="stretch"
+    )
 
 
 def _render_details(study_directory: Path, manifest: dict) -> None:

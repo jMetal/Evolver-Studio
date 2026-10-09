@@ -12,6 +12,8 @@ dependencies = [
     "pyyaml",
     "pandas",
     "plotly",
+    # Saves the charts as PNG and PDF, drawing them in the Chrome installed on the computer.
+    "kaleido>=1",
     "scipy",
 ]
 

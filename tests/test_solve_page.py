@@ -351,7 +351,12 @@ class TestSolutions:
         assert 0 < len(shown.value) < total
         assert shown.value["f1"].max() <= (lower + upper) / 2
         assert any(f"{len(shown.value)} of {total} solutions" in c.value for c in app.caption)
-        assert len(app.get("download_button")) == 3  # the table, the request and the zip
+        data_downloads = [
+            button
+            for button in app.get("download_button")
+            if button.proto.label not in ("PNG", "PDF")  # the charts' images
+        ]
+        assert len(data_downloads) == 3  # the table, the request and the zip
 
 
 class TestRepeatARun:
@@ -385,7 +390,12 @@ class TestRepeatARun:
         assert app.selectbox(key="solve_problem").value == "ZDT1"
         assert "--crossover blxAlpha" in app.code[0].value
         assert "--blxAlphaCrossoverAlpha" in app.code[0].value
-        assert len(app.get("download_button")) == 3  # the table, the request and the zip
+        data_downloads = [
+            button
+            for button in app.get("download_button")
+            if button.proto.label not in ("PNG", "PDF")  # the charts' images
+        ]
+        assert len(data_downloads) == 3  # the table, the request and the zip
 
     def test_should_run_a_problem_with_arguments_and_restore_them(
         self, app: AppTest, tmp_path: Path

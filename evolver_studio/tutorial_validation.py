@@ -23,6 +23,7 @@ import streamlit as st
 
 from evolver_studio import evolver_client, running_badge
 from evolver_studio.app_state import registered_problems
+from evolver_studio.figure_export import render_chart
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import (
     default_configuration_text,
@@ -357,7 +358,12 @@ def _render_medians(jar: Path) -> None:
             width="stretch",
             height="content",
         )
-        st.plotly_chart(_boxplot(runs, indicator), width="stretch", key=f"{KEY_PREFIX}_boxplot")
+        render_chart(
+            _boxplot(runs, indicator),
+            f"{KEY_PREFIX}_boxplot",
+            f"boxplots_{indicator}",
+            width="stretch",
+        )
     _render_best_quiz(table, indicator)
 
 

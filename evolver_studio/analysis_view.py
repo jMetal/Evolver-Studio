@@ -16,6 +16,7 @@ from evolver_studio.app_state import (
     registered_problems,
 )
 from evolver_studio.configuration import parse_configuration
+from evolver_studio.figure_export import render_chart
 from evolver_studio.front_analysis import (
     DIFFERENT,
     numeric_values,
@@ -251,6 +252,11 @@ def _render_parameter_detail(training, summaries, configurations, defaults) -> N
                 pass
         figure.update_layout(xaxis_title=chosen, showlegend=False)
     figure.update_layout(height=300, margin={"t": 20})
-    st.plotly_chart(figure, width="stretch", key=f"analysis_detail_{training.run_id}_{chosen}")
+    render_chart(
+        figure,
+        f"analysis_detail_{training.run_id}_{chosen}",
+        f"parameter_{chosen}",
+        width="stretch",
+    )
     if default is not None:
         st.caption("The default configuration's value is marked in orange.")

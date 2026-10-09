@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from evolver_studio import running_badge
@@ -44,6 +45,7 @@ from evolver_studio.evolver_client import (
     start_solve,
     write_pid_file,
 )
+from evolver_studio.figure_export import render_chart
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_catalogue import ArgumentValue, Problem, number_of_objectives
@@ -625,10 +627,11 @@ def _render_front(run: SolveRunInfo) -> None:
     )
     reference_file = run.request.get("referenceFrontFileName")
     reference = read_front(WORKING_DIRECTORY / reference_file) if reference_file else None
-    st.plotly_chart(
+    render_chart(
         build_front_figure({number: fronts[number] for number in chosen}, reference),
+        f"solve_front_{run.run_id}",
+        f"front_{run.run_id}",
         width="stretch",
-        key=f"solve_front_{run.run_id}",
     )
 
 
@@ -704,7 +707,11 @@ def _render_solution(solution: pd.Series, identifier: int) -> None:
         st.code(" ".join(str(int(value)) for value in variables), language=None, wrap_lines=True)
     else:
         st.caption("Decision variables:")
-        st.bar_chart(variables)
+        figure = go.Figure(go.Bar(x=list(variables.index), y=list(variables.to_numpy())))
+        figure.update_layout(height=300, margin={"t": 20}, yaxis_title="Value")
+        render_chart(
+            figure, f"solve_solution_{identifier}", f"solution_{identifier}", width="stretch"
+        )
 
 
 def _render_indicators(run: SolveRunInfo) -> None:
