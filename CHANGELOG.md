@@ -13,8 +13,13 @@ Works with Evolver 2.4.
 - **Tutorial S1, *A tour of Evolver-Studio*** (pairs with E4): how the app connects to Evolver (Java
   and the jar, checked live), what Evolver offers (read from the jar's manifest), what each page is
   for, and where runs and results are kept.
+- *A tour of Evolver-Studio* links Evolver's E4, *Evolver in 10 minutes* (it linked E16), names the
+  four steps of meta-optimization, and lists what to read next from the catalogue.
+- *Solving a problem with a configurable algorithm* begins with a new step, **Choosing a
+  problem**: the listing of Explore › Problems and what it says of each problem, with a quick
+  check read from the jar's problem catalogue.
 - **Tutorial S4, *Analyzing training results*** (pairs with E7): reads a real training that ships
-  with the app (`evolver_studio/tutorial_data/analysis/`) with the views of the Training analysis page —
+  with the app (`evolver_studio/tutorial_data/analysis/`) with the views of Training analysis —
   summary, convergence, front and population, final-front configurations, parameter agreement.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
   S4 analysis, S5 validation.

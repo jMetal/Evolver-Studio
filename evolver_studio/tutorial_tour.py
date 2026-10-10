@@ -1,9 +1,10 @@
 """Tutorial "A tour of Evolver-Studio": its steps.
 
-The interactive counterpart of Evolver's tutorial E4 (docs/tutorials/automating_with_the_cli.rst):
-what Evolver-Studio does for you, how it connects to Evolver, and what each page is for. It runs
-nothing long: it checks the connection (Java and the jar) and asks Evolver what it can resolve,
-and what the text says about Evolver comes from that answer, not from a list written down.
+The interactive counterpart of Evolver's tutorial E4, "Evolver in 10 minutes"
+(docs/quick_start.rst): what Evolver-Studio does for you, how it connects to Evolver, and what each
+page is for. It runs nothing long: it checks the connection (Java and the jar) and asks Evolver
+what it can resolve, and what the text says about Evolver comes from that answer, not from a list
+written down.
 """
 
 import shutil
@@ -21,9 +22,7 @@ from evolver_studio.tutorial_navigation import open_tutorial
 from evolver_studio.tutorials import TUTORIALS, TutorialStep
 from evolver_studio.validation_runner import VALIDATION_RUNS_DIRECTORY_NAME
 
-E4_TUTORIAL_URL = (
-    "https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/automating_with_the_cli.rst"
-)
+E4_TUTORIAL_URL = "https://github.com/jMetal/Evolver/blob/develop/docs/quick_start.rst"
 KEY_PREFIX = "tutorial_tour"
 
 
@@ -49,10 +48,13 @@ def _render_introduction(jar: Path) -> None:
         "adjust its configuration, run it and inspect the front it finds, as with jMetal's "
         "runners.\n"
         "- **Meta-optimization.** Let Evolver find a good configuration of an algorithm for a "
-        "family of problems (*training*), study what it found (*analysis*), and check that it "
-        "is really better than the defaults on problems it never saw (*validation*).\n\n"
+        "family of problems (*training*), study what it found (*training analysis*), check that "
+        "it is really better than the defaults, on problems it never saw too (*validation*), and "
+        "study that check (*validation analysis*).\n\n"
         "This tour shows how the app connects to Evolver and what each page is for. Evolver's "
-        f"tutorial [E4]({E4_TUTORIAL_URL}) shows the same machinery from the command line."
+        f"tutorial [E4. Evolver in 10 minutes]({E4_TUTORIAL_URL}) goes through the same "
+        "ground with the command line and Java: build Evolver, run an algorithm, tune it and "
+        "run it with the configuration found."
     )
 
 
@@ -129,7 +131,7 @@ def _render_pages(jar: Path) -> None:
         "A path through them for **solving**: *Explore › Problems* to choose a problem, then "
         "*Run algorithm*. For **meta-optimization**: *Training* to launch a run, *Training "
         "analysis* to read what it found, *Validation* to put a configuration to the test, and "
-        "*Validation analysis* (still to come) to study the results of that test. Each page can "
+        "*Validation analysis* to study the results of that test. Each page can "
         "hand its result to the next: a configuration goes from Training or Training "
         "analysis to Validation, or to Run algorithm, with a button."
     )
@@ -144,24 +146,22 @@ def _render_where_things_live(jar: Path) -> None:
         "- `results/`: what Evolver wrote for each training (`INDICATORS.csv`, `VAR_CONF.txt`, "
         "`METADATA.txt`…), which *Training analysis* reads;\n"
         f"- `{SOLVE_RUNS_DIRECTORY_NAME}/`: the runs of *Run algorithm*;\n"
-        f"- `{VALIDATION_RUNS_DIRECTORY_NAME}/`: the studies of *Validation*.\n\n"
+        f"- `{VALIDATION_RUNS_DIRECTORY_NAME}/`: the studies of *Validation*, every run's front "
+        "with its indicators, which *Validation analysis* reads.\n\n"
         "A run keeps going when you leave its page or close the tab, and you find it again "
         "when you come back. To stop one, use its page's *Cancel* button."
     )
 
 
 def _render_next_steps(jar: Path) -> None:
+    following = "\n".join(
+        f"- **{t.label}**: {t.summary}" for t in TUTORIALS if t.available and t.slug != "tour"
+    )
     st.markdown(
         "**Where to go next**, in the order the tutorials build on each other:\n\n"
-        "- *Exploring a parameter space*: read what an algorithm lets you configure.\n"
-        "- *Solving a problem with a configurable algorithm*: your first run.\n"
-        "- *Analyzing training results*: read what a training leaves, on a real one that "
-        "ships with the app.\n"
-        "- *Validating a configuration*: compare a tuned configuration with the defaults.\n\n"
-        "The tutorials still to be written are listed in the catalogue without a number."
+        + following
+        + "\n\nThe tutorials still to be written are listed in the catalogue without a number."
     )
-    written = [t.label for t in TUTORIALS if t.available]
-    st.caption(f"Written so far: {'; '.join(written)}.")
     st.button(
         "All the tutorials",
         icon="🎓",
