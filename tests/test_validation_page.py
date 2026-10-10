@@ -13,7 +13,7 @@ from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.resource_files import default_configuration_text
 from evolver_studio.runs import RunPhase, run_phase
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "validation.py"
+APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
 RUN_TIMEOUT_SECONDS = 120
 
@@ -21,6 +21,15 @@ RUN_TIMEOUT_SECONDS = 120
 def _jar_describes_problems() -> bool:
     result = describe(WORKING_DIRECTORY, jar_path())
     return parse_problem_catalogue(getattr(result, "value", {})) is not None
+
+
+def _open_page() -> AppTest:
+    """The page, through the app so that its links to other pages resolve."""
+    return (
+        AppTest.from_file(str(APP_SCRIPT), default_timeout=60)
+        .switch_page("pages/validation.py")
+        .run()
+    )
 
 
 @pytest.fixture
@@ -35,7 +44,7 @@ def working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.fixture
 def app(working_directory: Path) -> AppTest:
-    return AppTest.from_file(str(PAGE_SCRIPT), default_timeout=60).run()
+    return _open_page()
 
 
 def _needs_problem_catalogue() -> None:
@@ -182,7 +191,7 @@ class TestTunedConfiguration:
         _finished_training(working_directory)
 
         # Act
-        app = AppTest.from_file(str(PAGE_SCRIPT), default_timeout=60).run()
+        app = _open_page()
 
         # Assert
         options = app.selectbox(key="validation_configuration_20260101-000000").options
@@ -212,7 +221,7 @@ class TestRunAStudy:
         # three objectives of DTLZ2 but not for the two of ZDT1
         _needs_problem_catalogue()
         _finished_training(working_directory)
-        app = AppTest.from_file(str(PAGE_SCRIPT), default_timeout=60).run()
+        app = _open_page()
         app.multiselect(key="validation_problems_Double").select("ZDT1").select("DTLZ2").run()
         app.multiselect(key="validation_defaults_Double").select("MOEA/D").run()
         app.number_input(key="validation_population").set_value(91)
@@ -229,23 +238,32 @@ class TestRunAStudy:
         while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
             assert time.monotonic() < deadline, "the study did not finish"
             time.sleep(0.3)
+        app.switch_page("pages/validation_analysis.py")
+        app.session_state["validation_analysis_study"] = study_dir.name
         app.run()
-        app.selectbox(key="validation_history").select(study_dir.name).run()
 
-        # Assert
+        # Assert: the study, analyzed in Validation analysis
         assert not app.exception
         assert run_phase(study_dir) is RunPhase.FINISHED
-        assert [tab.label for tab in app.tabs][-5:] == [
-            "Summary",
-            "Comparison",
-            "Boxplots",
-            "Runs",
-            "Details",
+        assert [tab.label for tab in app.tabs] == [
+            "Verdict",
+            "Wilcoxon",
+            "Effect size",
+            "Ranking",
+            "Distributions",
+            "Fronts",
+            "Cost",
+            "Runs & details",
         ]
-        medians = next(d for d in app.dataframe if "NSGA-II (tuned)" in d.value.columns)
-        assert list(medians.value.index) == ["ZDT1", "DTLZ2"]
+        # The pivot is the last column of the Wilcoxon table
+        wilcoxon = next(d for d in app.dataframe if "NSGA-II (tuned)" in d.value.columns)
+        assert list(wilcoxon.value.columns)[-1] == "NSGA-II (tuned)"
+        assert list(wilcoxon.value.index) == ["ZDT1", "DTLZ2"]
         # 2 contenders on ZDT1, 3 on DTLZ2, 4 runs each
         assert len(next(d for d in app.dataframe if "Seed" in d.value.columns).value) == 20
+        labels = [button.proto.label for button in app.get("download_button")]
+        assert "Download the table (LaTeX)" in labels
+        assert "Results for SAES (CSV)" in labels
 
 
 class TestProblemBrowser:

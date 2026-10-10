@@ -21,7 +21,6 @@ from evolver_studio.validation import plan_jobs
 from evolver_studio.validation_form import PROBLEM_ROWS_KEY, form_state_from_study
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
-VALIDATION_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "validation.py"
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
 RUN_TIMEOUT_SECONDS = 180
 OPEN_KEY = "tutorial_open_validating_a_configuration"
@@ -88,12 +87,12 @@ class TestOpenInValidation:
         # Arrange
         (tmp_path / "resources").symlink_to(RESOURCES)
         monkeypatch.setattr(evolver_client, "WORKING_DIRECTORY", tmp_path)
-        app = AppTest.from_file(str(VALIDATION_SCRIPT), default_timeout=60)
+        app = AppTest.from_file(str(APP_SCRIPT), default_timeout=60)
         for key, value in form_state_from_study(tutorial_study(newer_jar)).items():
             app.session_state[key] = value
 
-        # Act
-        app.run()
+        # Act: through the app, so that the page's links to other pages resolve
+        app.switch_page("pages/validation.py").run()
 
         # Assert
         assert not app.exception

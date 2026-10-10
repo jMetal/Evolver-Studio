@@ -117,17 +117,18 @@ SECTIONS = (
                 "Validation",
                 "✅",
                 "Compare a tuned configuration with the default configurations of other algorithms "
-                "on a set of problems: many independent runs, medians, Wilcoxon tests and effect "
-                "sizes.",
+                "on a set of problems: design the study, run it many times in the background and "
+                "follow its progress.",
                 available=True,
             ),
             Page(
                 "pages/validation_analysis.py",
                 "Validation analysis",
                 "🔬",
-                "Study the results of a validation: the last step of meta-optimization, after "
-                "training, analyzing the training and validating a configuration.",
-                available=False,
+                "Study the results of a validation: whether the tuned configuration wins, where "
+                "and by how much, its ranking over all the problems, its fronts and its cost; "
+                "tables in LaTeX and charts in PNG or PDF.",
+                available=True,
             ),
         ),
     ),

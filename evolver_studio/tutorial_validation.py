@@ -3,11 +3,12 @@
 The interactive counterpart of Evolver's tutorial E8
 (docs/tutorials/validating_a_configuration.rst): a configuration found by a training is run again,
 many times, next to other algorithms, and the results are compared with a statistical test and an
-effect size, through the Validation page instead of through Java code and scripts.
+effect size, through the Validation and Validation analysis pages instead of through Java code
+and scripts.
 
 The tutorial runs one study, with the configuration that Evolver's tutorial E8 found for NSGA-II on
 the nine bi-objective WFG problems (bundled in Evolver's jar) as the pivot. The study is kept under
-validation-runs/ like any other, so the Validation page shows it too. Its runs are fixed by the
+validation-runs/ like any other, so Validation analysis shows it too. Its runs are fixed by the
 seeds, so they give the same values every time; and what the text says about the results is read
 from them, not written down, so that it holds for the Evolver in use.
 """
@@ -182,8 +183,8 @@ def _render_run_controls(jar: Path) -> bool:
         return False
     if phase is RunPhase.FINISHED:
         st.success(
-            f"The study is ready. It is kept as **{STUDY_ID}** in the Validation page, which "
-            "shows its results too."
+            f"The study is ready. It is kept as **{STUDY_ID}**, and Validation analysis shows "
+            "its results too."
         )
         if st.button("Run it again", key=f"{KEY_PREFIX}_again"):
             _start(jar)
@@ -616,8 +617,8 @@ def _render_next_steps(jar: Path) -> None:
         "Spread or IGD+ may disagree.\n"
         "- **Many comparisons.** Twelve tests at the 5% level are expected to flag a difference "
         "now and then by chance. Evolver's tutorial E8 analyzes all the problems at once, with "
-        "the Friedman test and Holm's procedure, and with critical difference plots; Validation "
-        "does not have them yet.\n"
+        "the Friedman test and Holm's procedure, and with critical difference plots: the "
+        "*Ranking* tab of Validation analysis does it for this study.\n"
         "- **The problems.** Four of them are a small sample of what a configuration may meet.\n\n"
         "**Explore on your own**, in Validation:\n\n"
         "- Add **SMS-EMOA** or another algorithm to compare with (the ones with a default "
@@ -640,6 +641,11 @@ def _render_next_steps(jar: Path) -> None:
         "*A training run* and one of the configurations of its final front."
     )
     st.page_link("pages/validation.py", label="Open Validation", icon="✅")
+    st.page_link(
+        "pages/validation_analysis.py",
+        label="Open Validation analysis, to read this study tab by tab",
+        icon="🔬",
+    )
     st.button(
         "All the tutorials",
         icon="🎓",

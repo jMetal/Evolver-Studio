@@ -38,19 +38,31 @@ Works with Evolver 2.4.
 ### The four steps of meta-optimization
 
 - The Meta-optimization menu follows the workflow: **Training**, **Training analysis** (the page
-  called *Analysis* until now), **Validation** and **Validation analysis**, which is still to come
-  (Validation shows a study's results meanwhile).
+  called *Analysis* until now), **Validation** and **Validation analysis**. Validation designs,
+  runs and follows a study, and offers to analyze it when it finishes.
+- **Validation analysis** reads a study, for the indicator chosen, in eight tabs:
+  - *Verdict*: the pivot's wins, ties and losses against each algorithm, per indicator;
+  - *Wilcoxon*: the Wilcoxon pivot table (median and IQR, `+`/`-`/`=`, best two shaded), on
+    screen and as LaTeX, and each comparison's p-value and A12;
+  - *Effect size*: a heatmap of A12;
+  - *Ranking*: average ranks, Friedman's test, Demšar's critical difference plot (Nemenyi) and
+    Holm's procedure against the pivot, with a LaTeX table;
+  - *Distributions*: boxplots;
+  - *Fronts*: the median, best or worst run of each algorithm on a problem, over the reference
+    front: overlaid for two objectives, in 3D for three, a parallel-coordinates chart per
+    algorithm for more;
+  - *Cost*: the median computing time of a run;
+  - *Runs & details*: the study's design, every run, and the CSV files SAES reads.
 
 ### Saving tables and charts
 
-- *Validation* saves a study's results as the two CSV files **SAES** reads: the results (one row
-  per run and indicator: `Algorithm`, `Instance`, `MetricName`, `ExecutionId`, `MetricValue`) and
-  the metrics (`MetricName`, `Maximize`), in its *Runs* tab.
-- With SAES installed (`pip install SAES`), *Validation* saves the comparison with the pivot as
-  **SAES's Wilcoxon pivot table** in LaTeX, as Evolver's `scripts/wilcoxon_pivot_tables.py` makes
-  it: median and interquartile range, the pivot in the last column, `+`/`-`/`=` against it and a
-  last row that counts them. The counts are written whole in bold and the preamble is one that
-  compiles, two fixes to SAES's document that the script also makes.
+- A study's results are saved as the two CSV files **SAES** reads: the results (one row per run
+  and indicator: `Algorithm`, `Instance`, `MetricName`, `ExecutionId`, `MetricValue`) and the
+  metrics (`MetricName`, `Maximize`).
+- The **Wilcoxon pivot table** and the **ranking** are saved as LaTeX documents that compile on
+  their own. The Wilcoxon table has the layout of SAES's (and of Evolver's
+  `scripts/wilcoxon_pivot_tables.py`), but is written by Evolver-Studio, without SAES, and with the
+  rank-sum test (SAES pairs the runs with the signed-rank test; they are independent).
 - **Every chart** of the app (fronts, solutions, boxplots, convergence, population, parameters, in
   the pages and in the tutorials) has **PNG** and **PDF** buttons. The images are made with Kaleido
   (a new dependency) in the Chrome installed on the computer, only when a button is pressed.

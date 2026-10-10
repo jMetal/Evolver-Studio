@@ -198,10 +198,8 @@ Validation / Run algorithm) and a parameter analysis against the default configu
   analysis-layer goal, not started yet).
 
 Meta-optimization has four steps, a page each: Training, Training analysis, Validation and
-**Validation analysis**. The last one is a placeholder (`pages/validation_analysis.py`): what it
-shows is still to be designed. Meanwhile Validation shows a study's results (medians, Wilcoxon,
-boxplots, the SAES files). A study keeps every run's front (`validation-runs/<id>/jobs/NNN/output/
-run-K/FUN.csv` and `VAR.csv`), which no page shows yet.
+**Validation analysis** (`pages/validation_analysis.py`, `evolver_studio/validation_view.py`): its
+tabs Verdict, Wilcoxon, Effect size, Ranking, Distributions, Fronts, Cost and Runs & details.
 
 ## Phase 4 — Validation runs
 
@@ -213,9 +211,10 @@ in Evolver: a study is a `cli.solving` request per algorithm and problem
 (`validation_worker.py`) that keeps a `status.yaml` in Evolver's format, and its statistics follow
 Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum, A12). Still to do:
 
-- Friedman test with Holm's procedure over the problems, critical difference plots and the Bayesian
-  sign test (Evolver's scripts use SAES for them). A study is already saved as SAES's CSV files,
-  and its Wilcoxon pivot table made by SAES (`saes_export.py`), when SAES is installed.
+- The Bayesian sign test (Friedman, Holm and the critical difference plot are in Validation
+  analysis, written without SAES: `validation_stats.py`, `latex_tables.py`).
+- Seen and unseen problems in the verdict, if a study records the training's problems.
+- Computing the hypervolume for a study that did not ask for it (its fronts are kept).
 - An estimate of how long a study takes: an algorithm such as SMS-EMOA with three objectives is
   orders of magnitude slower than NSGA-II, which one only learns by running it.
 

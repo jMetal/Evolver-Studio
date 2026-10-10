@@ -3,7 +3,7 @@
 The page builds a validation study (see evolver_studio/validation.py): the tuned configuration,
 which is the pivot, and the default configurations of other Evolver algorithms, all run many times
 on the same problems with the same population size, evaluation budget and seeds. A detached worker
-runs it, and its results are compared with medians, a Wilcoxon test and the A12 effect size.
+runs it; its results are studied in Validation analysis, which the page offers when it finishes.
 """
 
 import datetime as dt
@@ -12,8 +12,6 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-import pandas as pd
-import plotly.express as px
 import streamlit as st
 
 from evolver_studio import running_badge
@@ -22,7 +20,7 @@ from evolver_studio.app_state import (
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
-from evolver_studio.catalogue import BASE_ALGORITHMS, is_maximized, validation_indicators
+from evolver_studio.catalogue import BASE_ALGORITHMS, validation_indicators
 from evolver_studio.configuration import (
     complete_values,
     configuration_string,
@@ -31,7 +29,6 @@ from evolver_studio.configuration import (
     values_outside_the_space,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
-from evolver_studio.figure_export import render_chart
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
@@ -39,25 +36,16 @@ from evolver_studio.problem_catalogue import Problem, problems_with_encoding
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
 from evolver_studio.runs import RunPhase, find_run_in_progress, mark_cancelled, run_phase
-from evolver_studio.saes_export import (
-    saes_available,
-    saes_metrics,
-    saes_results,
-    wilcoxon_pivot_table,
-)
 from evolver_studio.training_runs import FinishedTraining, list_finished_trainings
 from evolver_studio.validation import (
     DEFAULT_MAX_EVALUATIONS,
     DEFAULT_POPULATION_SIZE,
     DEFAULT_RUNS,
     Contender,
-    StudyInfo,
     StudyProblem,
     ValidationStudy,
     base_algorithm,
-    collect_runs,
     default_contenders,
-    list_studies,
     plan_jobs,
     write_study,
 )
@@ -89,21 +77,15 @@ from evolver_studio.validation_runner import (
     cancel_study,
     start_study,
 )
-from evolver_studio.validation_stats import (
-    ALPHA,
-    best_contenders,
-    compare_with_pivot,
-    indicator_names,
-    interquartile_ranges,
-    medians,
-    verdict_counts,
-)
 
 RUNS_DIRECTORY = WORKING_DIRECTORY / VALIDATION_RUNS_DIRECTORY_NAME
 POLL_EVERY_SECONDS = 1
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 ENCODINGS = ("Double", "Binary", "Permutation")
-HISTORY_KEY = "validation_history"
+# The study that has just finished, to offer to analyze it.
+FINISHED_KEY = "validation_finished_study"
+# Validation analysis's selector of the study.
+ANALYSIS_STUDY_KEY = "validation_analysis_study"
 SPACE_COLUMN_HELP = (
     "Optional: the constructor's arguments, all of them or none, comma-separated "
     "(e.g. 12, 2 for DTLZ2 with 12 variables and 2 objectives). Explore › Problems lists them."
@@ -397,7 +379,7 @@ def _launch(study: ValidationStudy, processes: int, jar: Path) -> None:
     directory = RUNS_DIRECTORY / study_id
     write_study(study, directory, WORKING_DIRECTORY)
     start_study(directory, jar, processes, WORKING_DIRECTORY)
-    st.session_state.pop(HISTORY_KEY, None)
+    st.session_state.pop(FINISHED_KEY, None)
 
 
 def _render_form(catalogue: dict[str, Problem], jar: Path, can_run: bool) -> None:
@@ -449,7 +431,7 @@ def _render_study_in_progress(study_directory: Path) -> None:
     def _poll() -> None:
         running_badge.render(study_running_label(read_status(study_directory / "status.yaml")))
         if run_phase(study_directory) not in (RunPhase.STARTING, RunPhase.RUNNING):
-            st.session_state[HISTORY_KEY] = study_directory.name
+            st.session_state[FINISHED_KEY] = study_directory.name
             st.rerun()
 
     _poll()
@@ -458,212 +440,18 @@ def _render_study_in_progress(study_directory: Path) -> None:
         st.rerun()
 
 
-def _failed_jobs(study_directory: Path) -> list[int]:
-    try:
-        return [int(n) for n in (study_directory / "failed_jobs.txt").read_text().split()]
-    except (OSError, ValueError):
-        return []
-
-
-def _direction(indicator: str) -> str:
-    return "higher is better" if is_maximized(indicator) else "lower is better"
-
-
-def _render_summary(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
-    table = medians(runs, indicator)
-    maximize = is_maximized(indicator)
-    best = best_contenders(table, maximize)
-    st.markdown(
-        f"**Median of {indicator}** over the runs ({_direction(indicator)}); the best on each "
-        "problem is highlighted."
-    )
-    highlighted = (
-        table.style.highlight_max(axis=1) if maximize else table.style.highlight_min(axis=1)
-    )
-    st.dataframe(highlighted.format("{:.4g}"), width="stretch")
-    st.caption(
-        "Best on "
-        + ", ".join(
-            f"{name}: {(best == name).sum()}" for name in table.columns if (best == name).sum()
-        )
-        + f" of {len(table)} problems."
-    )
-    with st.expander("Interquartile range"):
-        st.dataframe(interquartile_ranges(runs, indicator).style.format("{:.4g}"), width="stretch")
-
-
-def _render_comparison(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
-    comparison = compare_with_pivot(runs, indicator, pivot)
-    if comparison.empty:
-        st.info("There is nothing to compare yet.")
+def _render_finished_study() -> None:
+    """Say that the study just run is ready, and offer to analyze it."""
+    study_id = st.session_state.get(FINISHED_KEY)
+    if study_id is None or not (RUNS_DIRECTORY / study_id).is_dir():
         return
-    st.markdown(
-        f"**{pivot}** against each other algorithm, problem by problem, on {indicator} "
-        f"({_direction(indicator)}). A Wilcoxon rank-sum test at {ALPHA}, and the **A12** "
-        "effect size: the probability that a run of the pivot is better than a run of the other "
-        "algorithm (0.5 is no difference; 1 means always better)."
-    )
-    st.markdown("On how many problems the pivot is better, not different, or worse:")
-    st.dataframe(verdict_counts(comparison), width="stretch")
-    detail = comparison.rename(
-        columns={
-            "problem": "Problem",
-            "contender": "Algorithm",
-            "pivot_median": "Pivot median",
-            "median": "Median",
-            "p_value": "p-value",
-            "a12": "A12",
-            "magnitude": "Effect",
-            "verdict": "Verdict",
-        }
-    )
-    st.dataframe(detail, hide_index=True, width="stretch")
-    st.download_button(
-        "Download the comparison (CSV)",
-        detail.to_csv(index=False),
-        file_name=f"comparison_{indicator}.csv",
-        mime="text/csv",
-        key=f"validation_comparison_{indicator}",
-    )
-    if saes_available():
-        st.download_button(
-            "Download the Wilcoxon pivot table (LaTeX)",
-            lambda: wilcoxon_pivot_table(runs, indicator, pivot),
-            file_name=f"WilcoxonPivot_{indicator}.tex",
-            mime="application/x-tex",
-            key=f"validation_wilcoxon_latex_{indicator}",
-            on_click="ignore",
-            icon=":material/download:",
-            help="SAES's Wilcoxon pivot table, as Evolver's scripts/wilcoxon_pivot_tables.py "
-            "makes it: median and interquartile range, the pivot in the last column, + the pivot "
-            "is significantly better, - significantly worse, = no significant difference, and "
-            "the last row counts them. A LaTeX document that compiles on its own.",
-        )
-    else:
-        st.caption(
-            "Install SAES (`pip install SAES`) to download this comparison as SAES's Wilcoxon "
-            "pivot table in LaTeX."
-        )
-
-
-def _render_boxplots(runs: pd.DataFrame, indicator: str) -> None:
-    figure = px.box(
-        runs,
-        x="contender",
-        y=indicator,
-        color="contender",
-        facet_col="problem",
-        facet_col_wrap=3,
-        labels={"contender": "", indicator: indicator},
-    )
-    figure.update_yaxes(matches=None, showticklabels=True)
-    figure.update_xaxes(showticklabels=False)
-    figure.update_layout(showlegend=True, height=320 * -(-runs["problem"].nunique() // 3))
-    render_chart(
-        figure, f"validation_boxplot_{indicator}", f"boxplots_{indicator}", width="stretch"
-    )
-
-
-def _render_details(study_directory: Path, manifest: dict) -> None:
-    st.markdown(
-        f"**Budget**: population {manifest['populationSize']}, {manifest['maxEvaluations']:,} "
-        f"evaluations, {manifest['runs']} runs from the seed {manifest['seed']}, "
-        f"{manifest['encoding']} problems. Folder: `{study_directory}`."
-    )
-    st.dataframe(pd.DataFrame(manifest["contenders"]), hide_index=True, width="stretch")
-    if manifest.get("skipped"):
-        st.warning(
-            "Left out: "
-            + "; ".join(
-                f"{s['contender']} on {s['problem']} ({s['reason']})" for s in manifest["skipped"]
-            )
-        )
-    failed = _failed_jobs(study_directory)
-    if failed:
-        st.error(
-            f"Jobs that failed: {', '.join(map(str, failed))}. See `runner.log` in their folders."
-        )
-    st.download_button(
-        "Download study.yaml",
-        (study_directory / "study.yaml").read_text(),
-        file_name="study.yaml",
-        mime="application/x-yaml",
-        key=f"validation_manifest_{study_directory.name}",
-    )
-
-
-def _render_results(study: StudyInfo) -> None:
-    """Show the results of a study: its summary, comparison, boxplots and runs."""
-    phase = run_phase(study.directory)
-    if phase == RunPhase.CANCELLED:
-        st.info("This study was cancelled: what follows is what had finished.")
-    elif phase in (RunPhase.STARTING, RunPhase.RUNNING):
-        st.info("This study is still in progress.")
-    runs = collect_runs(study.directory, WORKING_DIRECTORY)
-    if runs.empty:
-        st.info("No job has finished yet.")
-        return
-    indicators = indicator_names(runs)
-    indicator = st.selectbox("Indicator", indicators, key=f"validation_indicator_{study.study_id}")
-    tabs = st.tabs(["Summary", "Comparison", "Boxplots", "Runs", "Details"])
-    with tabs[0]:
-        _render_summary(runs, indicator, study.manifest["pivot"])
-    with tabs[1]:
-        _render_comparison(runs, indicator, study.manifest["pivot"])
-    with tabs[2]:
-        _render_boxplots(runs, indicator)
-    with tabs[3]:
-        st.dataframe(runs, hide_index=True, width="stretch")
-        st.download_button(
-            "Download every run (CSV)",
-            runs.to_csv(index=False),
-            file_name=f"{study.study_id}_runs.csv",
-            mime="text/csv",
-            key=f"validation_runs_{study.study_id}",
-        )
-        st.markdown(
-            "**For SAES**: the results (one row per run and indicator) and the metrics (whether "
-            "each indicator is maximized), the two files SAES reads (`-ds` and `-ms`)."
-        )
-        saes_columns = st.columns(2)
-        saes_columns[0].download_button(
-            "Results for SAES (CSV)",
-            saes_results(runs).to_csv(index=False),
-            file_name=f"{study.study_id}_saes_results.csv",
-            mime="text/csv",
-            key=f"validation_saes_results_{study.study_id}",
-            on_click="ignore",
-            icon=":material/download:",
-        )
-        saes_columns[1].download_button(
-            "Metrics for SAES (CSV)",
-            saes_metrics(runs).to_csv(index=False),
-            file_name=f"{study.study_id}_saes_metrics.csv",
-            mime="text/csv",
-            key=f"validation_saes_metrics_{study.study_id}",
-            on_click="ignore",
-            icon=":material/download:",
-        )
-    with tabs[4]:
-        _render_details(study.directory, study.manifest)
-
-
-def _render_history() -> None:
-    """Choose a past study and show its results."""
-    studies = {study.study_id: study for study in list_studies(RUNS_DIRECTORY)}
-    if not studies:
-        return
-    st.subheader("Results")
-    chosen = st.selectbox(
-        "Previous studies",
-        list(studies),
-        index=None,
-        placeholder="Choose a study to see its results",
-        format_func=lambda study_id: studies[study_id].label,
-        key=HISTORY_KEY,
-    )
-    if chosen is not None:
-        _render_results(studies[chosen])
+    phase = run_phase(RUNS_DIRECTORY / study_id)
+    message = "was cancelled" if phase == RunPhase.CANCELLED else "is ready"
+    st.success(f"The study {study_id} {message}.")
+    if st.button("Analyze it in Validation analysis", icon="🔬", type="primary"):
+        st.session_state[ANALYSIS_STUDY_KEY] = study_id
+        st.session_state.pop(FINISHED_KEY, None)
+        st.switch_page("pages/validation_analysis.py")
 
 
 st.title("Validation")
@@ -682,5 +470,11 @@ if catalogue is None:
 in_progress = find_run_in_progress(RUNS_DIRECTORY)
 if in_progress is not None:
     _render_study_in_progress(in_progress)
+else:
+    _render_finished_study()
 _render_form(catalogue, jar, can_run=in_progress is None)
-_render_history()
+st.page_link(
+    "pages/validation_analysis.py",
+    label="The results of the studies are in Validation analysis",
+    icon="🔬",
+)

@@ -60,8 +60,8 @@ purpose:
 | Solve | Run algorithm | ✅ | Run an algorithm on a problem from its default configuration, adjusted within its parameter space; inspect the fronts and indicators, download `VAR`/`FUN` |
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Training analysis | ✅ | Study a finished training: how it converged and how its population evolved, its final front of configurations, what they have in common and how they differ from the default; send one to Validation or Run algorithm |
-| Meta-optimization | Validation | ✅ | Compare a tuned configuration with the default configurations of other algorithms, adjustable within their parameter spaces, on a set of problems: many runs, medians, Wilcoxon tests, effect sizes and boxplots |
-| Meta-optimization | Validation analysis | 🚧 | Study the results of a validation (to be designed; meanwhile Validation shows them) |
+| Meta-optimization | Validation | ✅ | Compare a tuned configuration with the default configurations of other algorithms, adjustable within their parameter spaces, on a set of problems: design the study, run it many times in the background, follow it |
+| Meta-optimization | Validation analysis | ✅ | Study a validation: the pivot's wins and losses, the Wilcoxon pivot table, effect sizes, ranking with Friedman, Holm and the critical difference plot, boxplots, fronts (2, 3 or more objectives) and cost; LaTeX tables, PNG/PDF charts, SAES files |
 | Learn | Tutorials | ✅ | Interactive, step-by-step tutorials that pair with Evolver's documentation |
 
 ✅ available · 🚧 planned
@@ -104,9 +104,6 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 - Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF (Kaleido draws them in
   it). Without it the PNG/PDF buttons are not offered, and each chart's camera icon still saves it
   as PNG.
-- Optionally, [SAES](https://github.com/jMetal/SAES) (`pip install SAES`), for Validation to save
-  the comparison as SAES's Wilcoxon pivot table in LaTeX. The CSV files SAES reads are saved
-  without it.
 
 Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.4** (the
 release the app is built against) from Maven Central. Other
