@@ -2,7 +2,8 @@
 
 Pick a study kept under validation-runs/ and an indicator, and read it tab by tab: whether the
 tuned configuration (the pivot) wins, on which problems, by how much, over all the problems at
-once, how stable it is, what its fronts look like, what it costs and how the study was made.
+once, with what probability, how stable it is, what its fronts look like, where in the objective
+space it reaches, whether the indicators agree, what it costs and how the study was made.
 Tables and charts are saved as LaTeX, PNG or PDF, and the runs as the files SAES reads.
 """
 
@@ -54,31 +55,49 @@ if runs.empty:
 
 pivot = study.manifest["pivot"]
 indicators = indicator_names(runs)
-indicator = st.selectbox(
+choices = st.columns([3, 2])
+indicator = choices[0].selectbox(
     "Indicator",
     indicators,
     key=f"validation_analysis_indicator_{study_id}",
-    help="The one every tab but Verdict uses; it also chooses the run shown in Fronts.",
+    help="The one every tab but Verdict and Indicators uses; it also chooses the run shown in "
+    "Fronts.",
+)
+correction = choices[1].selectbox(
+    "Correction for many comparisons",
+    list(validation_view.CORRECTIONS),
+    format_func=validation_view.CORRECTIONS.get,
+    key=f"validation_analysis_correction_{study_id}",
+    help="A Wilcoxon test on each problem and algorithm is many tests: at 0.05, some find a "
+    "difference by chance. Holm keeps the chance of any false difference below 0.05; "
+    "Benjamini-Hochberg keeps the share of false ones among those found below 0.05, and finds "
+    "more. It applies to Verdict, Wilcoxon (and its LaTeX table) and Effect size.",
 )
 st.caption(
     f"{runs['problem'].nunique()} problems · {runs['contender'].nunique()} algorithms · "
     f"pivot **{pivot}** · {indicator}: {validation_view.direction(indicator)}"
 )
 
-tabs = st.tabs(list(validation_view.TAB_NAMES))
-with tabs[0]:
-    validation_view.render_verdict(runs, pivot)
-with tabs[1]:
-    validation_view.render_wilcoxon(runs, indicator, pivot, study_id)
-with tabs[2]:
-    validation_view.render_effect_size(runs, indicator, pivot, study_id)
-with tabs[3]:
+tabs = iter(st.tabs(list(validation_view.TAB_NAMES)))
+with next(tabs):
+    validation_view.render_verdict(runs, pivot, correction)
+with next(tabs):
+    validation_view.render_wilcoxon(runs, indicator, pivot, study_id, correction)
+with next(tabs):
+    validation_view.render_effect_size(runs, indicator, pivot, study_id, correction)
+with next(tabs):
     validation_view.render_ranking(runs, indicator, pivot, study_id)
-with tabs[4]:
+with next(tabs):
+    validation_view.render_bayesian(runs, indicator, pivot, study_id)
+with next(tabs):
     validation_view.render_distributions(runs, indicator, study_id)
-with tabs[5]:
+with next(tabs):
     validation_view.render_fronts(study, runs, indicator, WORKING_DIRECTORY)
-with tabs[6]:
+with next(tabs):
+    validation_view.render_attainment(study, runs, WORKING_DIRECTORY)
+with next(tabs):
+    validation_view.render_indicators(runs, study_id)
+with next(tabs):
     validation_view.render_cost(runs, study_id)
-with tabs[7]:
+with next(tabs):
     validation_view.render_runs_and_details(study, runs)

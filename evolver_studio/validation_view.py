@@ -2,9 +2,10 @@
 
 Each answers a question for deciding whether to use the tuned configuration (the pivot), and
 where: does it win (Verdict), on which problems (Wilcoxon), by how much (Effect size), over all the
-problems at once (Ranking), how stable it is (Distributions), what its fronts look like (Fronts),
-what it costs (Cost), and how the study was made (Runs & details). Every one follows the direction
-of the indicator chosen (`catalogue.is_maximized`).
+problems at once (Ranking), with what probability (Bayesian), how stable it is (Distributions),
+what its fronts look like (Fronts), where in the objective space it reaches (Attainment), whether
+the indicators agree (Indicators), what it costs (Cost), and how the study was made (Runs &
+details). Every one follows the direction of the indicator chosen (`catalogue.is_maximized`).
 """
 
 from pathlib import Path
@@ -12,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from evolver_studio.attainment import attainment_surfaces, eaf_differences
 from evolver_studio.catalogue import is_maximized
 from evolver_studio.figure_export import render_chart
 from evolver_studio.latex_tables import ranking_table, wilcoxon_pivot_table
@@ -22,28 +24,42 @@ from evolver_studio.validation import (
     read_study_reference_front,
 )
 from evolver_studio.validation_figures import (
+    COLOR_SCHEME,
+    GRAY_SCHEME,
+    attainment_figure,
+    bayesian_simplex_figure,
     boxplot_figure,
+    correlation_figure,
     cost_figure,
     critical_difference_figure,
+    eaf_difference_figure,
     effect_size_figure,
     fronts_grid_figure,
     parallel_fronts_figures,
 )
 from evolver_studio.validation_stats import (
     ALPHA,
+    BENJAMINI_HOCHBERG,
     BEST_RUN,
+    HOLM,
     MEDIAN_RUN,
+    NO_CORRECTION,
     WORST_RUN,
+    aligned_friedman_test,
     average_ranks,
+    bayesian_signed_rank,
     chosen_run,
     compare_with_pivot,
     critical_difference,
     friedman_test,
     holm_against_pivot,
+    indicator_correlations,
     indicator_names,
     interquartile_ranges,
     medians,
     nonsignificant_groups,
+    quade_test,
+    signed_rank_against_pivot,
     verdict_counts,
 )
 
@@ -52,11 +68,26 @@ TAB_NAMES = (
     "Wilcoxon",
     "Effect size",
     "Ranking",
+    "Bayesian",
     "Distributions",
     "Fronts",
+    "Attainment",
+    "Indicators",
     "Cost",
     "Runs & details",
 )
+CORRECTIONS = {
+    NO_CORRECTION: "None",
+    HOLM: "Holm",
+    BENJAMINI_HOCHBERG: "Benjamini-Hochberg",
+}
+CORRECTION_TEXT = {
+    NO_CORRECTION: "",
+    HOLM: ", the p-values adjusted with Holm's procedure for being many comparisons",
+    BENJAMINI_HOCHBERG: ", the p-values adjusted with the Benjamini-Hochberg procedure for being "
+    "many comparisons",
+}
+DEFAULT_ROPE = 0.01
 # Below this many problems, Friedman's test and the critical difference have little power.
 FEW_PROBLEMS = 5
 RUN_CHOICES = {
@@ -71,17 +102,17 @@ def direction(indicator: str) -> str:
     return "higher is better" if is_maximized(indicator) else "lower is better"
 
 
-def render_verdict(runs: pd.DataFrame, pivot: str) -> None:
+def render_verdict(runs: pd.DataFrame, pivot: str, correction: str) -> None:
     """Whether the pivot wins: its wins, ties and losses against each algorithm, per indicator."""
     st.markdown(
         f"How often **{pivot}** is significantly better (+), not different (=) or worse (-) "
         f"than each algorithm, over the problems: a Wilcoxon rank-sum test at {ALPHA} on each "
-        "problem."
+        f"problem{CORRECTION_TEXT[correction]}."
     )
     columns = {}
     sentences = []
     for indicator in indicator_names(runs):
-        counts = verdict_counts(compare_with_pivot(runs, indicator, pivot))
+        counts = verdict_counts(compare_with_pivot(runs, indicator, pivot, correction=correction))
         if counts.empty:
             continue
         columns[f"{indicator} (+ / = / -)"] = counts.apply(
@@ -99,13 +130,15 @@ def render_verdict(runs: pd.DataFrame, pivot: str) -> None:
     st.markdown("\n".join(sentences))
 
 
-def render_wilcoxon(runs: pd.DataFrame, indicator: str, pivot: str, study_id: str) -> None:
+def render_wilcoxon(
+    runs: pd.DataFrame, indicator: str, pivot: str, study_id: str, correction: str
+) -> None:
     """The Wilcoxon pivot table, on screen and as LaTeX, and the detail of each comparison."""
     maximize = is_maximized(indicator)
     contenders = [c for c in dict.fromkeys(runs["contender"]) if c != pivot] + [pivot]
     median_table = medians(runs, indicator).reindex(columns=contenders)
     iqr_table = interquartile_ranges(runs, indicator).reindex(columns=contenders)
-    comparison = compare_with_pivot(runs, indicator, pivot)
+    comparison = compare_with_pivot(runs, indicator, pivot, correction=correction)
     if comparison.empty:
         st.info("There is nothing to compare yet.")
         return
@@ -125,8 +158,9 @@ def render_wilcoxon(runs: pd.DataFrame, indicator: str, pivot: str, study_id: st
     st.markdown(
         f"Median and interquartile range of **{indicator}** ({direction(indicator)}); "
         f"**{pivot}** in the last column, the others marked against it: + it is significantly "
-        "better, - significantly worse, = the difference is not significant. The best and "
-        "second-best median of each problem are shaded."
+        "better, - significantly worse, = the difference is not significant"
+        f"{CORRECTION_TEXT[correction]}. The best and second-best median of each problem are "
+        "shaded."
     )
     st.dataframe(
         shown.style.apply(lambda row: _top_two_shades(median_table.loc[row.name], maximize), 1),
@@ -134,7 +168,7 @@ def render_wilcoxon(runs: pd.DataFrame, indicator: str, pivot: str, study_id: st
     )
     st.download_button(
         "Download the table (LaTeX)",
-        lambda: wilcoxon_pivot_table(runs, indicator, pivot),
+        lambda: wilcoxon_pivot_table(runs, indicator, pivot, correction=correction),
         file_name=f"WilcoxonPivot_{indicator}.tex",
         mime="application/x-tex",
         key=f"validation_analysis_wilcoxon_latex_{study_id}_{indicator}",
@@ -151,6 +185,7 @@ def render_wilcoxon(runs: pd.DataFrame, indicator: str, pivot: str, study_id: st
                 "pivot_median": "Pivot median",
                 "median": "Median",
                 "p_value": "p-value",
+                "adjusted_p_value": "Adjusted p-value",
                 "a12": "A12",
                 "magnitude": "Effect",
                 "verdict": "Verdict",
@@ -167,21 +202,34 @@ def render_wilcoxon(runs: pd.DataFrame, indicator: str, pivot: str, study_id: st
         )
 
 
-def render_effect_size(runs: pd.DataFrame, indicator: str, pivot: str, study_id: str) -> None:
+def render_effect_size(
+    runs: pd.DataFrame, indicator: str, pivot: str, study_id: str, correction: str
+) -> None:
     """How large the differences are: the A12 of the pivot against each algorithm."""
-    comparison = compare_with_pivot(runs, indicator, pivot)
+    comparison = compare_with_pivot(runs, indicator, pivot, correction=correction)
     if comparison.empty:
         st.info("There is nothing to compare yet.")
         return
     st.markdown(
         f"**A12** is the probability that a run of **{pivot}** is better than a run of the other "
         "algorithm on the same problem: 0.5 is no difference, 1 always better, 0 always worse. "
-        "A significant difference can be small: |A12 − 0.5| of 0.06, 0.14 and 0.21 are a small, "
-        "a medium and a large effect. Each cell also has the mark of the Wilcoxon test."
+        "A significant difference can be small, so the cells are shaded by the size of the "
+        "effect, as Vargha and Delaney classify it: |A12 − 0.5| of 0.06, 0.14 and 0.21 begin a "
+        "small, a medium and a large effect. Each cell also has the mark of the Wilcoxon test."
+    )
+    scheme = st.radio(
+        "Colors",
+        [COLOR_SCHEME, GRAY_SCHEME],
+        format_func={COLOR_SCHEME: "Color", GRAY_SCHEME: "Grays (for printing)"}.get,
+        horizontal=True,
+        key=f"validation_analysis_scheme_{study_id}",
+        help="In color, blue where the pivot is better and red where it is worse (safe for "
+        "color-blind readers). In grays, which print in black and white, the darker the larger "
+        "the effect, and the direction is the mark of the cell.",
     )
     render_chart(
-        effect_size_figure(comparison, pivot),
-        f"validation_analysis_a12_{study_id}_{indicator}",
+        effect_size_figure(comparison, pivot, scheme),
+        f"validation_analysis_a12_{study_id}_{indicator}_{scheme}",
         f"a12_{indicator}",
         width="stretch",
     )
@@ -244,6 +292,54 @@ def render_ranking(runs: pd.DataFrame, indicator: str, pivot: str, study_id: str
     ).drop(columns="z")
     pivot_row = pd.DataFrame([{"Algorithm": f"{pivot} (pivot)", "Average rank": ranks[pivot]}])
     st.dataframe(pd.concat([pivot_row, table], ignore_index=True), hide_index=True, width="stretch")
+    st.markdown(
+        "**Other tests of whether the algorithms differ at all**, with more power than "
+        "Friedman's when the problems are few (García et al., Inf. Sci. 180, 2010): the aligned "
+        "ranks compare the problems with each other too, and Quade's weights each problem by how "
+        "much the algorithms differ on it."
+    )
+    omnibus = []
+    for name, result in (
+        ("Friedman", friedman),
+        ("Friedman aligned ranks", aligned_friedman_test(median_table)),
+        ("Quade", quade_test(median_table)),
+    ):
+        if result is not None:
+            omnibus.append(
+                {
+                    "Test": name,
+                    "Statistic": result[0],
+                    "p-value": result[1],
+                    f"Differ at {ALPHA}": result[1] < ALPHA,
+                }
+            )
+    if omnibus:
+        st.dataframe(
+            pd.DataFrame(omnibus).style.format({"Statistic": "{:.3f}", "p-value": "{:.2e}"}),
+            hide_index=True,
+            width="stretch",
+        )
+    st.markdown(
+        f"**Wilcoxon's signed-rank test over the problems**: {pivot} against each algorithm, "
+        "the medians of each problem as a pair, the p-values adjusted with Holm's procedure. "
+        "Demšar recommends it to compare two algorithms over several problems."
+    )
+    signed = signed_rank_against_pivot(median_table, pivot, maximize)
+    st.dataframe(
+        signed.rename(
+            columns={
+                "contender": "Algorithm",
+                "problems": "Problems",
+                "pivot_better": f"{pivot} better on",
+                "pivot_worse": f"{pivot} worse on",
+                "p_value": "p-value",
+                "adjusted_p_value": "Holm p-value",
+                "verdict": "Verdict",
+            }
+        ).style.format({"p-value": "{:.2e}", "Holm p-value": "{:.2e}"}),
+        hide_index=True,
+        width="stretch",
+    )
     st.download_button(
         "Download the ranking (LaTeX)",
         lambda: ranking_table(holm, ranks, pivot, indicator),
@@ -335,6 +431,178 @@ def render_fronts(
             f"fronts_{problem}_{which}_{index + 1}",
             width="stretch",
         )
+
+
+def render_bayesian(runs: pd.DataFrame, indicator: str, pivot: str, study_id: str) -> None:
+    """The Bayesian signed-rank test of the pivot against each algorithm, over the problems."""
+    maximize = is_maximized(indicator)
+    median_table = medians(runs, indicator)
+    st.markdown(
+        "Instead of a p-value, the probability that the pivot is better, **practically "
+        "equivalent** or worse than each algorithm, over the problems (Benavoli et al., J. Mach. "
+        "Learn. Res. 18, 2017). Two medians closer than the **ROPE** (the region of practical "
+        "equivalence) count as equal: choose it as the smallest difference that matters to you."
+    )
+    columns = st.columns(2)
+    relative = (
+        columns[0].radio(
+            "Differences",
+            ["Relative", "Absolute"],
+            horizontal=True,
+            key=f"validation_analysis_relative_{study_id}",
+            help="Relative: each problem's difference divided by the mean of the two medians, so "
+            "that problems whose values differ in scale weigh alike, and the ROPE is a share "
+            f"(0.01 is 1%). Absolute: the difference in units of {indicator}.",
+        )
+        == "Relative"
+    )
+    rope = columns[1].number_input(
+        "ROPE (a share of the medians)" if relative else f"ROPE ({indicator})",
+        min_value=0.0,
+        value=DEFAULT_ROPE,
+        step=0.005,
+        format="%.4f",
+        key=f"validation_analysis_rope_{study_id}_{indicator}_{relative}",
+    )
+    others = [c for c in dict.fromkeys(runs["contender"]) if c != pivot]
+    comparisons = {
+        other: bayesian_signed_rank(median_table, pivot, other, rope, maximize, relative=relative)
+        for other in others
+    }
+    rows = [
+        {
+            "Algorithm": other,
+            f"P({pivot} better)": result.pivot_better,
+            "P(equivalent)": result.equivalent,
+            f"P({pivot} worse)": result.pivot_worse,
+        }
+        for other, result in comparisons.items()
+        if result is not None
+    ]
+    if not rows:
+        st.info("There is nothing to compare yet.")
+        return
+    st.dataframe(
+        pd.DataFrame(rows),
+        hide_index=True,
+        width="stretch",
+        column_config={
+            column: st.column_config.ProgressColumn(
+                column, min_value=0.0, max_value=1.0, format="%.3f"
+            )
+            for column in rows[0]
+            if column != "Algorithm"
+        },
+    )
+    st.caption(
+        "A probability above 0.95 is a clear answer. With few problems the posterior stays "
+        "spread, and the honest answer is that they cannot be told apart yet."
+    )
+    shown = st.selectbox(
+        "Posterior against", others, key=f"validation_analysis_simplex_{study_id}_{indicator}"
+    )
+    if comparisons.get(shown) is not None:
+        render_chart(
+            bayesian_simplex_figure(comparisons[shown].samples, pivot, shown),
+            f"validation_analysis_simplex_chart_{study_id}_{indicator}_{shown}",
+            f"bayesian_{indicator}_{shown}",
+            width="stretch",
+        )
+
+
+def render_attainment(study: StudyInfo, runs: pd.DataFrame, working_directory: Path) -> None:
+    """Where in the objective space each algorithm's runs reach: attainment surfaces and EAF
+    differences, for problems with two objectives."""
+    key = f"validation_analysis_attainment_{study.study_id}"
+    pivot = study.manifest["pivot"]
+    contenders = [pivot] + [c for c in dict.fromkeys(runs["contender"]) if c != pivot]
+    problems = list(dict.fromkeys(runs["problem"]))
+    problem = st.selectbox("Problem", problems, key=f"{key}_problem")
+    reference = read_study_reference_front(study.manifest, problem, working_directory)
+    fronts = {c: _run_fronts(study, runs, c, problem) for c in contenders}
+    fronts = {c: f for c, f in fronts.items() if f}
+    if not fronts:
+        st.info("No front to show: the runs of this problem kept none.")
+        return
+    objectives = len(next(iter(next(iter(fronts.values())).values())).columns)
+    if objectives != 2:
+        st.info(
+            f"This problem has {objectives} objectives: attainment surfaces and their "
+            "differences are drawn for two (see the Fronts tab for the others)."
+        )
+        return
+    st.markdown(
+        "**Attainment surfaces**: the points of the objective space reached by at least one "
+        "run of each algorithm (best), by half of them (median) and by all (worst). The closer "
+        "together, the more consistent the algorithm; the median surface is the typical result."
+    )
+    render_chart(
+        attainment_figure({c: attainment_surfaces(f) for c, f in fronts.items()}, reference),
+        f"{key}_surfaces_{problem}",
+        f"attainment_{problem}",
+        width="stretch",
+    )
+    others = [c for c in fronts if c != pivot]
+    if pivot not in fronts or not others:
+        return
+    st.markdown(
+        f"**Differences of the attainment functions** (López-Ibáñez et al., 2010): where "
+        f"**{pivot}**'s runs reach more often than another algorithm's (left), and where the "
+        "other's do (right). A quality indicator says who is better; this says *where* in the "
+        "front."
+    )
+    other = st.selectbox("Against", others, key=f"{key}_other_{problem}")
+    every = pd.concat([front for runs_fronts in fronts.values() for front in runs_fronts.values()])
+    render_chart(
+        eaf_difference_figure(eaf_differences(fronts[pivot], fronts[other]), pivot, other, every),
+        f"{key}_differences_{problem}_{other}",
+        f"eaf_differences_{problem}_{other}",
+        width="stretch",
+    )
+
+
+def render_indicators(runs: pd.DataFrame, study_id: str) -> None:
+    """Whether the indicators agree: Spearman's correlation of every pair, over all the runs."""
+    names = indicator_names(runs)
+    if len(names) < 2:
+        st.info("The study measured its runs with a single indicator.")
+        return
+    st.markdown(
+        "Do the indicators tell the same story? **Spearman's correlation** between each pair, "
+        "over the runs of each problem and averaged over the problems, each indicator turned so "
+        "that higher is better: near 1 "
+        "they agree on which runs are good; near 0 they measure different things (convergence "
+        "against spread, for instance); negative, they disagree. When they disagree, a verdict "
+        "on one indicator does not carry over to the other."
+    )
+    scheme = st.radio(
+        "Colors",
+        [COLOR_SCHEME, GRAY_SCHEME],
+        format_func={COLOR_SCHEME: "Color", GRAY_SCHEME: "Grays (for printing)"}.get,
+        horizontal=True,
+        key=f"validation_analysis_correlation_scheme_{study_id}",
+    )
+    render_chart(
+        correlation_figure(indicator_correlations(runs), scheme),
+        f"validation_analysis_correlation_{study_id}_{scheme}",
+        "indicator_correlation",
+        width="stretch",
+    )
+
+
+def _run_fronts(
+    study: StudyInfo, runs: pd.DataFrame, contender: str, problem: str
+) -> dict[int, pd.DataFrame]:
+    """The front of every run of a contender on a problem, by run number."""
+    numbers = runs.loc[
+        (runs["contender"] == contender) & (runs["problem"] == problem), "Run"
+    ].tolist()
+    fronts = {}
+    for run in numbers:
+        front = read_study_front(study.directory, study.manifest, contender, problem, int(run))
+        if front is not None:
+            fronts[int(run)] = front
+    return fronts
 
 
 def render_cost(runs: pd.DataFrame, study_id: str) -> None:

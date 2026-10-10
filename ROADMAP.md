@@ -199,7 +199,9 @@ Validation / Run algorithm) and a parameter analysis against the default configu
 
 Meta-optimization has four steps, a page each: Training, Training analysis, Validation and
 **Validation analysis** (`pages/validation_analysis.py`, `evolver_studio/validation_view.py`): its
-tabs Verdict, Wilcoxon, Effect size, Ranking, Distributions, Fronts, Cost and Runs & details.
+tabs Verdict, Wilcoxon, Effect size, Ranking, Bayesian, Distributions, Fronts, Attainment,
+Indicators, Cost and Runs & details (`validation_stats.py`, `attainment.py`, `latex_tables.py`;
+the tests checked against SAES and baycomp, without depending on them).
 
 ## Phase 4 — Validation runs
 
@@ -211,8 +213,8 @@ in Evolver: a study is a `cli.solving` request per algorithm and problem
 (`validation_worker.py`) that keeps a `status.yaml` in Evolver's format, and its statistics follow
 Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum, A12). Still to do:
 
-- The Bayesian sign test (Friedman, Holm and the critical difference plot are in Validation
-  analysis, written without SAES: `validation_stats.py`, `latex_tables.py`).
+- EAF differences for three objectives (moocore supports two), and the hierarchical Bayesian
+  test, which uses every run instead of the medians.
 - Seen and unseen problems in the verdict, if a study records the training's problems.
 - Computing the hypervolume for a study that did not ask for it (its fronts are kept).
 - An estimate of how long a study takes: an algorithm such as SMS-EMOA with three objectives is

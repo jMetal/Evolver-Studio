@@ -61,7 +61,7 @@ purpose:
 | Meta-optimization | Training | ✅ | Configure, launch, monitor and cancel a training run |
 | Meta-optimization | Training analysis | ✅ | Study a finished training: how it converged and how its population evolved, its final front of configurations, what they have in common and how they differ from the default; send one to Validation or Run algorithm |
 | Meta-optimization | Validation | ✅ | Compare a tuned configuration with the default configurations of other algorithms, adjustable within their parameter spaces, on a set of problems: design the study, run it many times in the background, follow it |
-| Meta-optimization | Validation analysis | ✅ | Study a validation: the pivot's wins and losses, the Wilcoxon pivot table, effect sizes, ranking with Friedman, Holm and the critical difference plot, boxplots, fronts (2, 3 or more objectives) and cost; LaTeX tables, PNG/PDF charts, SAES files |
+| Meta-optimization | Validation analysis | ✅ | Study a validation: the pivot's wins and losses, the Wilcoxon pivot table (with Holm or Benjamini-Hochberg corrections), effect sizes, ranking (Friedman, aligned Friedman, Quade, Holm, critical difference plot, signed-rank test), a Bayesian signed-rank test, boxplots, fronts (2, 3 or more objectives), attainment surfaces and EAF differences, indicator correlations and cost; LaTeX tables, PNG/PDF charts, SAES files |
 | Learn | Tutorials | ✅ | Interactive, step-by-step tutorials that pair with Evolver's documentation |
 
 ✅ available · 🚧 planned

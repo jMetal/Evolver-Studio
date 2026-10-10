@@ -40,18 +40,31 @@ Works with Evolver 2.4.
 - The Meta-optimization menu follows the workflow: **Training**, **Training analysis** (the page
   called *Analysis* until now), **Validation** and **Validation analysis**. Validation designs,
   runs and follows a study, and offers to analyze it when it finishes.
-- **Validation analysis** reads a study, for the indicator chosen, in eight tabs:
+- **Validation analysis** reads a study, for the indicator chosen, in eleven tabs, with an optional
+  correction of the Wilcoxon tests for being many (Holm or Benjamini-Hochberg) that the verdicts,
+  the marks and the LaTeX table follow:
   - *Verdict*: the pivot's wins, ties and losses against each algorithm, per indicator;
   - *Wilcoxon*: the Wilcoxon pivot table (median and IQR, `+`/`-`/`=`, best two shaded), on
     screen and as LaTeX, and each comparison's p-value and A12;
-  - *Effect size*: a heatmap of A12;
+  - *Effect size*: a heatmap of A12, shaded by the size of the effect as Vargha and Delaney
+    classify it (negligible, small, medium, large), in ColorBrewer's RdBu or in grays for
+    printing in black and white;
   - *Ranking*: average ranks, Friedman's test, Demšar's critical difference plot (Nemenyi) and
-    Holm's procedure against the pivot, with a LaTeX table;
+    Holm's procedure against the pivot, with a LaTeX table; the Friedman aligned-ranks and Quade
+    tests (more power with few problems); and Wilcoxon's signed-rank test of the pivot against
+    each algorithm over the problems, with Holm's procedure;
+  - *Bayesian*: Benavoli et al.'s Bayesian signed-rank test, the probabilities that the pivot is
+    better, practically equivalent (a ROPE, on relative or absolute differences) or worse, and
+    its posterior in a simplex;
   - *Distributions*: boxplots;
   - *Fronts*: the median, best or worst run of each algorithm on a problem, a panel each on the
     same axes: the reference front first, then the pivot's and the others', each over the
     reference front, faint (2D scatters for two objectives, 3D for three, a parallel-coordinates
     chart each for more);
+  - *Attainment* (two objectives): the best, median and worst attainment surfaces of each
+    algorithm, and the differences of the empirical attainment functions of the pivot and another
+    (where in the objective space each reaches more often), with moocore;
+  - *Indicators*: Spearman's correlation of every pair of indicators, within each problem;
   - *Cost*: the median computing time of a run;
   - *Runs & details*: the study's design, every run, and the CSV files SAES reads.
 

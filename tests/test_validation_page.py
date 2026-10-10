@@ -12,6 +12,7 @@ from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
 from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.resource_files import default_configuration_text
 from evolver_studio.runs import RunPhase, run_phase
+from evolver_studio.validation_view import TAB_NAMES
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
@@ -245,16 +246,7 @@ class TestRunAStudy:
         # Assert: the study, analyzed in Validation analysis
         assert not app.exception
         assert run_phase(study_dir) is RunPhase.FINISHED
-        assert [tab.label for tab in app.tabs] == [
-            "Verdict",
-            "Wilcoxon",
-            "Effect size",
-            "Ranking",
-            "Distributions",
-            "Fronts",
-            "Cost",
-            "Runs & details",
-        ]
+        assert [tab.label for tab in app.tabs] == list(TAB_NAMES)
         # The pivot is the last column of the Wilcoxon table
         wilcoxon = next(d for d in app.dataframe if "NSGA-II (tuned)" in d.value.columns)
         assert list(wilcoxon.value.columns)[-1] == "NSGA-II (tuned)"
