@@ -5,16 +5,25 @@ import pandas as pd
 import pytest
 
 from evolver_studio.validation_stats import (
+    BEST_RUN,
+    MEDIAN_RUN,
     NO_DIFFERENCE,
     PIVOT_BETTER,
     PIVOT_WORSE,
+    WORST_RUN,
     a12,
+    average_ranks,
     best_contenders,
+    chosen_run,
     compare_with_pivot,
+    critical_difference,
+    friedman_test,
+    holm_against_pivot,
     indicator_names,
     interquartile_ranges,
     magnitude,
     medians,
+    nonsignificant_groups,
     verdict_counts,
 )
 
@@ -204,3 +213,108 @@ class TestCompareWithPivot:
 
         # Assert
         assert counts.loc["NSGA-II"].to_dict() == {"better": 1, "equal": 1, "worse": 1}
+
+
+def _median_table() -> pd.DataFrame:
+    """Five problems where A is always best, B second and C last; D ties B on two of them."""
+    return pd.DataFrame(
+        {
+            "A": [0.1, 0.1, 0.1, 0.1, 0.1],
+            "B": [0.2, 0.2, 0.2, 0.2, 0.2],
+            "C": [0.4, 0.4, 0.4, 0.4, 0.4],
+            "D": [0.2, 0.2, 0.3, 0.3, 0.3],
+        },
+        index=[f"P{i}" for i in range(1, 6)],
+    )
+
+
+class TestRanking:
+    def test_should_average_the_ranks_of_each_problem_best_first(self):
+        # Act
+        ranks = average_ranks(_median_table())
+
+        # Assert: ties share the average of their ranks (B and D are 2.5 on P1 and P2)
+        assert list(ranks.index) == ["A", "B", "D", "C"]
+        assert ranks["A"] == 1.0
+        assert ranks["B"] == pytest.approx((2.5 + 2.5 + 2 + 2 + 2) / 5)
+        assert ranks["D"] == pytest.approx((2.5 + 2.5 + 3 + 3 + 3) / 5)
+        assert ranks["C"] == 4.0
+
+    def test_should_rank_the_highest_first_for_a_maximized_indicator(self):
+        # Act
+        ranks = average_ranks(_median_table(), maximize=True)
+
+        # Assert
+        assert list(ranks.index)[0] == "C"
+
+    def test_should_find_a_difference_with_friedman(self):
+        # Act
+        result = friedman_test(_median_table())
+
+        # Assert
+        assert result is not None
+        assert result[1] < 0.05
+
+    def test_should_not_apply_friedman_to_two_algorithms(self):
+        # Act / Assert
+        assert friedman_test(_median_table()[["A", "B"]]) is None
+
+    def test_should_compute_the_critical_difference_of_demsar(self):
+        # Act: Demšar's q(0.05) is 2.569 for four algorithms
+        difference = critical_difference(4, 5)
+
+        # Assert
+        assert difference == pytest.approx(2.569 * np.sqrt(4 * 5 / (6 * 5)), abs=1e-3)
+
+    def test_should_join_the_algorithms_closer_than_the_critical_difference(self):
+        # Arrange
+        ranks = pd.Series({"A": 1.0, "B": 1.5, "C": 3.0, "D": 3.4})
+
+        # Act
+        groups = nonsignificant_groups(ranks, 1.0)
+
+        # Assert: only the largest groups
+        assert groups == [["A", "B"], ["C", "D"]]
+
+    def test_should_join_no_algorithm_when_all_differ(self):
+        # Act / Assert
+        assert nonsignificant_groups(pd.Series({"A": 1.0, "B": 3.0}), 1.0) == []
+
+    def test_should_adjust_the_comparisons_with_the_pivot_with_holm(self):
+        # Arrange: C is far from the pivot A, B near it
+        ranks = pd.Series({"A": 1.0, "B": 1.4, "C": 3.6})
+
+        # Act
+        holm = holm_against_pivot(ranks, "A", problems=20)
+
+        # Assert: the smallest p-value is multiplied by 2, the next by 1 (and never decreases)
+        by_name = holm.set_index("contender")
+        assert set(by_name.index) == {"B", "C"}
+        assert by_name.loc["C", "adjusted_p_value"] == pytest.approx(
+            min(1.0, 2 * by_name.loc["C", "p_value"])
+        )
+        assert by_name.loc["B", "adjusted_p_value"] >= by_name.loc["C", "adjusted_p_value"]
+        assert bool(by_name.loc["C", "significant"]) and not bool(by_name.loc["B", "significant"])
+
+
+class TestChosenRun:
+    @pytest.fixture
+    def runs(self) -> pd.DataFrame:
+        return _runs({("P1", "tuned"): [0.3, 0.1, 0.4, 0.2]})
+
+    def test_should_choose_the_better_of_the_two_middle_runs_as_the_median(self, runs):
+        # Act / Assert: ordered 0.1 (run 2), 0.2 (run 4), 0.3 (run 1), 0.4 (run 3)
+        assert chosen_run(runs, "EP", "P1", "tuned", MEDIAN_RUN, maximize=False) == 4
+
+    def test_should_choose_the_best_and_the_worst_run(self, runs):
+        # Act / Assert
+        assert chosen_run(runs, "EP", "P1", "tuned", BEST_RUN, maximize=False) == 2
+        assert chosen_run(runs, "EP", "P1", "tuned", WORST_RUN, maximize=False) == 3
+
+    def test_should_choose_the_highest_as_best_for_a_maximized_indicator(self, runs):
+        # Act / Assert
+        assert chosen_run(runs, "EP", "P1", "tuned", BEST_RUN, maximize=True) == 3
+
+    def test_should_choose_none_for_a_contender_without_runs(self, runs):
+        # Act / Assert
+        assert chosen_run(runs, "EP", "P1", "nobody") is None

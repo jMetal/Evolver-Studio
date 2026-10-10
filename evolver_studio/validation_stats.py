@@ -9,6 +9,11 @@ One contender, the pivot (the tuned configuration), is compared with each of the
 problem: a Wilcoxon rank-sum test (the runs are independent) says whether the difference is
 significant, and Vargha and Delaney's A12 how large it is, the same as Evolver's
 `scripts/effect_size_tables.py`.
+
+Over all the problems at once, the algorithms are ranked on each problem by their median, and the
+average ranks are compared as Demšar proposes (J. Mach. Learn. Res. 7, 2006): Friedman's test says
+whether they differ at all, Nemenyi's critical difference which pairs differ (the critical
+difference plot), and Holm's procedure which algorithms differ from the pivot.
 """
 
 import numpy as np
@@ -191,6 +196,175 @@ def verdict_counts(comparison: pd.DataFrame) -> pd.DataFrame:
     ).reindex(columns=[PIVOT_BETTER, NO_DIFFERENCE, PIVOT_WORSE], fill_value=0)
     counts.columns = ["better", "equal", "worse"]
     return counts.reindex(list(dict.fromkeys(comparison["contender"])))
+
+
+def average_ranks(median_table: pd.DataFrame, maximize: bool = False) -> pd.Series:
+    """The average rank of each contender over the problems, ranking them by their median.
+
+    Args:
+        median_table: The table `medians` returns; problems where a contender has no value are
+            left out.
+        maximize: Whether higher values are better.
+
+    Returns:
+        The average rank (1 is the best) of each contender, best first; ties share the average of
+        their ranks.
+    """
+    complete = median_table.dropna()
+    ranks = complete.rank(axis=1, ascending=not maximize, method="average")
+    return ranks.mean().sort_values(kind="stable")
+
+
+def friedman_test(median_table: pd.DataFrame) -> tuple[float, float] | None:
+    """Friedman's test of whether the contenders differ over the problems.
+
+    Args:
+        median_table: The table `medians` returns; problems where a contender has no value are
+            left out.
+
+    Returns:
+        The statistic and its p-value; None with fewer than three contenders or two problems,
+        when the test is not defined.
+    """
+    complete = median_table.dropna()
+    if complete.shape[1] < 3 or complete.shape[0] < 2:
+        return None
+    if (complete.nunique(axis=1) == 1).all():
+        return 0.0, 1.0
+    result = stats.friedmanchisquare(*(complete[column] for column in complete.columns))
+    return float(result.statistic), float(result.pvalue)
+
+
+def critical_difference(contenders: int, problems: int, alpha: float = ALPHA) -> float:
+    """Nemenyi's critical difference of average ranks, as in Demšar's critical difference plot.
+
+    Two contenders whose average ranks differ by more than it are significantly different.
+
+    Args:
+        contenders: How many contenders are ranked.
+        problems: On how many problems.
+        alpha: The significance level.
+
+    Returns:
+        The critical difference.
+    """
+    q_alpha = stats.studentized_range.ppf(1 - alpha, contenders, np.inf) / np.sqrt(2)
+    return float(q_alpha * np.sqrt(contenders * (contenders + 1) / (6.0 * problems)))
+
+
+def nonsignificant_groups(ranks: pd.Series, difference: float) -> list[list[str]]:
+    """The groups of contenders whose average ranks differ by less than the critical difference.
+
+    These are the bars of a critical difference plot: the contenders joined by one are not
+    significantly different. Only the largest groups are kept (none is inside another), and a
+    contender different from all the others is in none.
+
+    Args:
+        ranks: The average ranks `average_ranks` returns, best first.
+        difference: The critical difference.
+
+    Returns:
+        The groups, each in rank order, from the best ranked.
+    """
+    ordered = ranks.sort_values(kind="stable")
+    names = list(ordered.index)
+    values = ordered.to_numpy()
+    groups: list[list[str]] = []
+    last_end = -1
+    for start in range(len(values)):
+        end = start
+        while end + 1 < len(values) and values[end + 1] - values[start] < difference:
+            end += 1
+        if end > start and end > last_end:
+            groups.append(names[start : end + 1])
+            last_end = end
+    return groups
+
+
+def holm_against_pivot(
+    ranks: pd.Series, pivot: str, problems: int, alpha: float = ALPHA
+) -> pd.DataFrame:
+    """Holm's procedure: which contenders' average ranks differ from the pivot's.
+
+    Each contender is compared with the pivot by z = (R_i - R_pivot) / sqrt(k(k + 1) / 6N), and
+    the p-values are adjusted for the number of comparisons with Holm's step-down procedure.
+
+    Args:
+        ranks: The average ranks `average_ranks` returns.
+        pivot: The pivot.
+        problems: How many problems the ranks are over.
+        alpha: The significance level.
+
+    Returns:
+        One row per other contender, in the order of the ranks: `contender`, `rank`, `z`,
+        `p_value`, `adjusted_p_value` and `significant`; empty when the pivot is not ranked.
+    """
+    columns = ["contender", "rank", "z", "p_value", "adjusted_p_value", "significant"]
+    if pivot not in ranks.index or len(ranks) < 2 or problems < 1:
+        return pd.DataFrame(columns=columns)
+    contenders = len(ranks)
+    error = np.sqrt(contenders * (contenders + 1) / (6.0 * problems))
+    others = ranks.drop(pivot)
+    z = (others - ranks[pivot]) / error
+    p_values = 2 * stats.norm.sf(np.abs(z))
+    order = np.argsort(p_values, kind="stable")
+    adjusted = np.empty(len(p_values))
+    running = 0.0
+    for step, index in enumerate(order):
+        running = max(running, min(1.0, (len(p_values) - step) * p_values[index]))
+        adjusted[index] = running
+    return pd.DataFrame(
+        {
+            "contender": others.index,
+            "rank": others.to_numpy(),
+            "z": z.to_numpy(),
+            "p_value": p_values,
+            "adjusted_p_value": adjusted,
+            "significant": adjusted < alpha,
+        },
+        columns=columns,
+    )
+
+
+MEDIAN_RUN = "median"
+BEST_RUN = "best"
+WORST_RUN = "worst"
+
+
+def chosen_run(
+    runs: pd.DataFrame,
+    indicator: str,
+    problem: str,
+    contender: str,
+    which: str = MEDIAN_RUN,
+    maximize: bool | None = None,
+) -> int | None:
+    """The run of a contender on a problem that shows it: its median, best or worst by an indicator.
+
+    The median run is an actual run: with an even number of runs, the better of the two middle
+    ones.
+
+    Args:
+        runs: The runs table.
+        indicator: The indicator that orders the runs.
+        problem: The problem.
+        contender: The contender.
+        which: `MEDIAN_RUN`, `BEST_RUN` or `WORST_RUN`.
+        maximize: Whether higher values are better; None looks it up in the catalogue.
+
+    Returns:
+        The run's number, or None when the contender has no run with a value on the problem.
+    """
+    if maximize is None:
+        maximize = is_maximized(indicator)
+    mask = (runs["problem"] == problem) & (runs["contender"] == contender)
+    values = runs.loc[mask, ["Run", indicator]].dropna()
+    if values.empty:
+        return None
+    # Best first; a stable sort keeps the order of the runs among equal values.
+    ordered = values.sort_values(indicator, ascending=not maximize, kind="stable")
+    position = {BEST_RUN: 0, WORST_RUN: len(ordered) - 1}.get(which, (len(ordered) - 1) // 2)
+    return int(ordered["Run"].iloc[position])
 
 
 def _grouped(runs: pd.DataFrame, indicator: str, statistic) -> pd.DataFrame:
