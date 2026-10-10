@@ -190,13 +190,18 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 
 ## Phase 3 — Analysis layer
 
-First version shipped (`pages/analysis.py`): the history of finished trainings, and for one of them
+First version shipped (`pages/training_analysis.py`, *Training analysis*): the history of finished trainings, and for one of them
 its summary, convergence, front, population, final-front configurations (to download or send to
 Validation / Run algorithm) and a parameter analysis against the default configuration.
 
 - Statistical comparison of several trainings (Wilcoxon, comparison tables — `CLAUDE.md`'s original
   analysis-layer goal, not started yet).
-- Tutorial "Analyzing training results".
+
+Meta-optimization has four steps, a page each: Training, Training analysis, Validation and
+**Validation analysis**. The last one is a placeholder (`pages/validation_analysis.py`): what it
+shows is still to be designed. Meanwhile Validation shows a study's results (medians, Wilcoxon,
+boxplots, the SAES files). A study keeps every run's front (`validation-runs/<id>/jobs/NNN/output/
+run-K/FUN.csv` and `VAR.csv`), which no page shows yet.
 
 ## Phase 4 — Validation runs
 

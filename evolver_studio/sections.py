@@ -121,6 +121,14 @@ SECTIONS = (
                 "sizes.",
                 available=True,
             ),
+            Page(
+                "pages/validation_analysis.py",
+                "Validation analysis",
+                "🔬",
+                "Study the results of a validation: the last step of meta-optimization, after "
+                "training, analyzing the training and validating a configuration.",
+                available=False,
+            ),
         ),
     ),
     Section(

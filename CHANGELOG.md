@@ -14,10 +14,16 @@ Works with Evolver 2.4.
   and the jar, checked live), what Evolver offers (read from the jar's manifest), what each page is
   for, and where runs and results are kept.
 - **Tutorial S4, *Analyzing training results*** (pairs with E7): reads a real training that ships
-  with the app (`evolver_studio/tutorial_data/analysis/`) with the views of the Analysis page —
+  with the app (`evolver_studio/tutorial_data/analysis/`) with the views of the Training analysis page —
   summary, convergence, front and population, final-front configurations, parameter agreement.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
   S4 analysis, S5 validation.
+
+### The four steps of meta-optimization
+
+- The Meta-optimization menu follows the workflow: **Training**, **Training analysis** (the page
+  called *Analysis* until now), **Validation** and **Validation analysis**, which is still to come
+  (Validation shows a study's results meanwhile).
 
 ### Saving tables and charts
 
@@ -39,7 +45,7 @@ Works with Evolver 2.4.
   and each has an **Adjust the parameters** form, the one of *Run algorithm*: a changed algorithm
   enters the study as "<name> (adjusted)", and *Open in Validation* brings it back adjusted.
 
-### Analysis
+### Training analysis
 
 - *Training*'s best configurations, while it runs and once it has finished, have a **Validate this
   configuration** button that opens *Validation* with the chosen one as the tuned configuration (the
@@ -47,7 +53,7 @@ Works with Evolver 2.4.
   population size and the indicators of the training, and the list of problems empty, for you to
   fill.
 
-- *Meta-optimization › Analysis* lists the finished trainings and, for the one chosen, shows how it
+- *Meta-optimization › Training analysis* lists the finished trainings and, for the one chosen, shows how it
   was run and what it took, how its meta-objectives converged, the front and (if it was written) the
   population at each checkpoint, and the configurations of its final front. A configuration can be
   downloaded, sent to *Validation* as the tuned configuration, or to *Run algorithm* on one of the

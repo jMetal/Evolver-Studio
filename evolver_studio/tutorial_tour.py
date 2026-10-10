@@ -128,8 +128,9 @@ def _render_pages(jar: Path) -> None:
     st.markdown(
         "A path through them for **solving**: *Explore › Problems* to choose a problem, then "
         "*Run algorithm*. For **meta-optimization**: *Training* to launch a run, *Training "
-        "analysis* to read what it found, *Validation* to put a configuration to the test. Each "
-        "page can hand its result to the next: a configuration goes from Training or Training "
+        "analysis* to read what it found, *Validation* to put a configuration to the test, and "
+        "*Validation analysis* (still to come) to study the results of that test. Each page can "
+        "hand its result to the next: a configuration goes from Training or Training "
         "analysis to Validation, or to Run algorithm, with a button."
     )
 
