@@ -23,6 +23,9 @@ import pandas as pd
 from evolver_studio.catalogue import is_maximized
 from evolver_studio.validation_stats import (
     ALPHA,
+    BENJAMINI_HOCHBERG,
+    HOLM,
+    NO_CORRECTION,
     NO_DIFFERENCE,
     PIVOT_BETTER,
     PIVOT_WORSE,
@@ -44,6 +47,10 @@ PREAMBLE = r"""\documentclass{article}
 BEST_COLOR = "gray95"
 SECOND_COLOR = "gray25"
 MARKS = {PIVOT_BETTER: "+", PIVOT_WORSE: "-", NO_DIFFERENCE: "="}
+CORRECTION_NOTES = {
+    HOLM: " (p-values adjusted with Holm's procedure)",
+    BENJAMINI_HOCHBERG: " (p-values adjusted with the Benjamini-Hochberg procedure)",
+}
 _SPECIAL_CHARACTERS = {
     "\\": r"\textbackslash{}",
     "&": r"\&",
@@ -59,7 +66,11 @@ _SPECIAL_CHARACTERS = {
 
 
 def wilcoxon_pivot_table(
-    runs: pd.DataFrame, indicator: str, pivot: str, maximize: bool | None = None
+    runs: pd.DataFrame,
+    indicator: str,
+    pivot: str,
+    maximize: bool | None = None,
+    correction: str = NO_CORRECTION,
 ) -> str:
     """The Wilcoxon pivot table of an indicator, as a LaTeX document.
 
@@ -68,6 +79,8 @@ def wilcoxon_pivot_table(
         indicator: The indicator.
         pivot: The pivot, which goes in the last column.
         maximize: Whether higher values are better; None looks it up in the catalogue.
+        correction: How the p-values are adjusted for being many comparisons (see
+            `validation_stats.adjust_p_values`); the marks follow the adjusted ones.
 
     Returns:
         The LaTeX document.
@@ -77,7 +90,9 @@ def wilcoxon_pivot_table(
     contenders = [c for c in dict.fromkeys(runs["contender"]) if c != pivot] + [pivot]
     median_values = medians(runs, indicator).reindex(columns=contenders)
     iqr_values = interquartile_ranges(runs, indicator).reindex(columns=contenders)
-    comparison = compare_with_pivot(runs, indicator, pivot, maximize=maximize)
+    comparison = compare_with_pivot(
+        runs, indicator, pivot, maximize=maximize, correction=correction
+    )
     verdicts = {(row.problem, row.contender): row.verdict for row in comparison.itertuples()}
     counts = {contender: [0, 0, 0] for contender in contenders[:-1]}
     rows = []
@@ -105,7 +120,8 @@ def wilcoxon_pivot_table(
     caption = (
         f"{_escape(indicator)}. Median and interquartile range "
         f"({'higher' if maximize else 'lower'} is better), and the Wilcoxon rank-sum test at "
-        f"{ALPHA} against {_escape(pivot)}, the last column: + it is significantly better, - "
+        f"{ALPHA}{CORRECTION_NOTES.get(correction, '')} against {_escape(pivot)}, the last "
+        "column: + it is significantly better, - "
         "significantly worse, = the difference is not significant. Dark and light gray: the best "
         "and the second-best median of each problem."
     )

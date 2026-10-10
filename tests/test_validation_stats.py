@@ -5,25 +5,34 @@ import pandas as pd
 import pytest
 
 from evolver_studio.validation_stats import (
+    BENJAMINI_HOCHBERG,
     BEST_RUN,
+    HOLM,
     MEDIAN_RUN,
+    NO_CORRECTION,
     NO_DIFFERENCE,
     PIVOT_BETTER,
     PIVOT_WORSE,
     WORST_RUN,
     a12,
+    adjust_p_values,
+    aligned_friedman_test,
     average_ranks,
+    bayesian_signed_rank,
     best_contenders,
     chosen_run,
     compare_with_pivot,
     critical_difference,
     friedman_test,
     holm_against_pivot,
+    indicator_correlations,
     indicator_names,
     interquartile_ranges,
     magnitude,
     medians,
     nonsignificant_groups,
+    quade_test,
+    signed_rank_against_pivot,
     verdict_counts,
 )
 
@@ -318,3 +327,179 @@ class TestChosenRun:
     def test_should_choose_none_for_a_contender_without_runs(self, runs):
         # Act / Assert
         assert chosen_run(runs, "EP", "P1", "nobody") is None
+
+
+class TestMultipleComparisons:
+    P_VALUES = np.array([0.01, 0.04, 0.03, 0.20])
+
+    def test_should_leave_the_p_values_as_they_are_without_correction(self):
+        # Act / Assert
+        assert list(adjust_p_values(self.P_VALUES, NO_CORRECTION)) == list(self.P_VALUES)
+
+    def test_should_adjust_with_holm(self):
+        # Act: sorted 0.01, 0.03, 0.04, 0.20 times 4, 3, 2, 1, never decreasing
+        adjusted = adjust_p_values(self.P_VALUES, HOLM)
+
+        # Assert
+        assert adjusted == pytest.approx([0.04, 0.09, 0.09, 0.20])
+
+    def test_should_adjust_with_benjamini_hochberg(self):
+        # Act: p * 4 / rank, never increasing from the largest
+        adjusted = adjust_p_values(self.P_VALUES, BENJAMINI_HOCHBERG)
+
+        # Assert
+        assert adjusted == pytest.approx([0.04, 0.04 * 4 / 3, 0.04 * 4 / 3, 0.20])
+
+    def test_should_decide_the_verdicts_on_the_adjusted_p_values(self):
+        # Arrange: a difference on one problem, significant alone, not among many comparisons
+        values = {("P1", "tuned"): LOW, ("P1", "A"): [v + 0.05 for v in LOW]}
+        for index in range(2, 21):
+            values[(f"P{index}", "tuned")] = LOW
+            values[(f"P{index}", "A")] = LOW
+        runs = _runs(values)
+
+        # Act
+        alone = compare_with_pivot(runs, "EP", "tuned", maximize=False)
+        corrected = compare_with_pivot(runs, "EP", "tuned", maximize=False, correction=HOLM)
+
+        # Assert
+        assert alone.iloc[0]["verdict"] == PIVOT_BETTER
+        assert corrected.iloc[0]["verdict"] == NO_DIFFERENCE
+        assert corrected.iloc[0]["adjusted_p_value"] > corrected.iloc[0]["p_value"]
+
+
+def _random_table() -> pd.DataFrame:
+    """The table SAES's tests were checked against."""
+    rng = np.random.default_rng(3)
+    return pd.DataFrame(
+        rng.random((9, 5)) + np.array([0, 0.1, 0.2, 0.3, 0.05]), columns=list("ABCDE")
+    )
+
+
+class TestOtherRankingTests:
+    def test_should_compute_the_aligned_friedman_test_as_saes(self):
+        # Act
+        statistic, p_value = aligned_friedman_test(_random_table())
+
+        # Assert: SAES 1.5.0's friedman_aligned_rank on the same table
+        assert statistic == pytest.approx(12.54233689)
+        assert p_value == pytest.approx(0.01374265, abs=1e-8)
+
+    def test_should_compute_quades_test_as_saes(self):
+        # Act
+        statistic, p_value = quade_test(_random_table())
+
+        # Assert: SAES 1.5.0's quade on the same table
+        assert statistic == pytest.approx(2.16042781)
+        assert p_value == pytest.approx(0.09605242, abs=1e-8)
+
+    def test_should_not_apply_them_to_two_algorithms(self):
+        # Act / Assert
+        assert aligned_friedman_test(_random_table()[["A", "B"]]) is None
+        assert quade_test(_random_table()[["A", "B"]]) is None
+
+    def test_should_compare_the_pivot_over_the_problems_with_the_signed_rank_test(self):
+        # Arrange: the pivot better than B on all ten problems, and as good as C
+        table = pd.DataFrame(
+            {"pivot": np.arange(10) / 10, "B": np.arange(10) / 10 + 0.5, "C": np.arange(10) / 10}
+        )
+
+        # Act
+        result = signed_rank_against_pivot(table, "pivot").set_index("contender")
+
+        # Assert
+        assert result.loc["B", "pivot_better"] == 10
+        assert result.loc["B", "verdict"] == PIVOT_BETTER
+        assert result.loc["C", "verdict"] == NO_DIFFERENCE
+
+
+class TestBayesianSignedRank:
+    def test_should_give_probabilities_that_add_up_to_one(self):
+        # Act
+        result = bayesian_signed_rank(_random_table(), "A", "B", rope=0.05, maximize=True)
+
+        # Assert
+        assert result.pivot_better + result.equivalent + result.pivot_worse == pytest.approx(1)
+        assert result.samples.shape[1] == 3
+
+    def test_should_agree_with_baycomp(self):
+        # Act: baycomp 1.0.3's SignedRankTest.probs on the same medians gives 0.106, 0.056, 0.838
+        rng = np.random.default_rng(5)
+        table = pd.DataFrame(rng.random((9, 2)) + np.array([0, 0.1]), columns=["A", "B"])
+        result = bayesian_signed_rank(
+            table, "A", "B", rope=0.1, maximize=True, samples=50000, relative=False
+        )
+
+        # Assert: within the error of sampling
+        assert result.pivot_better == pytest.approx(0.106, abs=0.01)
+        assert result.equivalent == pytest.approx(0.056, abs=0.01)
+        assert result.pivot_worse == pytest.approx(0.838, abs=0.01)
+
+    def test_should_be_sure_when_the_pivot_is_always_much_better(self):
+        # Arrange
+        table = pd.DataFrame({"pivot": [0.1] * 10, "B": [0.9] * 10})
+
+        # Act
+        result = bayesian_signed_rank(table, "pivot", "B", rope=0.01)
+
+        # Assert
+        assert result.pivot_better > 0.95
+
+
+class TestIndicatorCorrelations:
+    def test_should_turn_every_indicator_so_that_higher_is_better(self):
+        # Arrange: EP (minimized) and HV (maximized) that agree on which runs are good
+        runs = pd.DataFrame(
+            {
+                "contender": ["A"] * 4,
+                "problem": ["P"] * 4,
+                "Run": [1, 2, 3, 4],
+                "Seed": [1, 2, 3, 4],
+                "TimeMs": [1] * 4,
+                "EP": [0.1, 0.2, 0.3, 0.4],
+                "HV": [0.9, 0.8, 0.7, 0.6],
+            }
+        )
+
+        # Act
+        correlations = indicator_correlations(runs)
+
+        # Assert
+        assert correlations.loc["EP", "HV"] == pytest.approx(1.0)
+
+
+class TestRelativeBayesianSignedRank:
+    def test_should_weigh_problems_of_different_scales_alike_with_relative_differences(self):
+        # Arrange: the pivot half the other's (lower is better) on problems whose values are tiny
+        table = pd.DataFrame({"pivot": [0.004] * 10, "B": [0.008] * 10})
+
+        # Act
+        absolute = bayesian_signed_rank(table, "pivot", "B", rope=0.01, relative=False)
+        relative = bayesian_signed_rank(table, "pivot", "B", rope=0.01)
+
+        # Assert: 0.004 is within an absolute ROPE of 0.01, but 67% of the medians' mean
+        assert absolute.equivalent > 0.95
+        assert relative.pivot_better > 0.95
+
+    def test_should_not_mix_the_scales_of_the_problems(self):
+        # Arrange: on each problem HV is a decreasing function of NHV, at different scales
+        rows = []
+        for problem, scale in (("P1", 1.0), ("P2", 10.0)):
+            for run, nhv in enumerate([0.1, 0.2, 0.3, 0.4], start=1):
+                rows.append(
+                    {
+                        "contender": "A",
+                        "problem": problem,
+                        "Run": run,
+                        "Seed": run,
+                        "TimeMs": 1,
+                        "NHV": nhv,
+                        "HV": scale * (1 - nhv),
+                    }
+                )
+
+        # Act
+        correlations = indicator_correlations(pd.DataFrame(rows))
+
+        # Assert
+        assert correlations.loc["NHV", "HV"] == pytest.approx(1.0)

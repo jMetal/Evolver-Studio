@@ -16,6 +16,8 @@ whether they differ at all, Nemenyi's critical difference which pairs differ (th
 difference plot), and Holm's procedure which algorithms differ from the pivot.
 """
 
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -29,6 +31,9 @@ PIVOT_BETTER = "pivot better"
 PIVOT_WORSE = "pivot worse"
 NO_DIFFERENCE = "no significant difference"
 NON_INDICATOR_COLUMNS = ("contender", "problem", "Run", "Seed", "TimeMs")
+NO_CORRECTION = "none"
+HOLM = "holm"
+BENJAMINI_HOCHBERG = "benjamini-hochberg"
 
 
 def indicator_names(runs: pd.DataFrame) -> list[str]:
@@ -125,6 +130,7 @@ def compare_with_pivot(
     pivot: str,
     alpha: float = ALPHA,
     maximize: bool | None = None,
+    correction: str = NO_CORRECTION,
 ) -> pd.DataFrame:
     """Compare the pivot with each other contender on each problem.
 
@@ -134,12 +140,15 @@ def compare_with_pivot(
         pivot: The pivot contender.
         alpha: The significance level of the Wilcoxon test.
         maximize: Whether higher values are better; None looks it up in the catalogue.
+        correction: How the p-values of all the comparisons are adjusted for being many
+            (`NO_CORRECTION`, `HOLM` or `BENJAMINI_HOCHBERG`, see `adjust_p_values`); the verdicts
+            follow the adjusted ones.
 
     Returns:
         One row per problem and other contender, with the columns `problem`, `contender`,
-        `pivot_median`, `median`, `p_value`, `a12`, `magnitude` and `verdict`: the pivot is better
-        or worse when the test is significant and its A12 is above or below 0.5, and there is no
-        significant difference otherwise.
+        `pivot_median`, `median`, `p_value`, `adjusted_p_value`, `a12`, `magnitude` and
+        `verdict`: the pivot is better or worse when the test is significant and its A12 is above
+        or below 0.5, and there is no significant difference otherwise.
     """
     if maximize is None:
         maximize = is_maximized(indicator)
@@ -153,32 +162,73 @@ def compare_with_pivot(
             if pivot_values.size == 0 or other_values.size == 0:
                 continue
             effect = a12(pivot_values, other_values, maximize)
-            p_value = _rank_sum_p_value(pivot_values, other_values)
             rows.append(
                 {
                     "problem": problem,
                     "contender": contender,
                     "pivot_median": float(np.median(pivot_values)),
                     "median": float(np.median(other_values)),
-                    "p_value": p_value,
+                    "p_value": _rank_sum_p_value(pivot_values, other_values),
                     "a12": effect,
                     "magnitude": magnitude(effect),
-                    "verdict": _verdict(p_value, effect, alpha),
                 }
             )
-    return pd.DataFrame(
-        rows,
-        columns=[
-            "problem",
-            "contender",
-            "pivot_median",
-            "median",
-            "p_value",
-            "a12",
-            "magnitude",
-            "verdict",
-        ],
+    columns = [
+        "problem",
+        "contender",
+        "pivot_median",
+        "median",
+        "p_value",
+        "adjusted_p_value",
+        "a12",
+        "magnitude",
+        "verdict",
+    ]
+    table = pd.DataFrame(
+        rows, columns=[c for c in columns if c not in ("adjusted_p_value", "verdict")]
     )
+    table.insert(5, "adjusted_p_value", adjust_p_values(table["p_value"].to_numpy(), correction))
+    table["verdict"] = [
+        _verdict(p, effect, alpha) for p, effect in zip(table["adjusted_p_value"], table["a12"])
+    ]
+    return table[columns]
+
+
+def adjust_p_values(p_values: np.ndarray, correction: str = HOLM) -> np.ndarray:
+    """Adjust p-values for being many comparisons at once.
+
+    Args:
+        p_values: The p-values.
+        correction: `NO_CORRECTION`; `HOLM`, Holm's step-down procedure, which keeps the
+            probability of any false difference (the family-wise error) below the significance
+            level; or `BENJAMINI_HOCHBERG`, which keeps the expected share of false differences
+            among those found (the false discovery rate) below it, and so finds more.
+
+    Returns:
+        The adjusted p-values, in the same order.
+    """
+    p_values = np.asarray(p_values, dtype=float)
+    count = len(p_values)
+    if correction == NO_CORRECTION or count == 0:
+        return p_values.copy()
+    if correction == HOLM:
+        order = np.argsort(p_values, kind="stable")
+        adjusted = np.empty(count)
+        running = 0.0
+        for step, index in enumerate(order):
+            running = max(running, min(1.0, (count - step) * p_values[index]))
+            adjusted[index] = running
+        return adjusted
+    if correction == BENJAMINI_HOCHBERG:
+        order = np.argsort(p_values, kind="stable")[::-1]
+        adjusted = np.empty(count)
+        running = 1.0
+        for position, index in enumerate(order):
+            rank = count - position
+            running = min(running, p_values[index] * count / rank)
+            adjusted[index] = min(1.0, running)
+        return adjusted
+    raise ValueError(f"Unknown correction: {correction}")
 
 
 def verdict_counts(comparison: pd.DataFrame) -> pd.DataFrame:
@@ -307,12 +357,7 @@ def holm_against_pivot(
     others = ranks.drop(pivot)
     z = (others - ranks[pivot]) / error
     p_values = 2 * stats.norm.sf(np.abs(z))
-    order = np.argsort(p_values, kind="stable")
-    adjusted = np.empty(len(p_values))
-    running = 0.0
-    for step, index in enumerate(order):
-        running = max(running, min(1.0, (len(p_values) - step) * p_values[index]))
-        adjusted[index] = running
+    adjusted = adjust_p_values(p_values, HOLM)
     return pd.DataFrame(
         {
             "contender": others.index,
@@ -323,6 +368,263 @@ def holm_against_pivot(
             "significant": adjusted < alpha,
         },
         columns=columns,
+    )
+
+
+def signed_rank_against_pivot(
+    median_table: pd.DataFrame,
+    pivot: str,
+    maximize: bool = False,
+    alpha: float = ALPHA,
+) -> pd.DataFrame:
+    """Wilcoxon's signed-rank test of the pivot against each contender, over the problems.
+
+    Each problem is a pair (the two medians); Demšar recommends this test to compare two
+    algorithms over several problems. The p-values are adjusted with Holm's procedure, for the
+    comparisons with each contender.
+
+    Args:
+        median_table: The table `medians` returns; problems where either has no value are left
+            out of that comparison.
+        pivot: The pivot.
+        maximize: Whether higher values are better.
+        alpha: The significance level.
+
+    Returns:
+        One row per other contender: `contender`, `problems`, `pivot_better` and `pivot_worse`
+        (on how many problems its median is better or worse), `p_value`, `adjusted_p_value` and
+        `verdict` (as in `compare_with_pivot`); empty when the pivot is not in the table.
+    """
+    columns = [
+        "contender",
+        "problems",
+        "pivot_better",
+        "pivot_worse",
+        "p_value",
+        "adjusted_p_value",
+        "verdict",
+    ]
+    if pivot not in median_table.columns:
+        return pd.DataFrame(columns=columns)
+    rows = []
+    for contender in median_table.columns:
+        if contender == pivot:
+            continue
+        pair = median_table[[pivot, contender]].dropna()
+        # Positive: the pivot is better.
+        gain = (pair[pivot] - pair[contender]) * (1 if maximize else -1)
+        nonzero = gain[gain != 0]
+        if nonzero.empty:
+            p_value = 1.0
+        else:
+            p_value = float(stats.wilcoxon(nonzero, zero_method="wilcox").pvalue)
+        rows.append(
+            {
+                "contender": contender,
+                "problems": len(pair),
+                "pivot_better": int((gain > 0).sum()),
+                "pivot_worse": int((gain < 0).sum()),
+                "p_value": p_value,
+            }
+        )
+    table = pd.DataFrame(rows)
+    if table.empty:
+        return pd.DataFrame(columns=columns)
+    table["adjusted_p_value"] = adjust_p_values(table["p_value"].to_numpy(), HOLM)
+    table["verdict"] = [
+        NO_DIFFERENCE
+        if p >= alpha or better == worse
+        else (PIVOT_BETTER if better > worse else PIVOT_WORSE)
+        for p, better, worse in zip(
+            table["adjusted_p_value"], table["pivot_better"], table["pivot_worse"]
+        )
+    ]
+    return table[columns]
+
+
+def aligned_friedman_test(median_table: pd.DataFrame) -> tuple[float, float] | None:
+    """The Friedman aligned-ranks test (Hodges and Lehmann), as in García et al. (2010).
+
+    Each value is aligned by subtracting its problem's mean, and all the aligned values are
+    ranked together, so that problems are compared with each other too: more power than
+    Friedman's test with few problems. Its statistic follows a chi-squared distribution with
+    k - 1 degrees of freedom.
+
+    Args:
+        median_table: The table `medians` returns; problems where a contender has no value are
+            left out.
+
+    Returns:
+        The statistic and its p-value; None with fewer than three contenders or two problems.
+    """
+    complete = median_table.dropna()
+    problems, contenders = complete.shape
+    if contenders < 3 or problems < 2:
+        return None
+    values = complete.to_numpy(dtype=float)
+    aligned = values - values.mean(axis=1, keepdims=True)
+    ranks = stats.rankdata(aligned.ravel()).reshape(aligned.shape)
+    total = problems * contenders
+    by_contender = (ranks.sum(axis=0) ** 2).sum()
+    by_problem = (ranks.sum(axis=1) ** 2).sum()
+    numerator = (contenders - 1) * (
+        by_contender - (contenders * problems**2 / 4.0) * (total + 1) ** 2
+    )
+    denominator = total * (total + 1) * (2 * total + 1) / 6.0 - by_problem / contenders
+    if denominator <= 0:
+        return 0.0, 1.0
+    statistic = float(numerator / denominator)
+    return statistic, float(stats.chi2.sf(statistic, contenders - 1))
+
+
+def quade_test(median_table: pd.DataFrame) -> tuple[float, float] | None:
+    """Quade's test: Friedman's, with each problem weighted by how much the contenders differ.
+
+    The problems are ranked by the range of their values, and a contender's ranks within a
+    problem count more on problems where the contenders differ more. Its statistic follows an F
+    distribution with k - 1 and (n - 1)(k - 1) degrees of freedom (García et al., 2010).
+
+    Args:
+        median_table: The table `medians` returns; problems where a contender has no value are
+            left out.
+
+    Returns:
+        The statistic and its p-value; None with fewer than three contenders or two problems.
+    """
+    complete = median_table.dropna()
+    problems, contenders = complete.shape
+    if contenders < 3 or problems < 2:
+        return None
+    values = complete.to_numpy(dtype=float)
+    within = np.apply_along_axis(stats.rankdata, 1, values)
+    weights = stats.rankdata(values.max(axis=1) - values.min(axis=1))
+    scores = weights[:, None] * (within - (contenders + 1) / 2.0)
+    total = (scores**2).sum()
+    between = (scores.sum(axis=0) ** 2).sum() / problems
+    if total - between <= 0:
+        return (0.0, 1.0) if between == 0 else (float("inf"), 0.0)
+    statistic = float((problems - 1) * between / (total - between))
+    return statistic, float(
+        stats.f.sf(statistic, contenders - 1, (problems - 1) * (contenders - 1))
+    )
+
+
+@dataclass(frozen=True)
+class BayesianComparison:
+    """The posterior of the Bayesian signed-rank test of the pivot against a contender.
+
+    Attributes:
+        contender: The contender.
+        pivot_better: The probability that the pivot is better (by more than the ROPE).
+        equivalent: The probability that they are practically equivalent (within the ROPE).
+        pivot_worse: The probability that the pivot is worse.
+        samples: Samples of the posterior, one row per sample: the probabilities of the pivot
+            being worse, equivalent and better (for the simplex plot).
+    """
+
+    contender: str
+    pivot_better: float
+    equivalent: float
+    pivot_worse: float
+    samples: np.ndarray
+
+
+def bayesian_signed_rank(
+    median_table: pd.DataFrame,
+    pivot: str,
+    contender: str,
+    rope: float,
+    maximize: bool = False,
+    samples: int = 20000,
+    prior: float = 0.5,
+    seed: int = 1,
+    relative: bool = True,
+) -> BayesianComparison | None:
+    """Benavoli et al.'s Bayesian signed-rank test of the pivot against a contender (JMLR 2017).
+
+    Over the problems, as Wilcoxon's signed-rank test, but it answers with probabilities: that
+    the pivot is better, practically equivalent (their difference within the region of practical
+    equivalence, the ROPE) or worse. The posterior is a Dirichlet process with a pseudo-
+    observation at zero difference (weight `prior`), sampled `samples` times.
+
+    Args:
+        median_table: The table `medians` returns.
+        pivot: The pivot.
+        contender: The contender to compare it with.
+        rope: Half the width of the region of practical equivalence: a share of the medians when
+            `relative`, else in the indicator's units.
+        maximize: Whether higher values are better.
+        samples: How many samples of the posterior.
+        prior: The weight of the pseudo-observation.
+        seed: The seed of the sampling, so that the answer is the same every time.
+        relative: Whether each problem's difference is divided by the mean of the two medians,
+            so that problems whose indicator values differ in scale weigh alike, and the ROPE is
+            a share (0.01 is 1%).
+
+    Returns:
+        The comparison; None when they share no problem.
+    """
+    pair = median_table[[pivot, contender]].dropna()
+    if pair.empty:
+        return None
+    # Positive: the pivot is better.
+    gain = ((pair[pivot] - pair[contender]) * (1 if maximize else -1)).to_numpy(dtype=float)
+    if relative:
+        scale = (pair[pivot].abs() + pair[contender].abs()).to_numpy(dtype=float) / 2
+        gain = np.divide(gain, scale, out=np.zeros_like(gain), where=scale > 0)
+    points = np.concatenate([[0.0], gain])
+    # Walsh averages (z_i + z_j) / 2 against the ROPE; one exactly on its edge counts one half.
+    sums = points[:, None] + points[None, :]
+    better = (sums > 2 * rope) + 0.5 * (sums == 2 * rope)
+    worse = (sums < -2 * rope) + 0.5 * (sums == -2 * rope)
+    within = 1.0 - better - worse
+    weights = np.random.default_rng(seed).dirichlet(
+        np.concatenate([[prior], np.ones(len(gain))]), samples
+    )
+    posterior = np.column_stack(
+        [np.einsum("si,ij,sj->s", weights, region, weights) for region in (worse, within, better)]
+    )
+    winners = np.bincount(posterior.argmax(axis=1), minlength=3) / samples
+    return BayesianComparison(
+        contender=contender,
+        pivot_worse=float(winners[0]),
+        equivalent=float(winners[1]),
+        pivot_better=float(winners[2]),
+        samples=posterior,
+    )
+
+
+def indicator_correlations(runs: pd.DataFrame) -> pd.DataFrame:
+    """How the indicators agree: Spearman's correlation between each pair, within each problem.
+
+    Each indicator is first turned so that higher is better, so a positive correlation means
+    the two agree on which runs are good. The correlation is computed over the runs of each
+    problem and averaged over the problems: pooling the problems would mix their scales (two
+    indicators that agree on every problem, as the hypervolume and the normalized one, would not
+    seem to).
+
+    Args:
+        runs: The runs table.
+
+    Returns:
+        A square table, one row and column per indicator.
+    """
+    names = indicator_names(runs)
+    oriented = runs[["problem"]].assign(
+        **{name: runs[name] * (1 if is_maximized(name) else -1) for name in names}
+    )
+    per_problem = [
+        group[names].corr(method="spearman")
+        for _, group in oriented.groupby("problem", sort=False)
+        if len(group) > 2
+    ]
+    if not per_problem:
+        return pd.DataFrame(np.nan, index=names, columns=names)
+    return (
+        pd.concat(per_problem)
+        .groupby(level=0, sort=False)
+        .mean()
+        .reindex(index=names, columns=names)
     )
 
 
