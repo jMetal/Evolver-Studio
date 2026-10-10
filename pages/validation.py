@@ -32,7 +32,6 @@ from evolver_studio.configuration import (
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
 from evolver_studio.figure_export import render_chart
-from evolver_studio.latex_tables import median_table, wilcoxon_pivot_table
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
@@ -40,6 +39,12 @@ from evolver_studio.problem_catalogue import Problem, problems_with_encoding
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
 from evolver_studio.runs import RunPhase, find_run_in_progress, mark_cancelled, run_phase
+from evolver_studio.saes_export import (
+    saes_available,
+    saes_metrics,
+    saes_results,
+    wilcoxon_pivot_table,
+)
 from evolver_studio.training_runs import FinishedTraining, list_finished_trainings
 from evolver_studio.validation import (
     DEFAULT_MAX_EVALUATIONS,
@@ -475,18 +480,6 @@ def _render_summary(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
     )
     with st.expander("Interquartile range"):
         st.dataframe(interquartile_ranges(runs, indicator).style.format("{:.4g}"), width="stretch")
-    st.download_button(
-        "Download the medians (LaTeX)",
-        median_table(runs, indicator, pivot),
-        file_name=f"median_{indicator}.tex",
-        mime="application/x-tex",
-        key=f"validation_median_latex_{indicator}",
-        on_click="ignore",
-        icon=":material/download:",
-        help="Median and interquartile range of every algorithm on every problem, with the "
-        "pivot in the last column and the best two medians of each problem shaded, as in "
-        "Evolver's tables. A LaTeX document that compiles on its own.",
-    )
 
 
 def _render_comparison(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
@@ -522,19 +515,25 @@ def _render_comparison(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
         mime="text/csv",
         key=f"validation_comparison_{indicator}",
     )
-    st.download_button(
-        "Download the Wilcoxon pivot table (LaTeX)",
-        wilcoxon_pivot_table(runs, indicator, pivot),
-        file_name=f"wilcoxon_pivot_{indicator}.tex",
-        mime="application/x-tex",
-        key=f"validation_wilcoxon_latex_{indicator}",
-        on_click="ignore",
-        icon=":material/download:",
-        help="The medians and interquartile ranges, each algorithm marked against the pivot: + "
-        "the pivot is significantly better, - significantly worse, = no significant difference; "
-        "the last row counts them. The table of Evolver's scripts/wilcoxon_pivot_tables.py, as "
-        "a LaTeX document that compiles on its own.",
-    )
+    if saes_available():
+        st.download_button(
+            "Download the Wilcoxon pivot table (LaTeX)",
+            lambda: wilcoxon_pivot_table(runs, indicator, pivot),
+            file_name=f"WilcoxonPivot_{indicator}.tex",
+            mime="application/x-tex",
+            key=f"validation_wilcoxon_latex_{indicator}",
+            on_click="ignore",
+            icon=":material/download:",
+            help="SAES's Wilcoxon pivot table, as Evolver's scripts/wilcoxon_pivot_tables.py "
+            "makes it: median and interquartile range, the pivot in the last column, + the pivot "
+            "is significantly better, - significantly worse, = no significant difference, and "
+            "the last row counts them. A LaTeX document that compiles on its own.",
+        )
+    else:
+        st.caption(
+            "Install SAES (`pip install SAES`) to download this comparison as SAES's Wilcoxon "
+            "pivot table in LaTeX."
+        )
 
 
 def _render_boxplots(runs: pd.DataFrame, indicator: str) -> None:
@@ -611,6 +610,29 @@ def _render_results(study: StudyInfo) -> None:
             file_name=f"{study.study_id}_runs.csv",
             mime="text/csv",
             key=f"validation_runs_{study.study_id}",
+        )
+        st.markdown(
+            "**For SAES**: the results (one row per run and indicator) and the metrics (all "
+            "minimized), the two files SAES reads (`-ds` and `-ms`)."
+        )
+        saes_columns = st.columns(2)
+        saes_columns[0].download_button(
+            "Results for SAES (CSV)",
+            saes_results(runs).to_csv(index=False),
+            file_name=f"{study.study_id}_saes_results.csv",
+            mime="text/csv",
+            key=f"validation_saes_results_{study.study_id}",
+            on_click="ignore",
+            icon=":material/download:",
+        )
+        saes_columns[1].download_button(
+            "Metrics for SAES (CSV)",
+            saes_metrics(runs).to_csv(index=False),
+            file_name=f"{study.study_id}_saes_metrics.csv",
+            mime="text/csv",
+            key=f"validation_saes_metrics_{study.study_id}",
+            on_click="ignore",
+            icon=":material/download:",
         )
     with tabs[4]:
         _render_details(study.directory, study.manifest)

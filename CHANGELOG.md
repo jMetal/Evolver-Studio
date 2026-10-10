@@ -21,11 +21,14 @@ Works with Evolver 2.4.
 
 ### Saving tables and charts
 
-- *Validation* saves its **median table** and its **Wilcoxon pivot table** as LaTeX, in the format
-  of Evolver's `scripts/wilcoxon_pivot_tables.py`: median with the interquartile range as a
-  subscript, the pivot in the last column, the best and second-best median of each problem shaded,
-  `+`/`-`/`=` against the pivot and a last row that counts them. Each is a LaTeX document that
-  compiles on its own.
+- *Validation* saves a study's results as the two CSV files **SAES** reads: the results (one row
+  per run and indicator: `Algorithm`, `Instance`, `MetricName`, `ExecutionId`, `MetricValue`) and
+  the metrics (`MetricName`, `Maximize`), in its *Runs* tab.
+- With SAES installed (`pip install SAES`), *Validation* saves the comparison with the pivot as
+  **SAES's Wilcoxon pivot table** in LaTeX, as Evolver's `scripts/wilcoxon_pivot_tables.py` makes
+  it: median and interquartile range, the pivot in the last column, `+`/`-`/`=` against it and a
+  last row that counts them. The counts are written whole in bold and the preamble is one that
+  compiles, two fixes to SAES's document that the script also makes.
 - **Every chart** of the app (fronts, solutions, boxplots, convergence, population, parameters, in
   the pages and in the tutorials) has **PNG** and **PDF** buttons. The images are made with Kaleido
   (a new dependency) in the Chrome installed on the computer, only when a button is pressed.

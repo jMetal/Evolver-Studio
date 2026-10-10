@@ -103,6 +103,9 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 - Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF (Kaleido draws them in
   it). Without it the PNG/PDF buttons are not offered, and each chart's camera icon still saves it
   as PNG.
+- Optionally, [SAES](https://github.com/jMetal/SAES) (`pip install SAES`), for Validation to save
+  the comparison as SAES's Wilcoxon pivot table in LaTeX. The CSV files SAES reads are saved
+  without it.
 
 Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.4** (the
 release the app is built against) from Maven Central. Other
