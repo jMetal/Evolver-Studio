@@ -414,6 +414,48 @@ def studio_indicator_values(
     return values
 
 
+def read_study_front(
+    study_directory: Path, manifest: dict, contender: str, problem: str, run: int
+) -> pd.DataFrame | None:
+    """The front a run of a contender found on a problem.
+
+    Args:
+        study_directory: The study's directory.
+        manifest: Its manifest.
+        contender: The contender's name.
+        problem: The problem's label, as in the jobs (e.g. "DTLZ2(12, 3)").
+        run: The run's number.
+
+    Returns:
+        The objective values of its solutions, with columns f1, f2, ...; None when the job or the
+        run has no front.
+    """
+    job = next(
+        (j for j in manifest["jobs"] if j["contender"] == contender and j["problem"] == problem),
+        None,
+    )
+    if job is None:
+        return None
+    return _read_objectives(
+        _job_output(study_directory, job["directory"]) / f"run-{run}" / "FUN.csv"
+    )
+
+
+def read_study_reference_front(
+    manifest: dict, problem: str, working_directory: Path
+) -> pd.DataFrame | None:
+    """The reference front of a problem of a study, with columns f1, f2, ...; None if missing."""
+    file = _reference_fronts_by_problem(manifest).get(problem)
+    return _read_objectives(working_directory / file) if file else None
+
+
+def _read_objectives(front_file: Path) -> pd.DataFrame | None:
+    front = _read_front(front_file)
+    if front is None:
+        return None
+    return pd.DataFrame(front, columns=[f"f{i}" for i in range(1, front.shape[1] + 1)])
+
+
 def _computed_by_studio(name: str) -> bool:
     indicator = quality_indicator(name)
     return indicator is not None and indicator.computed_by_studio

@@ -14,6 +14,8 @@ from evolver_studio.validation import (
     list_studies,
     plan_jobs,
     read_manifest,
+    read_study_front,
+    read_study_reference_front,
     study_is_written,
     write_study,
 )
@@ -192,6 +194,24 @@ class TestWriteAndCollect:
         assert list(runs.columns) == ["contender", "problem", "Run", "Seed", "TimeMs", "EP", "HV"]
         assert runs["HV"].iloc[0] == pytest.approx(0.25)
         assert (output / "STUDIO_INDICATORS.csv").is_file()
+
+    def test_should_read_the_front_of_a_run_and_the_reference_front(self, working_directory: Path):
+        # Arrange
+        directory = working_directory / "validation-runs" / "x"
+        write_study(_study(), directory, working_directory)
+        run = directory / "jobs" / "002" / "output" / "run-3"
+        run.mkdir(parents=True)
+        (run / "FUN.csv").write_text("0.1,0.9\n0.5,0.5\n")
+        manifest = read_manifest(directory)
+
+        # Act
+        front = read_study_front(directory, manifest, "NSGA-II", "ZDT1", 3)
+        reference = read_study_reference_front(manifest, "ZDT1", working_directory)
+
+        # Assert
+        assert list(front.columns) == ["f1", "f2"] and len(front) == 2
+        assert len(reference) == 2
+        assert read_study_front(directory, manifest, "NSGA-II", "ZDT1", 4) is None
 
     def test_should_gather_nothing_before_any_job_has_finished(self, working_directory: Path):
         # Arrange
