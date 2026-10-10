@@ -10,7 +10,10 @@ from evolver_studio.catalogue import (
     META_ALGORITHMS,
     QUALITY_INDICATORS,
     is_at_least,
+    is_maximized,
     is_older_than_catalogue,
+    quality_indicator,
+    validation_indicators,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
 from evolver_studio.resource_files import PARAMETER_SPACES_DIRECTORY
@@ -462,3 +465,25 @@ class TestCatalogueMatchesDescribeManifest:
 
         # Assert
         assert catalogue_names == set(manifest["indicators"])
+
+
+class TestIndicatorDirections:
+    def test_should_find_an_indicator_by_its_registry_name_or_its_abbreviation(self):
+        # Act / Assert
+        assert quality_indicator("Epsilon") is quality_indicator("EP")
+        assert quality_indicator("Nope") is None
+
+    def test_should_minimize_every_indicator_a_training_can_use(self):
+        """A training minimizes its meta-objectives: an indicator it can use cannot be maximized."""
+        # Assert
+        assert not any(indicator.maximized for indicator in QUALITY_INDICATORS)
+        assert not is_maximized("NHV")
+        assert not is_maximized("unknown")
+
+    def test_should_not_offer_the_negated_hypervolume_in_validation(self):
+        # Act
+        names = [indicator.registry_name for indicator in validation_indicators()]
+
+        # Assert
+        assert "HypervolumeMinus" not in names
+        assert {"Epsilon", "NormalizedHypervolume"} <= set(names)

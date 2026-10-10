@@ -24,6 +24,7 @@ import re
 
 import pandas as pd
 
+from evolver_studio.catalogue import is_maximized
 from evolver_studio.validation_stats import indicator_names
 
 RESULTS_COLUMNS = ("Algorithm", "Instance", "MetricName", "ExecutionId", "MetricValue")
@@ -77,7 +78,7 @@ def saes_results(runs: pd.DataFrame) -> pd.DataFrame:
 
 
 def saes_metrics(runs: pd.DataFrame) -> pd.DataFrame:
-    """The indicators of a study as SAES's metrics file: all of them are minimized.
+    """The indicators of a study as SAES's metrics file, with whether each one is maximized.
 
     Args:
         runs: The runs table of the study.
@@ -86,7 +87,11 @@ def saes_metrics(runs: pd.DataFrame) -> pd.DataFrame:
         One row per indicator, with the columns `METRICS_COLUMNS`.
     """
     return pd.DataFrame(
-        {"MetricName": indicator_names(runs), "Maximize": False}, columns=list(METRICS_COLUMNS)
+        {
+            "MetricName": indicator_names(runs),
+            "Maximize": [is_maximized(name) for name in indicator_names(runs)],
+        },
+        columns=list(METRICS_COLUMNS),
     )
 
 

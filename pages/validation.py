@@ -22,7 +22,7 @@ from evolver_studio.app_state import (
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
-from evolver_studio.catalogue import BASE_ALGORITHMS, QUALITY_INDICATORS
+from evolver_studio.catalogue import BASE_ALGORITHMS, is_maximized, validation_indicators
 from evolver_studio.configuration import (
     complete_values,
     configuration_string,
@@ -379,11 +379,12 @@ def _render_budget() -> Budget:
     )
     indicators = st.multiselect(
         "Quality indicators",
-        [indicator.registry_name for indicator in QUALITY_INDICATORS],
+        [indicator.registry_name for indicator in validation_indicators()],
         default=list(DEFAULT_INDICATORS),
         key=INDICATORS_KEY,
         help="Computed on each run's front, normalized with the problem's reference front. "
-        "All are minimized.",
+        "HypervolumeMinus, the hypervolume negated so that a training can minimize it, is not "
+        "offered: NormalizedHypervolume tells the same about a validation.",
     )
     return Budget(
         int(population), int(evaluations), int(runs), int(seed), tuple(indicators), int(processes)
@@ -464,13 +465,22 @@ def _failed_jobs(study_directory: Path) -> list[int]:
         return []
 
 
+def _direction(indicator: str) -> str:
+    return "higher is better" if is_maximized(indicator) else "lower is better"
+
+
 def _render_summary(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
     table = medians(runs, indicator)
-    best = best_contenders(table)
+    maximize = is_maximized(indicator)
+    best = best_contenders(table, maximize)
     st.markdown(
-        f"**Median of {indicator}** over the runs; the lowest on each problem is highlighted."
+        f"**Median of {indicator}** over the runs ({_direction(indicator)}); the best on each "
+        "problem is highlighted."
     )
-    st.dataframe(table.style.highlight_min(axis=1).format("{:.4g}"), width="stretch")
+    highlighted = (
+        table.style.highlight_max(axis=1) if maximize else table.style.highlight_min(axis=1)
+    )
+    st.dataframe(highlighted.format("{:.4g}"), width="stretch")
     st.caption(
         "Best on "
         + ", ".join(
@@ -488,10 +498,10 @@ def _render_comparison(runs: pd.DataFrame, indicator: str, pivot: str) -> None:
         st.info("There is nothing to compare yet.")
         return
     st.markdown(
-        f"**{pivot}** against each other algorithm, problem by problem, on {indicator} (lower is "
-        f"better). A Wilcoxon rank-sum test at {ALPHA}, and the **A12** effect size: the "
-        "probability that a run of the pivot is better than a run of the other algorithm "
-        "(0.5 is no difference; 1 means always better)."
+        f"**{pivot}** against each other algorithm, problem by problem, on {indicator} "
+        f"({_direction(indicator)}). A Wilcoxon rank-sum test at {ALPHA}, and the **A12** "
+        "effect size: the probability that a run of the pivot is better than a run of the other "
+        "algorithm (0.5 is no difference; 1 means always better)."
     )
     st.markdown("On how many problems the pivot is better, not different, or worse:")
     st.dataframe(verdict_counts(comparison), width="stretch")
@@ -612,8 +622,8 @@ def _render_results(study: StudyInfo) -> None:
             key=f"validation_runs_{study.study_id}",
         )
         st.markdown(
-            "**For SAES**: the results (one row per run and indicator) and the metrics (all "
-            "minimized), the two files SAES reads (`-ds` and `-ms`)."
+            "**For SAES**: the results (one row per run and indicator) and the metrics (whether "
+            "each indicator is maximized), the two files SAES reads (`-ds` and `-ms`)."
         )
         saes_columns = st.columns(2)
         saes_columns[0].download_button(

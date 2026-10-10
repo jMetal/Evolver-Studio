@@ -19,6 +19,16 @@ Works with Evolver 2.4.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
   S4 analysis, S5 validation.
 
+### Quality indicators: which way is better
+
+- Each quality indicator of the catalogue says whether it is **maximized**, and the analysis of a
+  validation follows it (the best median, the A12 effect size and the Wilcoxon verdict, the
+  highlighted cells, "lower/higher is better", the `Maximize` column of SAES's metrics file).
+  Every indicator Evolver offers today is minimized; Explore › Quality indicators shows the
+  direction of each.
+- *Validation* no longer offers **HypervolumeMinus**: it only exists so that a training can
+  minimize the hypervolume; *NormalizedHypervolume* tells the same about a validation.
+
 ### The four steps of meta-optimization
 
 - The Meta-optimization menu follows the workflow: **Training**, **Training analysis** (the page

@@ -435,7 +435,7 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
 
 @dataclass(slots=True, frozen=True)
 class QualityIndicator:
-    """A quality indicator a training run can minimize.
+    """A quality indicator a training run can minimize, or a validation measure.
 
     Attributes:
         registry_name: The name a training request uses for it, as
@@ -444,16 +444,23 @@ class QualityIndicator:
             INDICATORS.csv).
         full_name: Its full name.
         measures: What it measures, in a sentence.
+        maximized: Whether higher values are better. A training minimizes its meta-objectives,
+            so only a minimized indicator can be one.
+        in_validation: Whether Validation offers it: one that only exists so that a training can
+            minimize it (the negated hypervolume) tells a validation nothing new.
     """
 
     registry_name: str
     short_name: str
     full_name: str
     measures: str
+    maximized: bool = False
+    in_validation: bool = True
 
 
 # org.uma.evolver.cli.IndicatorRegistry. Evolver normalizes each front with the reference front of
-# its problem and computes every indicator against that front; all of them are minimized.
+# its problem and computes every indicator against that front; all of them are minimized today, but
+# the analysis of a validation follows `maximized`, for an indicator where higher is better.
 QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
     # org.uma.jmetal.qualityindicator.impl.Epsilon
     QualityIndicator(
@@ -486,6 +493,7 @@ QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
         full_name="Hypervolume, negated",
         measures="−HV(front): the hypervolume, negated so that it can be minimized like the "
         "other indicators.",
+        in_validation=False,
     ),
     # org.uma.jmetal.qualityindicator.impl.Spread
     QualityIndicator(
@@ -507,6 +515,26 @@ QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
         "front; not convergence.",
     ),
 )
+
+
+def quality_indicator(name: str) -> QualityIndicator | None:
+    """A quality indicator by its registry name or its abbreviation (e.g. "Epsilon" or "EP")."""
+    return next((i for i in QUALITY_INDICATORS if name in (i.registry_name, i.short_name)), None)
+
+
+def is_maximized(name: str) -> bool:
+    """Whether higher values of an indicator are better; False for an unknown one.
+
+    Args:
+        name: Its registry name or its abbreviation.
+    """
+    indicator = quality_indicator(name)
+    return indicator is not None and indicator.maximized
+
+
+def validation_indicators() -> tuple[QualityIndicator, ...]:
+    """The quality indicators Validation offers."""
+    return tuple(i for i in QUALITY_INDICATORS if i.in_validation)
 
 
 def is_older_than_catalogue(version: str) -> bool:

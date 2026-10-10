@@ -2,7 +2,8 @@
 
 The input is the table of every independent run of the study, one row per run of a contender on a
 problem, with the columns `contender`, `problem`, `Run`, `Seed`, `TimeMs` and one per quality
-indicator. The indicators are all minimized.
+indicator. Lower values are better unless the indicator is maximized (`catalogue.is_maximized`):
+"better" below means lower or higher accordingly.
 
 One contender, the pivot (the tuned configuration), is compared with each of the others, problem by
 problem: a Wilcoxon rank-sum test (the runs are independent) says whether the difference is
@@ -13,6 +14,8 @@ significant, and Vargha and Delaney's A12 how large it is, the same as Evolver's
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+from evolver_studio.catalogue import is_maximized
 
 ALPHA = 0.05
 # The thresholds of |A12 - 0.5| for a small, a medium and a large effect.
@@ -61,33 +64,35 @@ def interquartile_ranges(runs: pd.DataFrame, indicator: str) -> pd.DataFrame:
     return _grouped(runs, indicator, lambda values: values.quantile(0.75) - values.quantile(0.25))
 
 
-def best_contenders(median_table: pd.DataFrame) -> pd.Series:
-    """The contender with the lowest median on each problem.
+def best_contenders(median_table: pd.DataFrame, maximize: bool = False) -> pd.Series:
+    """The contender with the best median on each problem.
 
     Args:
         median_table: The table `medians` returns.
+        maximize: Whether higher values of the indicator are better.
 
     Returns:
         The name of the best contender, by problem; the first one on a tie.
     """
-    return median_table.idxmin(axis=1)
+    return median_table.idxmax(axis=1) if maximize else median_table.idxmin(axis=1)
 
 
-def a12(pivot: np.ndarray, other: np.ndarray) -> float:
-    """The probability that a run of the pivot is better (lower) than one of the other.
+def a12(pivot: np.ndarray, other: np.ndarray, maximize: bool = False) -> float:
+    """The probability that a run of the pivot is better than one of the other.
 
     Ties count one half, so 0.5 is no difference.
 
     Args:
         pivot: The pivot's values of an indicator.
         other: The other contender's.
+        maximize: Whether higher values are better (else lower ones are).
 
     Returns:
         The A12 statistic.
     """
     pivot_values = np.asarray(pivot, dtype=float)[:, None]
     other_values = np.asarray(other, dtype=float)[None, :]
-    better = (pivot_values < other_values).sum()
+    better = (pivot_values > other_values if maximize else pivot_values < other_values).sum()
     ties = (pivot_values == other_values).sum()
     return float((better + 0.5 * ties) / (pivot_values.size * other_values.size))
 
@@ -110,7 +115,11 @@ def magnitude(value: float) -> str:
 
 
 def compare_with_pivot(
-    runs: pd.DataFrame, indicator: str, pivot: str, alpha: float = ALPHA
+    runs: pd.DataFrame,
+    indicator: str,
+    pivot: str,
+    alpha: float = ALPHA,
+    maximize: bool | None = None,
 ) -> pd.DataFrame:
     """Compare the pivot with each other contender on each problem.
 
@@ -119,6 +128,7 @@ def compare_with_pivot(
         indicator: The indicator to compare on.
         pivot: The pivot contender.
         alpha: The significance level of the Wilcoxon test.
+        maximize: Whether higher values are better; None looks it up in the catalogue.
 
     Returns:
         One row per problem and other contender, with the columns `problem`, `contender`,
@@ -126,6 +136,8 @@ def compare_with_pivot(
         or worse when the test is significant and its A12 is above or below 0.5, and there is no
         significant difference otherwise.
     """
+    if maximize is None:
+        maximize = is_maximized(indicator)
     rows = []
     for problem, problem_runs in runs.groupby("problem", sort=False):
         pivot_values = _values(problem_runs, pivot, indicator)
@@ -135,7 +147,7 @@ def compare_with_pivot(
             other_values = _values(problem_runs, contender, indicator)
             if pivot_values.size == 0 or other_values.size == 0:
                 continue
-            effect = a12(pivot_values, other_values)
+            effect = a12(pivot_values, other_values, maximize)
             p_value = _rank_sum_p_value(pivot_values, other_values)
             rows.append(
                 {

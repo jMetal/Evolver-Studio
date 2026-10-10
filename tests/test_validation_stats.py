@@ -42,6 +42,10 @@ class TestA12:
         # Act / Assert
         assert a12(np.array(HIGH), np.array(LOW)) == 0.0
 
+    def test_should_count_higher_values_as_better_for_a_maximized_indicator(self):
+        # Act / Assert
+        assert a12(np.array(HIGH), np.array(LOW), maximize=True) == 1.0
+
     def test_should_count_ties_as_one_half(self):
         # Act / Assert
         assert a12(np.array([1.0, 1.0]), np.array([1.0, 1.0])) == 0.5
@@ -102,6 +106,13 @@ class TestSummaryTables:
         # Assert
         assert best.to_dict() == {"P1": "tuned", "P2": "NSGA-II"}
 
+    def test_should_pick_the_highest_median_for_a_maximized_indicator(self, runs):
+        # Act
+        best = best_contenders(medians(runs, "EP"), maximize=True)
+
+        # Assert
+        assert best.to_dict() == {"P1": "NSGA-II", "P2": "tuned"}
+
     def test_should_list_the_indicators_of_the_table(self, runs: pd.DataFrame):
         # Act / Assert
         assert indicator_names(runs) == ["EP"]
@@ -144,6 +155,19 @@ class TestCompareWithPivot:
         # Assert
         assert row["verdict"] == PIVOT_WORSE
         assert row["a12"] == 0.0
+
+    def test_should_say_the_pivot_is_better_when_significantly_higher_on_a_maximized_indicator(
+        self,
+    ):
+        # Arrange
+        runs = _runs({("P1", "tuned"): HIGH, ("P1", "NSGA-II"): LOW})
+
+        # Act
+        row = compare_with_pivot(runs, "EP", "tuned", maximize=True).iloc[0]
+
+        # Assert
+        assert row["verdict"] == PIVOT_BETTER
+        assert row["a12"] == 1.0
 
     def test_should_find_no_difference_between_equal_samples(self, comparison):
         # Act

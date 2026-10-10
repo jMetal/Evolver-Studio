@@ -102,6 +102,17 @@ class TestOpening:
         assert list(defaults.options) == ["NSGA-II", "PAES"]
         assert defaults.value == ["NSGA-II"]
 
+    def test_should_not_offer_the_negated_hypervolume(self, app: AppTest):
+        # Arrange
+        _needs_problem_catalogue()
+
+        # Act
+        options = list(app.multiselect(key="validation_indicators").options)
+
+        # Assert
+        assert "HypervolumeMinus" not in options
+        assert "NormalizedHypervolume" in options
+
     def test_should_not_let_a_study_run_without_problems_or_a_tuned_configuration(
         self, app: AppTest
     ):

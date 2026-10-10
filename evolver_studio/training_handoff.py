@@ -10,7 +10,7 @@ from collections.abc import Mapping
 
 import pandas as pd
 
-from evolver_studio.catalogue import QUALITY_INDICATORS
+from evolver_studio.catalogue import validation_indicators
 from evolver_studio.problem_catalogue import (
     Problem,
 )
@@ -70,9 +70,11 @@ def validation_form_state(
         state[defaults_key(training.encoding)] = [algorithm.name]
     if training.population_size:
         state[POPULATION_KEY] = training.population_size
-    known = {indicator.registry_name for indicator in QUALITY_INDICATORS}
-    if training.indicators and set(training.indicators) <= known:
-        state[INDICATORS_KEY] = list(training.indicators)
+    # Those of the training that Validation offers (not the negated hypervolume, for instance).
+    offered = {indicator.registry_name for indicator in validation_indicators()}
+    indicators = [name for name in training.indicators if name in offered]
+    if indicators:
+        state[INDICATORS_KEY] = indicators
     state[problems_key(training.encoding)] = []
     state[PROBLEM_ROWS_KEY] = pd.DataFrame(columns=list(PROBLEM_COLUMNS))
     return state

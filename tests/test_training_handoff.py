@@ -115,6 +115,16 @@ class TestValidationFormState:
         assert state["validation_population"] == 150
         assert state[INDICATORS_KEY] == ["Epsilon", "NormalizedHypervolume"]
 
+    def test_should_leave_out_the_indicators_validation_does_not_offer(self):
+        # Arrange
+        training = _training(indicators=("Epsilon", "HypervolumeMinus"))
+
+        # Act
+        state = validation_form_state(training, CONFIGURATION)
+
+        # Assert
+        assert state is not None and state[INDICATORS_KEY] == ["Epsilon"]
+
     def test_should_not_fill_what_it_does_not_know(self):
         # Act
         state = validation_form_state(_training(algorithm="Nope"), CONFIGURATION)
