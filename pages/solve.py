@@ -24,8 +24,8 @@ from evolver_studio.app_state import (
 )
 from evolver_studio.catalogue import (
     BASE_ALGORITHMS,
-    QUALITY_INDICATORS,
     BaseAlgorithm,
+    evolver_indicators,
     is_at_least,
 )
 from evolver_studio.configuration import (
@@ -441,7 +441,7 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
         seed = st.number_input("Seed", 0, value=1, disabled=not fix_seed, key=SEED_KEY)
     indicators = st.multiselect(
         "Quality indicators",
-        [indicator.registry_name for indicator in QUALITY_INDICATORS],
+        [indicator.registry_name for indicator in evolver_indicators()],
         default=list(DEFAULT_INDICATORS) if has_reference_front else [],
         disabled=not has_reference_front,
         help="Computed on each run's front, normalized with the reference front. Run `i` uses "

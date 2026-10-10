@@ -161,6 +161,38 @@ class TestWriteAndCollect:
         assert set(runs["problem"]) == {"ZDT1"}
         assert len(runs) == 2
 
+    def test_should_not_ask_evolver_for_the_hypervolume_studio_computes(
+        self, working_directory: Path
+    ):
+        # Act
+        jobs, _ = plan_jobs(
+            _study(indicators=("Epsilon", "Hypervolume")),
+            working_directory / "validation-runs" / "x",
+            working_directory,
+        )
+
+        # Assert
+        assert jobs[0].request.indicator_names == ["Epsilon"]
+
+    def test_should_compute_the_hypervolume_of_each_run_from_its_front(
+        self, working_directory: Path
+    ):
+        # Arrange: the front (0.5, 0.5) of ZDT1's reference front [0, 1] x [0, 1]
+        directory = working_directory / "validation-runs" / "x"
+        write_study(_study(indicators=("Epsilon", "Hypervolume")), directory, working_directory)
+        output = directory / "jobs" / "001" / "output"
+        (output / "run-1").mkdir(parents=True)
+        (output / "run-1" / "FUN.csv").write_text("0.5,0.5\n")
+        (output / "INDICATORS.csv").write_text("Run,Seed,TimeMs,EP\n1,1,10,0.5\n")
+
+        # Act
+        runs = collect_runs(directory, working_directory)
+
+        # Assert: computed once, and kept next to Evolver's indicators
+        assert list(runs.columns) == ["contender", "problem", "Run", "Seed", "TimeMs", "EP", "HV"]
+        assert runs["HV"].iloc[0] == pytest.approx(0.25)
+        assert (output / "STUDIO_INDICATORS.csv").is_file()
+
     def test_should_gather_nothing_before_any_job_has_finished(self, working_directory: Path):
         # Arrange
         directory = working_directory / "validation-runs" / "x"

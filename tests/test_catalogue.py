@@ -9,6 +9,7 @@ from evolver_studio.catalogue import (
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
     QUALITY_INDICATORS,
+    evolver_indicators,
     is_at_least,
     is_maximized,
     is_older_than_catalogue,
@@ -455,13 +456,13 @@ class TestCatalogueMatchesDescribeManifest:
         assert catalogue_keys == manifest_keys
 
     def test_should_have_an_indicator_entry_for_every_manifest_indicator(self):
-        """QUALITY_INDICATORS must list exactly what IndicatorRegistry registers."""
+        """The indicators Evolver computes must be exactly what IndicatorRegistry registers."""
         manifest = self._manifest()
         if manifest is None:
             pytest.skip(f"Evolver jar not found at {jar_path()}")
 
         # Arrange
-        catalogue_names = {indicator.registry_name for indicator in QUALITY_INDICATORS}
+        catalogue_names = {indicator.registry_name for indicator in evolver_indicators()}
 
         # Assert
         assert catalogue_names == set(manifest["indicators"])
@@ -476,9 +477,19 @@ class TestIndicatorDirections:
     def test_should_minimize_every_indicator_a_training_can_use(self):
         """A training minimizes its meta-objectives: an indicator it can use cannot be maximized."""
         # Assert
-        assert not any(indicator.maximized for indicator in QUALITY_INDICATORS)
+        assert not any(indicator.maximized for indicator in evolver_indicators())
         assert not is_maximized("NHV")
         assert not is_maximized("unknown")
+
+    def test_should_maximize_the_hypervolume_studio_computes(self):
+        # Act
+        hypervolume = quality_indicator("HV")
+
+        # Assert
+        assert hypervolume is not None and hypervolume.computed_by_studio
+        assert is_maximized("Hypervolume") and is_maximized("HV")
+        assert hypervolume in validation_indicators()
+        assert hypervolume not in evolver_indicators()
 
     def test_should_not_offer_the_negated_hypervolume_in_validation(self):
         # Act

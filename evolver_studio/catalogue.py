@@ -448,6 +448,9 @@ class QualityIndicator:
             so only a minimized indicator can be one.
         in_validation: Whether Validation offers it: one that only exists so that a training can
             minimize it (the negated hypervolume) tells a validation nothing new.
+        computed_by_studio: Whether Evolver-Studio computes it from the fronts a validation
+            keeps, instead of asking Evolver for it (Evolver does not register it): only
+            Validation offers it.
     """
 
     registry_name: str
@@ -456,11 +459,12 @@ class QualityIndicator:
     measures: str
     maximized: bool = False
     in_validation: bool = True
+    computed_by_studio: bool = False
 
 
 # org.uma.evolver.cli.IndicatorRegistry. Evolver normalizes each front with the reference front of
-# its problem and computes every indicator against that front; all of them are minimized today, but
-# the analysis of a validation follows `maximized`, for an indicator where higher is better.
+# its problem and computes every indicator against that front; all of them are minimized. The
+# hypervolume, maximized, is computed by Evolver-Studio for a validation (`computed_by_studio`).
 QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
     # org.uma.jmetal.qualityindicator.impl.Epsilon
     QualityIndicator(
@@ -505,6 +509,20 @@ QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
         "Defined only for two objectives: Evolver rejects a request that uses it on a problem "
         "with any other number.",
     ),
+    # Not registered by Evolver: computed by evolver_studio.hypervolume from a validation's fronts,
+    # as Evolver computes HypervolumeMinus (same normalization and reference point), without the
+    # sign change.
+    QualityIndicator(
+        registry_name="Hypervolume",
+        short_name="HV",
+        full_name="Hypervolume",
+        measures="HV(front): the volume of the objective space the front dominates, up to the "
+        "reference point, with the front normalized by its problem's reference front; between 0 "
+        "and 1, higher is better. Validation only: Evolver-Studio computes it from each run's "
+        "front.",
+        maximized=True,
+        computed_by_studio=True,
+    ),
     # org.uma.jmetal.qualityindicator.impl.GeneralizedSpread
     QualityIndicator(
         registry_name="GeneralizedSpread",
@@ -530,6 +548,11 @@ def is_maximized(name: str) -> bool:
     """
     indicator = quality_indicator(name)
     return indicator is not None and indicator.maximized
+
+
+def evolver_indicators() -> tuple[QualityIndicator, ...]:
+    """The quality indicators Evolver computes (those its IndicatorRegistry registers)."""
+    return tuple(i for i in QUALITY_INDICATORS if not i.computed_by_studio)
 
 
 def validation_indicators() -> tuple[QualityIndicator, ...]:

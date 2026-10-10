@@ -10,6 +10,11 @@ each job (`jobs/<n>/request.yaml`, its status and its `output/`).
 The encoding is that of the problems, which must all share it: an algorithm can only solve problems
 of an encoding it supports, so the contenders are the algorithms with a default configuration for
 that encoding.
+
+Most indicators are computed by Evolver as each job runs (`output/INDICATORS.csv`). Those Evolver
+does not register (the hypervolume, maximized) are computed here from each run's front
+(`output/run-<k>/FUN.csv`) when the runs are gathered, and kept next to Evolver's
+(`output/STUDIO_INDICATORS.csv`), so that they are computed once.
 """
 
 from collections.abc import Callable
@@ -19,7 +24,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from evolver_studio.catalogue import BASE_ALGORITHMS, BaseAlgorithm
+from evolver_studio.catalogue import BASE_ALGORITHMS, BaseAlgorithm, quality_indicator
+from evolver_studio.hypervolume import hypervolume
 from evolver_studio.problem_catalogue import ArgumentValue, format_problem_spec, problem_spec
 from evolver_studio.problems import reference_front_dimension
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
@@ -29,6 +35,9 @@ MANIFEST_NAME = "study.yaml"
 JOBS_DIRECTORY_NAME = "jobs"
 OUTPUT_DIRECTORY_NAME = "output"
 INDICATORS_FILE = "INDICATORS.csv"
+STUDIO_INDICATORS_FILE = "STUDIO_INDICATORS.csv"
+# The indicators Evolver-Studio computes from a run's front and its problem's reference front.
+STUDIO_INDICATOR_FUNCTIONS = {"Hypervolume": hypervolume}
 DEFAULT_RUNS = 30
 DEFAULT_MAX_EVALUATIONS = 25000
 DEFAULT_POPULATION_SIZE = 100
@@ -337,17 +346,99 @@ def collect_runs(study_directory: Path, working_directory: Path) -> pd.DataFrame
     manifest = read_manifest(study_directory)
     if manifest is None:
         return pd.DataFrame()
+    studio_indicators = [n for n in manifest.get("indicators", []) if _computed_by_studio(n)]
+    reference_fronts = _reference_fronts_by_problem(manifest)
     tables = []
     for job in manifest["jobs"]:
-        indicators_file = _job_output(study_directory, job["directory"]) / INDICATORS_FILE
+        output = _job_output(study_directory, job["directory"])
         try:
-            table = pd.read_csv(indicators_file)
+            table = pd.read_csv(output / INDICATORS_FILE)
         except (OSError, pd.errors.EmptyDataError):
             continue
+        if studio_indicators:
+            reference_front = working_directory / reference_fronts.get(job["problem"], "")
+            computed = studio_indicator_values(
+                output, table["Run"].tolist(), reference_front, studio_indicators
+            )
+            table = table.merge(computed, on="Run", how="left")
         table.insert(0, "problem", job["problem"])
         table.insert(0, "contender", job["contender"])
         tables.append(table)
     return pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+
+
+def studio_indicator_values(
+    output: Path, runs: list[int], reference_front_file: Path, indicators: list[str]
+) -> pd.DataFrame:
+    """The indicators Evolver-Studio computes, for the runs of a job, from their fronts.
+
+    They are read from `STUDIO_INDICATORS.csv` when it holds them all, and computed and written
+    there otherwise; a run whose front or reference front cannot be read gets no value.
+
+    Args:
+        output: The job's output directory.
+        runs: The numbers of its runs.
+        reference_front_file: The reference front of its problem.
+        indicators: The registry names of the indicators (e.g. "Hypervolume").
+
+    Returns:
+        One row per run: `Run` and a column per indicator, named by its abbreviation (e.g. "HV").
+    """
+    columns = [_column(name) for name in indicators]
+    cache = output / STUDIO_INDICATORS_FILE
+    try:
+        cached = pd.read_csv(cache)
+        if set(columns) <= set(cached.columns) and set(runs) <= set(cached["Run"]):
+            return cached[["Run", *columns]]
+    except (OSError, pd.errors.EmptyDataError, KeyError):
+        pass
+    try:
+        reference_front = pd.read_csv(reference_front_file, header=None).to_numpy()
+    except (OSError, pd.errors.EmptyDataError):
+        reference_front = None
+    rows = []
+    for run in runs:
+        row: dict[str, float | int | None] = {"Run": run}
+        front = _read_front(output / f"run-{run}" / "FUN.csv")
+        for name, column in zip(indicators, columns, strict=True):
+            usable = front is not None and reference_front is not None
+            row[column] = (
+                STUDIO_INDICATOR_FUNCTIONS[name](front, reference_front) if usable else None
+            )
+        rows.append(row)
+    values = pd.DataFrame(rows, columns=["Run", *columns])
+    try:
+        values.to_csv(cache, index=False)
+    except OSError:
+        pass
+    return values
+
+
+def _computed_by_studio(name: str) -> bool:
+    indicator = quality_indicator(name)
+    return indicator is not None and indicator.computed_by_studio
+
+
+def _column(name: str) -> str:
+    indicator = quality_indicator(name)
+    return indicator.short_name if indicator is not None else name
+
+
+def _reference_fronts_by_problem(manifest: dict) -> dict[str, str]:
+    """The reference front of each problem, by its label in the jobs (e.g. "DTLZ2(12, 2)")."""
+    return {
+        StudyProblem(p["name"], tuple(p.get("arguments") or ()), p["referenceFront"]).label: p[
+            "referenceFront"
+        ]
+        for p in manifest.get("problems", [])
+    }
+
+
+def _read_front(front_file: Path):
+    try:
+        return pd.read_csv(front_file, header=None).to_numpy()
+    except (OSError, pd.errors.EmptyDataError):
+        return None
 
 
 def _job_output(study_directory: Path, job_directory: str) -> Path:
@@ -409,7 +500,8 @@ def _request(
         max_evaluations=study.max_evaluations,
         number_of_independent_runs=study.runs,
         seed=study.seed,
-        indicator_names=list(study.indicators),
+        # Evolver computes only those it registers; the others are computed from the fronts.
+        indicator_names=[name for name in study.indicators if not _computed_by_studio(name)],
         status_frequency=None,
         front_frequency=None,
         write_population=False,

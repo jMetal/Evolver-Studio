@@ -20,7 +20,9 @@ st.markdown(
     "needs a reference front file. For `HypervolumeMinus` an approximate one is enough, since "
     "only its bounds are used (to normalize and to place the reference point); the others also "
     "use its points. A validation measures its runs with them too, all but `HypervolumeMinus`, "
-    "which only exists so that a training can minimize the hypervolume (*In Validation*)."
+    "which only exists so that a training can minimize the hypervolume, and with `Hypervolume`, "
+    "which Evolver does not compute: Evolver-Studio computes it from each run's front, the same "
+    "way (*In Validation*)."
 )
 # A markdown table, not st.dataframe: the descriptions are the point, and it wraps them instead of
 # truncating them.

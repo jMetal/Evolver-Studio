@@ -26,6 +26,12 @@ Works with Evolver 2.4.
   highlighted cells, "lower/higher is better", the `Maximize` column of SAES's metrics file).
   Every indicator Evolver offers today is minimized; Explore › Quality indicators shows the
   direction of each.
+- *Validation* offers the **Hypervolume** (HV, maximized), which Evolver does not register:
+  Evolver-Studio computes it from each run's front (`run-K/FUN.csv`) as Evolver computes its own
+  hypervolume indicators (the front normalized with the reference front's bounds, clipped to
+  [0, 1], reference point (1, ..., 1)), with moocore (a new dependency), and keeps it in each job's
+  `STUDIO_INDICATORS.csv`. On the 360 fronts of a WFG study and on DTLZ2 with 3, 4 and 6
+  objectives, 1 - HV/HV(reference front) equals Evolver's NormalizedHypervolume to 1e-15.
 - *Validation* no longer offers **HypervolumeMinus**: it only exists so that a training can
   minimize the hypervolume; *NormalizedHypervolume* tells the same about a validation.
 
