@@ -1,9 +1,10 @@
 """The charts of the analysis of a validation study.
 
 Boxplots of an indicator, a heatmap of the A12 effect sizes against the pivot, the computing time
-of each algorithm, Demšar's critical difference plot, and the fronts of chosen runs: overlaid for
-two and three objectives, and for more, a parallel-coordinates chart per algorithm, normalized
-with the reference front, which each shows in gray behind the algorithm's front.
+of each algorithm, Demšar's critical difference plot, and the fronts of chosen runs: for two and
+three objectives a grid with a panel for the reference front and one per algorithm, and for more,
+a parallel-coordinates chart for the reference front and one per algorithm, normalized with the
+reference front, which each shows in gray behind the algorithm's front.
 
 Nothing here depends on Streamlit.
 """
@@ -11,11 +12,17 @@ Nothing here depends on Streamlit.
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from evolver_studio.solve_figures import REFERENCE_FRONT_COLOR
 
 COLORS = px.colors.qualitative.Plotly
 PANEL_HEIGHT = 260
+GRID_COLUMNS = 3
+GRID_2D_ROW_HEIGHT = 340
+GRID_3D_ROW_HEIGHT = 480
+# The reference front in its own panel; in the algorithms' panels it is REFERENCE_FRONT_COLOR.
+REFERENCE_PANEL_COLOR = "dimgray"
 
 
 def boxplot_figure(runs: pd.DataFrame, indicator: str) -> go.Figure:
@@ -156,19 +163,24 @@ def critical_difference_figure(ranks: pd.Series, difference: float, groups: list
     return figure
 
 
-def fronts_figure(
-    fronts: dict[str, pd.DataFrame], reference_front: pd.DataFrame | None
+def fronts_grid_figure(
+    fronts: dict[str, pd.DataFrame],
+    reference_front: pd.DataFrame | None,
+    reference_behind: bool = True,
+    columns: int = GRID_COLUMNS,
 ) -> go.Figure:
-    """The fronts of some algorithms on a problem with two or three objectives, overlaid.
+    """The fronts of some algorithms on a problem with two or three objectives, a panel each.
 
-    Two objectives give a scatter over the reference front's line, three a 3D scatter over its
-    points (an algorithm is hidden or shown by clicking its name in the legend). For more, see
-    `parallel_fronts_figures`.
+    The first panel is the reference front, and then one per algorithm, in the order given (the
+    pivot first), all on the same axes so that they can be compared. Two objectives give
+    scatters, three 3D scatters.
 
     Args:
-        fronts: The objective values (columns f1, f2, ...) of the front to show of each
-            algorithm, by the label to show it with.
+        fronts: The objective values (columns f1, f2, ...) of the front of each algorithm, by
+            the label to show it with.
         reference_front: The problem's reference front, with the same columns, or None.
+        reference_behind: Whether each algorithm's panel also shows the reference front, faint.
+        columns: Panels per row.
 
     Returns:
         The figure; empty when there are no fronts.
@@ -178,61 +190,98 @@ def fronts_figure(
     objectives = list(next(iter(fronts.values())).columns)
     if len(objectives) >= 4:
         raise ValueError("Four objectives or more: use parallel_fronts_figures")
-    figure = go.Figure()
     three = len(objectives) == 3
+    panels: list[tuple[str, pd.DataFrame | None, str | None]] = []
     if reference_front is not None:
-        ordered = reference_front.sort_values("f1")
-        if three:
-            figure.add_trace(
-                go.Scatter3d(
-                    x=ordered["f1"],
-                    y=ordered["f2"],
-                    z=ordered["f3"],
-                    mode="markers",
-                    name="Reference front",
-                    marker={"size": 2, "color": REFERENCE_FRONT_COLOR, "opacity": 0.4},
-                )
-            )
-        else:
-            figure.add_trace(
-                go.Scatter(
-                    x=ordered["f1"],
-                    y=ordered["f2"],
-                    mode="lines",
-                    name="Reference front",
-                    line={"color": REFERENCE_FRONT_COLOR},
-                )
-            )
+        panels.append(("Reference front", None, None))
     for index, (label, front) in enumerate(fronts.items()):
-        color = COLORS[index % len(COLORS)]
-        if three:
+        panels.append((label, front, COLORS[index % len(COLORS)]))
+    columns = min(columns, len(panels))
+    rows = -(-len(panels) // columns)
+    figure = make_subplots(
+        rows=rows,
+        cols=columns,
+        subplot_titles=[label for label, _, _ in panels],
+        specs=[[{"type": "scene" if three else "xy"}] * columns for _ in range(rows)],
+        shared_xaxes="all" if not three else False,
+        shared_yaxes="all" if not three else False,
+        horizontal_spacing=0.06,
+        vertical_spacing=0.12 / rows if not three else 0.04,
+    )
+    everything = pd.concat(
+        [f[objectives] for f in fronts.values()]
+        + ([reference_front[objectives]] if reference_front is not None else [])
+    )
+    for position, (_, front, color) in enumerate(panels):
+        row, column = divmod(position, columns)
+        place = {"row": row + 1, "col": column + 1}
+        if reference_front is not None and (front is None or reference_behind):
             figure.add_trace(
-                go.Scatter3d(
-                    x=front["f1"],
-                    y=front["f2"],
-                    z=front["f3"],
-                    mode="markers",
-                    name=label,
-                    marker={"size": 3, "color": color},
-                )
+                _reference_trace(reference_front, three, faint=front is not None), **place
             )
-        else:
-            figure.add_trace(
-                go.Scatter(
-                    x=front["f1"],
-                    y=front["f2"],
-                    mode="markers",
-                    name=label,
-                    marker={"color": color, "size": 7},
-                )
-            )
+        if front is not None:
+            figure.add_trace(_front_trace(front, three, color), **place)
+    figure.update_layout(showlegend=False)
     if three:
-        figure.update_layout(
-            scene={"xaxis_title": "f1", "yaxis_title": "f2", "zaxis_title": "f3"}, height=650
-        )
+        ranges = {
+            axis: [float(everything[objective].min()), float(everything[objective].max())]
+            for axis, objective in zip(("xaxis", "yaxis", "zaxis"), objectives, strict=True)
+        }
+        for index in range(1, len(panels) + 1):
+            scene = "scene" if index == 1 else f"scene{index}"
+            figure.update_layout(
+                {
+                    scene: {
+                        axis: {"title": objective, "range": ranges[axis]}
+                        for axis, objective in zip(
+                            ("xaxis", "yaxis", "zaxis"), objectives, strict=True
+                        )
+                    }
+                }
+            )
+        figure.update_layout(height=GRID_3D_ROW_HEIGHT * rows)
     else:
-        figure.update_layout(xaxis_title="f1", yaxis_title="f2", height=550)
+        figure.update_xaxes(title_text="f1", row=rows)
+        figure.update_yaxes(title_text="f2", col=1)
+        figure.update_layout(height=GRID_2D_ROW_HEIGHT * rows + 60)
     return figure
+
+
+def _reference_trace(reference_front: pd.DataFrame, three: bool, faint: bool):
+    color = REFERENCE_FRONT_COLOR if faint else REFERENCE_PANEL_COLOR
+    if three:
+        return go.Scatter3d(
+            x=reference_front["f1"],
+            y=reference_front["f2"],
+            z=reference_front["f3"],
+            mode="markers",
+            name="Reference front",
+            # Dense: light enough for the surface's shape to show through its own points.
+            marker={"size": 1.5, "color": color, "opacity": 0.4 if faint else 0.25},
+        )
+    ordered = reference_front.sort_values("f1")
+    return go.Scatter(
+        x=ordered["f1"],
+        y=ordered["f2"],
+        mode="lines" if faint else "lines+markers",
+        name="Reference front",
+        line={"color": color},
+        marker={"size": 3, "color": color},
+    )
+
+
+def _front_trace(front: pd.DataFrame, three: bool, color: str):
+    if three:
+        return go.Scatter3d(
+            x=front["f1"],
+            y=front["f2"],
+            z=front["f3"],
+            mode="markers",
+            marker={"size": 2.5, "color": color},
+        )
+    return go.Scatter(
+        x=front["f1"], y=front["f2"], mode="markers", marker={"color": color, "size": 6}
+    )
 
 
 def parallel_fronts_figures(
@@ -251,7 +300,8 @@ def parallel_fronts_figures(
             fronts' own bounds normalize them then).
 
     Returns:
-        A figure per algorithm, in the order of `fronts`.
+        The reference front's figure, when there is one, and then a figure per algorithm, in the
+        order of `fronts`.
     """
     if not fronts:
         return []
@@ -261,6 +311,23 @@ def parallel_fronts_figures(
     span = (bounds[objectives].max() - lower).replace(0, 1.0)
     top = max(1.0, *(float(((f[objectives] - lower) / span).max().max()) for f in fronts.values()))
     figures = []
+    if reference_front is not None:
+        reference = (reference_front[objectives] - lower) / span
+        figure = go.Figure(
+            go.Parcoords(
+                line={"color": REFERENCE_PANEL_COLOR},
+                dimensions=[
+                    {"label": objective, "values": reference[objective], "range": [0, top]}
+                    for objective in objectives
+                ],
+            )
+        )
+        figure.update_layout(
+            title={"text": "Reference front", "x": 0.01},
+            height=PANEL_HEIGHT + 80,
+            margin={"t": 80},
+        )
+        figures.append(figure)
     for index, (label, front) in enumerate(fronts.items()):
         color = COLORS[index % len(COLORS)]
         parts = [front[objectives].assign(_shown=1.0)]

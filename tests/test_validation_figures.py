@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from evolver_studio.validation_figures import (
     critical_difference_figure,
     effect_size_figure,
-    fronts_figure,
+    fronts_grid_figure,
     parallel_fronts_figures,
 )
 
@@ -18,37 +18,49 @@ def _front(objectives: int, points: int = 5) -> pd.DataFrame:
 
 
 class TestFrontsFigure:
-    def test_should_overlay_two_objective_fronts_over_the_reference_front(self):
+    def test_should_give_the_reference_front_and_then_each_front_a_panel_of_its_own(self):
         # Act
-        figure = fronts_figure({"A": _front(2), "B": _front(2)}, _front(2, 20))
+        figure = fronts_grid_figure({"A": _front(2), "B": _front(2)}, _front(2, 20))
 
-        # Assert
-        assert [trace.name for trace in figure.data] == ["Reference front", "A", "B"]
+        # Assert: panel 1 the reference front; panels 2 and 3 each front over the reference
+        titles = [annotation.text for annotation in figure.layout.annotations]
+        assert titles == ["Reference front", "A", "B"]
+        assert [trace.xaxis for trace in figure.data] == ["x", "x2", "x2", "x3", "x3"]
         assert all(isinstance(trace, go.Scatter) for trace in figure.data)
 
-    def test_should_overlay_three_objective_fronts_in_3d(self):
+    def test_should_leave_the_reference_front_out_of_the_fronts_panels_if_asked(self):
         # Act
-        figure = fronts_figure({"A": _front(3), "B": _front(3)}, _front(3, 20))
+        figure = fronts_grid_figure(
+            {"A": _front(2), "B": _front(2)}, _front(2, 20), reference_behind=False
+        )
+
+        # Assert
+        assert len(figure.data) == 3
+
+    def test_should_draw_three_objectives_in_3d_panels_on_the_same_ranges(self):
+        # Act
+        figure = fronts_grid_figure({"A": _front(3), "B": _front(3)}, _front(3, 20))
 
         # Assert
         assert all(isinstance(trace, go.Scatter3d) for trace in figure.data)
-        assert len(figure.data) == 3
+        assert figure.layout.scene.xaxis.range == figure.layout.scene3.xaxis.range
 
     def test_should_give_a_parallel_coordinates_chart_per_algorithm_for_more(self):
         # Act
         figures = parallel_fronts_figures({"A": _front(5), "B": _front(5)}, _front(5, 20))
 
-        # Assert: each holds the reference front and the algorithm's front, on one scale
-        assert len(figures) == 2
-        chart = figures[0].data[0]
+        # Assert: the reference front first; then each front over it, on one scale
+        assert len(figures) == 3
+        assert figures[0].layout.title.text == "Reference front"
+        chart = figures[1].data[0]
         assert isinstance(chart, go.Parcoords)
         assert len(chart.dimensions) == 5
         assert len(chart.dimensions[0].values) == 25
-        assert figures[0].data[0].dimensions[0].range == figures[1].data[0].dimensions[0].range
+        assert figures[1].data[0].dimensions[0].range == figures[2].data[0].dimensions[0].range
 
     def test_should_be_empty_without_fronts(self):
         # Act / Assert
-        assert len(fronts_figure({}, None).data) == 0
+        assert len(fronts_grid_figure({}, None).data) == 0
 
 
 class TestOtherFigures:

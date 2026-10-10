@@ -48,9 +48,10 @@ Works with Evolver 2.4.
   - *Ranking*: average ranks, Friedman's test, Demšar's critical difference plot (Nemenyi) and
     Holm's procedure against the pivot, with a LaTeX table;
   - *Distributions*: boxplots;
-  - *Fronts*: the median, best or worst run of each algorithm on a problem, over the reference
-    front: overlaid for two objectives, in 3D for three, a parallel-coordinates chart per
-    algorithm for more;
+  - *Fronts*: the median, best or worst run of each algorithm on a problem, a panel each on the
+    same axes: the reference front first, then the pivot's and the others', each over the
+    reference front, faint (2D scatters for two objectives, 3D for three, a parallel-coordinates
+    chart each for more);
   - *Cost*: the median computing time of a run;
   - *Runs & details*: the study's design, every run, and the CSV files SAES reads.
 

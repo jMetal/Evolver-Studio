@@ -26,7 +26,7 @@ from evolver_studio.validation_figures import (
     cost_figure,
     critical_difference_figure,
     effect_size_figure,
-    fronts_figure,
+    fronts_grid_figure,
     parallel_fronts_figures,
 )
 from evolver_studio.validation_stats import (
@@ -269,10 +269,12 @@ def render_distributions(runs: pd.DataFrame, indicator: str, study_id: str) -> N
 def render_fronts(
     study: StudyInfo, runs: pd.DataFrame, indicator: str, working_directory: Path
 ) -> None:
-    """The fronts of chosen runs of each algorithm on a problem, over its reference front."""
+    """The fronts of chosen runs of each algorithm on a problem: a panel each, after the reference
+    front's, the pivot's first."""
     key = f"validation_analysis_fronts_{study.study_id}"
     problems = list(dict.fromkeys(runs["problem"]))
-    contenders = list(dict.fromkeys(runs["contender"]))
+    pivot = study.manifest["pivot"]
+    contenders = [pivot] + [c for c in dict.fromkeys(runs["contender"]) if c != pivot]
     columns = st.columns([2, 2, 3])
     problem = columns[0].selectbox("Problem", problems, key=f"{key}_problem")
     which = columns[1].radio(
@@ -302,22 +304,30 @@ def render_fronts(
         return
     reference = read_study_reference_front(study.manifest, problem, working_directory)
     objectives = len(next(iter(fronts.values())).columns)
-    if objectives == 3:
-        st.caption("Drag to rotate; click an algorithm in the legend to hide or show it.")
-    elif objectives >= 4:
-        st.caption(
-            f"{objectives} objectives: a chart per algorithm, its front in color over the "
-            "reference front in gray, each objective normalized with the reference front's "
-            "bounds (0 its lowest value, 1 its highest), on the same scale in every chart."
-        )
     if objectives < 4:
+        behind = st.checkbox(
+            "Show the reference front behind each front",
+            value=True,
+            key=f"{key}_behind",
+            help="Faint, in gray: how close each front comes to it.",
+        )
+        st.caption(
+            "The reference front, then each algorithm's front, the pivot's first, all on the "
+            "same axes." + (" Drag a panel to rotate it." if objectives == 3 else "")
+        )
         render_chart(
-            fronts_figure(fronts, reference),
+            fronts_grid_figure(fronts, reference, reference_behind=behind),
             f"{key}_chart_{problem}_{which}",
             f"fronts_{problem}_{which}",
             width="stretch",
         )
         return
+    st.caption(
+        f"{objectives} objectives: the reference front, then a chart per algorithm, the pivot's "
+        "first, its front in color over the reference front in gray, each objective normalized "
+        "with the reference front's bounds (0 its lowest value, 1 its highest), on the same "
+        "scale in every chart."
+    )
     for index, figure in enumerate(parallel_fronts_figures(fronts, reference)):
         render_chart(
             figure,
