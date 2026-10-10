@@ -1,4 +1,4 @@
-"""Tutorial S4, "Analyzing training results": its steps.
+"""Tutorial "Analyzing training results": its steps.
 
 The interactive counterpart of Evolver's tutorial E7
 (docs/tutorials/analyzing_training_results.rst):

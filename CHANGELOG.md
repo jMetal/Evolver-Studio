@@ -23,11 +23,18 @@ Works with Evolver 2.4.
 - *Solving a problem with a configurable algorithm* begins with a new step, **Choosing a
   problem**: the listing of Explore › Problems and what it says of each problem, with a quick
   check read from the jar's problem catalogue.
-- **Tutorial S4, *Analyzing training results*** (pairs with E7): reads a real training that ships
+- **Tutorial *Your first guided training*** (pairs with E3): the training of Evolver's E3 (NSGA-II
+  tuned for ZDT4 by NSGA-II, NHV and EP, 2000 configurations), piece by piece; a button opens
+  Training with it in the form, to launch and follow it there; then it reads what the training
+  found (or, until the reader has run one, the training that ships with the app) and runs the
+  configuration with the lowest NHV and the default NSGA-II five times each on ZDT4 — which can
+  show that a configuration chosen by a single run per configuration was a lucky one.
+- **Tutorial *Analyzing training results*** (pairs with E7): reads a real training that ships
   with the app (`evolver_studio/tutorial_data/analysis/`) with the views of Training analysis —
   summary, convergence, front and population, final-front configurations, parameter agreement.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
-  S4 analysis, S5 validation.
+  S4 first training, S5 training analysis, S6 validation, S7 validation analysis. Their text names
+  the other tutorials by title, not by number.
 
 ### Quality indicators: which way is better
 
@@ -140,7 +147,7 @@ Works with Evolver 2.4.
   per problem and every run, with CSV downloads. The problems are chosen from a list or from the
   listing of Explore › Problems, as in Training. Studies are kept under `validation-runs/` and can
   be reopened. Needs scipy.
-- **Tutorial S5, *Validating a configuration**** (pairs with E8): it runs a small validation study
+- **Tutorial *Validating a configuration*** (pairs with E8): it runs a small validation study
   in the background and reads it step by step. The pivot is the NSGA-II that Evolver's tutorial E8
   tuned for the nine bi-objective WFG problems (bundled in Evolver's jar), against the default
   NSGA-II, MOEA/D and RVEA, on two WFG problems it was tuned for and on ZDT1 and DTLZ2 with two

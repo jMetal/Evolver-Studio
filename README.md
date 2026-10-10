@@ -21,7 +21,8 @@ It serves two purposes:
 
 > **Status:** early development, heading to 0.1.0 (see [CHANGELOG.md](CHANGELOG.md)). Exploring
 > parameter spaces, launching and monitoring training runs, analyzing them, running an algorithm
-> on a problem, validating a tuned configuration, and five tutorials are available.
+> on a problem, validating a tuned configuration and analyzing the validation, with a tutorial
+> for each.
 > See [ROADMAP.md](ROADMAP.md).
 
 ## How it works

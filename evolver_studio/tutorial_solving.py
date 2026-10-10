@@ -84,7 +84,7 @@ class PreparedRun:
         max_evaluations: The evaluations of each run.
         runs: The number of independent runs.
         expected: The indicator values the text announces (the first run's, or the mean of the runs
-            when there are several), by short name.
+            when there are several), by short name; empty when it announces none.
     """
 
     key: str
@@ -269,12 +269,12 @@ def run_prepared(prepared: PreparedRun, jar: Path) -> Path | None:
     return run_dir if run_phase(run_dir) is RunPhase.FINISHED else None
 
 
-def _output_directory(run_dir: Path) -> Path:
+def output_directory(run_dir: Path) -> Path:
     """Where the results of a prepared run are: `run_prepared` writes them under its directory."""
     return run_dir / "output"
 
 
-def _remembered_run(prepared: PreparedRun) -> Path | None:
+def remembered_run(prepared: PreparedRun) -> Path | None:
     """The run the reader has already launched for a prepared run, if it still exists."""
     run_id = st.session_state.get(f"{KEY_PREFIX}_run_{prepared.key}")
     if run_id is None:
@@ -283,7 +283,7 @@ def _remembered_run(prepared: PreparedRun) -> Path | None:
     return run_dir if run_phase(run_dir) is RunPhase.FINISHED else None
 
 
-def _render_prepared_run(prepared: PreparedRun, jar: Path, show_front: bool = True) -> Path | None:
+def render_prepared_run(prepared: PreparedRun, jar: Path, show_front: bool = True) -> Path | None:
     """Offer a prepared run, run it on request, and show what it gave.
 
     Args:
@@ -315,7 +315,7 @@ def _render_prepared_run(prepared: PreparedRun, jar: Path, show_front: bool = Tr
             help="Fills the form of Run algorithm with this run, to repeat it by hand.",
         ):
             _open_in_run_algorithm(request, jar)
-    run_dir = _remembered_run(prepared)
+    run_dir = remembered_run(prepared)
     if run_dir is not None:
         _render_outcome(prepared, run_dir, show_front)
     return run_dir
@@ -335,7 +335,7 @@ def _open_in_run_algorithm(request: SolveRequest, jar: Path) -> None:
 
 
 def _render_outcome(prepared: PreparedRun, run_dir: Path, show_front: bool) -> None:
-    output = _output_directory(run_dir)
+    output = output_directory(run_dir)
     if show_front:
         fronts = read_run_fronts(output)
         reference = read_front(evolver_client.WORKING_DIRECTORY / prepared.reference_front)
@@ -353,7 +353,9 @@ def _render_outcome(prepared: PreparedRun, run_dir: Path, show_front: bool) -> N
 
 
 def _check_expected(prepared: PreparedRun, indicators: pd.DataFrame) -> None:
-    """Say whether the indicator values are the ones the text announces."""
+    """Say whether the indicator values are the ones the text announces (if it announces any)."""
+    if not prepared.expected:
+        return
     values = {"EP": indicators["EP"], "NHV": indicators["NHV"]}
     measured = {
         name: series.mean() if len(series) > 1 else series.iloc[0]
@@ -389,14 +391,14 @@ def _render_introduction(jar: Path) -> None:
         "front and the indicators it gives;\n"
         "- see what else a run leaves: the solutions with their variables, and the files;\n"
         "- run it again with a very different configuration, adjusting the parameters you "
-        "learned to read in tutorial S2;\n"
+        "learned to read in tutorial *Exploring a parameter space*;\n"
         "- repeat a run several times, and try a problem with three objectives and other "
         "algorithms;\n"
         "- take a run out of the app, to run it from a terminal.\n\n"
         "It is the interactive companion of Evolver's tutorial "
         f"[E2. Base-level algorithms]({E2_TUTORIAL_URL}), which does the same with Java code. "
         "This is **solving**: the configuration is something *you choose*. In a **training** "
-        "(the subject of the coming tutorial *Your first guided training*) it is something "
+        "(the subject of tutorial *Your first guided training*) it is something "
         "Evolver *searches for*."
     )
     st.markdown(
@@ -477,7 +479,7 @@ def _render_default_run(jar: Path) -> None:
         "population as the result (`algorithmResult population`). The population size and the "
         "budget are not part of the configuration: they are chosen in the section 4."
     )
-    _render_prepared_run(DEFAULT_ON_ZDT1, jar)
+    render_prepared_run(DEFAULT_ON_ZDT1, jar)
     st.markdown(
         "The front found is drawn over the reference front of ZDT1, the grey line. The table has "
         "one row per run with two indicators, **both to be minimized**: **EP** (Epsilon), how far "
@@ -498,7 +500,7 @@ def _render_default_run(jar: Path) -> None:
 
 
 def _render_results(jar: Path) -> None:
-    run_dir = _remembered_run(DEFAULT_ON_ZDT1)
+    run_dir = remembered_run(DEFAULT_ON_ZDT1)
     if run_dir is None:
         st.info("Run the first step to see its results here.")
         if st.button("Run it now", key=f"{KEY_PREFIX}_button_results"):
@@ -508,7 +510,7 @@ def _render_results(jar: Path) -> None:
                 st.session_state[f"{KEY_PREFIX}_run_{DEFAULT_ON_ZDT1.key}"] = finished.name
                 st.rerun()
         return
-    output = _output_directory(run_dir)
+    output = output_directory(run_dir)
     st.markdown(
         "After a run, the results of Run algorithm have four tabs: **Front** (the fronts of the "
         "runs over the reference front), **Indicators** (the table you saw, and a summary when "
@@ -568,21 +570,22 @@ def _render_other_configuration(jar: Path) -> None:
         "| `crossover` | `blxAlpha` (`sbxDistributionIndex` disappears and "
         "`blxAlphaCrossoverAlpha` 0.5 appears) |\n"
         "| `mutation` | `uniform` (`uniformMutationPerturbation` 0.5) |\n\n"
-        "Notice how the parameters appear and disappear (the *active* parameters of tutorial S2), "
+        "Notice how the parameters appear and disappear (the *active* parameters of tutorial "
+        "*Exploring a parameter space*), "
         "the ✏️ that marks each changed parameter and the count of parameters changed. "
         "**Reset to the default configuration** undoes everything."
     )
     st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
     st.markdown("Or run the prepared one here:")
-    other = _render_prepared_run(OTHER_ON_ZDT1, jar, show_front=False)
-    standard = _remembered_run(DEFAULT_ON_ZDT1)
+    other = render_prepared_run(OTHER_ON_ZDT1, jar, show_front=False)
+    standard = remembered_run(DEFAULT_ON_ZDT1)
     if other is not None and standard is not None:
         rows = []
         for label, run_dir in (
             ("Standard configuration", standard),
             ("Other configuration", other),
         ):
-            indicators = read_indicators(_output_directory(run_dir))
+            indicators = read_indicators(output_directory(run_dir))
             rows.append(
                 {"": label, "EP": indicators["EP"].iloc[0], "NHV": indicators["NHV"].iloc[0]}
             )
@@ -593,7 +596,8 @@ def _render_other_configuration(jar: Path) -> None:
             "archive**, which keeps the solutions that are farthest apart from each other. In this "
             "run it also gets better values of both indicators. One run is not enough to conclude "
             "that it is better, though; that needs several runs and a statistical test "
-            "(tutorial **S5** does it), but it shows how much the configuration matters, and why "
+            "(tutorial *Validating a configuration* does it), but it shows how much the "
+            "configuration matters, and why "
             "finding good ones automatically, which is what meta-optimization does, is "
             "worthwhile."
         )
@@ -612,13 +616,14 @@ def _render_more_runs(jar: Path) -> None:
         "its number minus one** (1, 2, 3…), so that every run can be reproduced. Here, the "
         "default NSGA-II on ZDT2, five times:"
     )
-    _render_prepared_run(DEFAULT_ON_ZDT2_FIVE_RUNS, jar)
+    render_prepared_run(DEFAULT_ON_ZDT2_FIVE_RUNS, jar)
     st.markdown(
         "The table has a row per run, with its seed and its time, and below it a summary with the "
         "mean, the standard deviation, the minimum and the maximum over the runs. The values "
         "change from run to run: the spread says how much of a difference between two "
         "configurations may be luck. Comparing configurations with several runs and a test is the "
-        "subject of tutorial **S5** and of the coming tutorial *Comparing configurations on a "
+        "subject of tutorial *Validating a configuration* and of the coming tutorial "
+        "*Comparing configurations on a "
         "problem*."
     )
 
@@ -634,7 +639,7 @@ def _render_more_objectives(jar: Path) -> None:
         "weightVectors`). That is why its population size in Run algorithm is a **selector** "
         "with the sizes that have a file for these three objectives (here, 91):"
     )
-    _render_prepared_run(MOEAD_ON_DTLZ2, jar)
+    render_prepared_run(MOEAD_ON_DTLZ2, jar)
     st.markdown(
         "**RVEA** reads the weight vectors too, and has three variants, which differ in its "
         "`replacement` parameter: RVEA, RVEA* and iRVEA. Run algorithm offers the default "
@@ -643,7 +648,7 @@ def _render_more_objectives(jar: Path) -> None:
     variant = st.radio(
         "Variant", list(RVEA_VARIANTS), horizontal=True, key=f"{KEY_PREFIX}_rvea_variant"
     )
-    _render_prepared_run(RVEA_VARIANTS[variant], jar)
+    render_prepared_run(RVEA_VARIANTS[variant], jar)
     st.caption(
         "A single run of each, on one problem: the values say what these runs gave, not which "
         "algorithm is better."
@@ -651,7 +656,7 @@ def _render_more_objectives(jar: Path) -> None:
 
 
 def _render_take_it_elsewhere(jar: Path) -> None:
-    run_dir = _remembered_run(DEFAULT_ON_ZDT1)
+    run_dir = remembered_run(DEFAULT_ON_ZDT1)
     st.markdown(
         "A run is a request, a YAML file, and Evolver can run it from a terminal: that is how "
         "Run algorithm runs it. In its results, **Use this configuration for a new run** fills the "

@@ -98,7 +98,7 @@ below; revisit and reorder as real usage surfaces new ones.
 - **Moved to Evolver 2.4 (October 2026)**: the app downloads Evolver 2.4 and its resources come from
   tag `v2.4` (unchanged since 2.3). Everything of the sync with `develop` above holds with the
   release: the 18 registered base algorithms, the problem catalogue (Explore › Problems, Run
-  algorithm, Training, Validation) and the tutorial S5 need Evolver 2.4 or later, and the two
+  algorithm, Training, Validation) and the tutorial *Validating a configuration* need Evolver 2.4 or later, and the two
   drift-detection tests against `DescribeMain` pass with the release jar.
 
 - **Moved to Evolver 2.3 (October 2026)**: the app downloads Evolver 2.3 and its resources come from
@@ -152,7 +152,7 @@ below; revisit and reorder as real usage surfaces new ones.
   quality indicators. **S3, "Solving a problem with a configurable algorithm"**
   (`evolver_studio/tutorial_solving.py`), the companion of E2, is the first of the solving track:
   each step has a prepared run (`PreparedRun`: fixed seed, the values the text announces) that runs
-  in the tutorial or opens in Run algorithm. **S5, "Validating a configuration"**
+  in the tutorial or opens in Run algorithm. **S6, "Validating a configuration"**
   (`evolver_studio/tutorial_validation.py`), the companion of E8, runs one validation study in the
   background (kept as `validation-runs/tutorial-validation`, reused while it is current) and reads
   its results; the text about them is computed from the data. `tests/test_tutorials.py`,
@@ -184,9 +184,13 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
-  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time (S1 to S5
-  are done). As in Evolver, only the written ones are numbered, consecutively by level: writing
-  a new one renumbers those after it.
+  documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time. Every
+  section of the app has one for 1.0 (S1 to S7: tour, parameter spaces, solving with the
+  problems, first training, training analysis, validation, validation analysis); the six planned
+  ones (comparing configurations, using a tuned configuration, customizing a training, your own
+  problem, meta-optimizers and encodings, long-running jobs) come after 1.0. As in Evolver, only
+  the written ones are numbered, consecutively by level: writing a new one renumbers those after
+  it.
 
 ## Phase 3 — Analysis layer
 

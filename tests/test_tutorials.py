@@ -30,6 +30,7 @@ class TestTutorialsCatalogue:
             "tour",
             "parameter_spaces",
             "solving",
+            "first_training",
             "analyzing_training_results",
             "validating_a_configuration",
             "analyzing_a_validation",

@@ -104,11 +104,12 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "first_training",
-        None,
+        "S4",
         "Your first guided training",
         _INTRO,
         "Meta-optimization",
-        "A ready-made training run with a live front and its result files.",
+        "Set up Evolver's E3 training in the Training page, launch it and follow it, read what "
+        "it found, and compare a configuration it found with the default NSGA-II.",
         ("E3",),
     ),
     Tutorial(
@@ -140,7 +141,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "analyzing_training_results",
-        "S4",
+        "S5",
         "Analyzing training results",
         _MID,
         "Meta-optimization",
@@ -150,7 +151,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "validating_a_configuration",
-        "S5",
+        "S6",
         "Validating a configuration",
         _MID,
         "Meta-optimization",
@@ -160,7 +161,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "analyzing_a_validation",
-        "S6",
+        "S7",
         "Analyzing a validation",
         _MID,
         "Meta-optimization",
