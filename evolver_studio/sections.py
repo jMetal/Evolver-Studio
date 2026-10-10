@@ -104,8 +104,8 @@ SECTIONS = (
                 available=True,
             ),
             Page(
-                "pages/analysis.py",
-                "Analysis",
+                "pages/training_analysis.py",
+                "Training analysis",
                 "📊",
                 "Study a finished training run: how it converged, how its population evolved, the "
                 "configurations of its final front and what they have in common, and take one to "

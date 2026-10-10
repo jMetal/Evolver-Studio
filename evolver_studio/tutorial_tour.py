@@ -127,10 +127,10 @@ def _render_pages(jar: Path) -> None:
                 st.page_link(page.path, label=f"{page.title} — {page.description}", icon=page.icon)
     st.markdown(
         "A path through them for **solving**: *Explore › Problems* to choose a problem, then "
-        "*Run algorithm*. For **meta-optimization**: *Training* to launch a run, *Analysis* to "
-        "read what it found, *Validation* to put a configuration to the test. Each page can "
-        "hand its result to the next: a configuration goes from Training or Analysis to "
-        "Validation, or to Run algorithm, with a button."
+        "*Run algorithm*. For **meta-optimization**: *Training* to launch a run, *Training "
+        "analysis* to read what it found, *Validation* to put a configuration to the test. Each "
+        "page can hand its result to the next: a configuration goes from Training or Training "
+        "analysis to Validation, or to Run algorithm, with a button."
     )
 
 
@@ -141,7 +141,7 @@ def _render_where_things_live(jar: Path) -> None:
         f"- `{RUNS_DIRECTORY_NAME}/`: one folder per training, with the request it ran, its "
         "status and its log;\n"
         "- `results/`: what Evolver wrote for each training (`INDICATORS.csv`, `VAR_CONF.txt`, "
-        "`METADATA.txt`…), which *Analysis* reads;\n"
+        "`METADATA.txt`…), which *Training analysis* reads;\n"
         f"- `{SOLVE_RUNS_DIRECTORY_NAME}/`: the runs of *Run algorithm*;\n"
         f"- `{VALIDATION_RUNS_DIRECTORY_NAME}/`: the studies of *Validation*.\n\n"
         "A run keeps going when you leave its page or close the tab, and you find it again "

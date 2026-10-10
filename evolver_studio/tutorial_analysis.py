@@ -3,12 +3,12 @@
 The interactive counterpart of Evolver's tutorial E7
 (docs/tutorials/analyzing_training_results.rst):
 what a finished training leaves, how to read it and how to choose a configuration, through the
-Analysis page instead of through the files and scripts.
+Training analysis page instead of through the files and scripts.
 
 The tutorial reads a real training run that ships with the app (tutorial_data/analysis/): NSGA-II
 tuned on ZDT4 by NSGA-II, for 3,000 meta-evaluations, run with Evolver 2.4 and its population
-written. It is read with the same views as the Analysis page, which lists the trainings of the
-reader. What the text says about its results is read from it, not written down.
+written. It is read with the same views as the Training analysis page, which lists the
+trainings of the reader. What the text says about its results is read from it, not written down.
 """
 
 from pathlib import Path
@@ -49,7 +49,8 @@ def _render_introduction(jar: Path) -> None:
         "base algorithm, and each is a different compromise between the meta-objectives the "
         "training minimized (here, two quality indicators). Which one to use, and whether to "
         "trust it, is decided by reading what the training left behind. That is what the "
-        "**Analysis** page is for: it lists the trainings you have run and shows, for one:\n\n"
+        "**Training analysis** page is for: it lists the trainings you have run and shows, for "
+        "one:\n\n"
         "- how it was run and what it took;\n"
         "- how its meta-objectives **converged**;\n"
         "- its **front**, and the meta-optimizer's **population** if it was written;\n"
@@ -58,9 +59,10 @@ def _render_introduction(jar: Path) -> None:
         "- what those configurations **have in common**, and where they differ from the "
         "algorithm's default configuration.\n\n"
         "This tutorial reads a real training that ships with Evolver-Studio, with the same views "
-        f"as the Analysis page: **{training.algorithm}** ({training.encoding} variables) tuned on "
-        f"**{', '.join(training.problems)}**. It ran with Evolver 2.4 and wrote its population. "
-        "To follow it on a training of your own, run one in Training and open Analysis; "
+        f"as the Training analysis page: **{training.algorithm}** ({training.encoding} "
+        f"variables) tuned on **{', '.join(training.problems)}**. It ran with Evolver 2.4 and "
+        "wrote its population. To follow it on a training of your own, run one in Training and "
+        "open Training analysis; "
         f"Evolver's tutorial [E7]({E7_TUTORIAL_URL}) does the same reading with Java code."
     )
 
@@ -169,8 +171,8 @@ def _render_parameters(jar: Path) -> None:
 def _render_next_steps(jar: Path) -> None:
     training = tutorial_training()
     st.markdown(
-        "**Taking a configuration on.** In the Analysis page, the *Configurations* tab of any "
-        "of your trainings has three buttons for the configuration chosen:\n\n"
+        "**Taking a configuration on.** In the Training analysis page, the *Configurations* tab "
+        "of any of your trainings has three buttons for the configuration chosen:\n\n"
         "- **Download**, as a `.txt` of `--parameter value` pairs;\n"
         "- **Validate it**, which opens *Validation* with it as the tuned configuration, "
         "compared with the algorithm's default one, on the problems you choose there (those of "
@@ -186,7 +188,7 @@ def _render_next_steps(jar: Path) -> None:
         "is across repeated trainings, and how the configurations do on problems it did not "
         "see, are questions for *Validation*, and for several trainings with different seeds."
     )
-    st.page_link("pages/analysis.py", label="Open Analysis", icon="🔍")
+    st.page_link("pages/training_analysis.py", label="Open Training analysis", icon="🔍")
     st.button(
         "All the tutorials",
         icon="🎓",

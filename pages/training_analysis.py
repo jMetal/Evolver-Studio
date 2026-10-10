@@ -1,4 +1,4 @@
-"""Analysis: study a finished training run and take what it found to where it is used.
+"""Training analysis: study a finished training run and take what it found to where it is used.
 
 Pick a training run kept under cli-runner-runs/ and see how it was run and what it took, how its
 meta-objectives converged, how its population evolved, the configurations of its final front and
@@ -26,7 +26,7 @@ from evolver_studio.training_runs import list_finished_trainings
 
 SELECTION_KEY = "analysis_training"
 
-st.title("Analysis")
+st.title("Training analysis")
 
 jar = require_evolver_jar()
 

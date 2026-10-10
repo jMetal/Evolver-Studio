@@ -1,4 +1,4 @@
-"""Tests for the Analysis page, on synthetic training runs."""
+"""Tests for the Training analysis page, on synthetic training runs."""
 
 from pathlib import Path
 
@@ -60,7 +60,7 @@ def working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _open(timeout: int = 60) -> AppTest:
     return AppTest.from_file(str(APP_SCRIPT), default_timeout=timeout).switch_page(
-        "pages/analysis.py"
+        "pages/training_analysis.py"
     )
 
 

@@ -1,4 +1,4 @@
-"""The views of a finished training run, shared by the Analysis page and its tutorial.
+"""The views of a finished training run, shared by the Training analysis page and its tutorial.
 
 A summary of how it was run and what it took, the files it left read once and kept in the session,
 the configurations of its final front (with the way to take one to Validation or to Run algorithm)
