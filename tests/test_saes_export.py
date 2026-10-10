@@ -1,19 +1,12 @@
-"""Tests for the results of a validation study for SAES, and its Wilcoxon pivot table."""
-
-import shutil
-import subprocess
-from pathlib import Path
+"""Tests for the results of a validation study as the files SAES reads."""
 
 import pandas as pd
-import pytest
 
 from evolver_studio.saes_export import (
     METRICS_COLUMNS,
     RESULTS_COLUMNS,
-    saes_available,
     saes_metrics,
     saes_results,
-    wilcoxon_pivot_table,
 )
 
 PIVOT = "NSGA-II (tuned)"
@@ -45,12 +38,6 @@ def _runs() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-@pytest.fixture
-def saes() -> None:
-    if not saes_available():
-        pytest.skip("SAES is not installed")
-
-
 class TestSaesFiles:
     def test_should_write_a_row_per_run_and_indicator(self):
         # Act
@@ -75,45 +62,3 @@ class TestSaesFiles:
         assert list(metrics.columns) == list(METRICS_COLUMNS)
         assert list(metrics["MetricName"]) == ["EP", "NHV"]
         assert not metrics["Maximize"].any()
-
-
-class TestWilcoxonPivotTable:
-    def test_should_put_the_pivot_in_the_last_column(self, saes):
-        # Act
-        document = wilcoxon_pivot_table(_runs(), "EP", PIVOT)
-
-        # Assert
-        header = next(line for line in document.splitlines() if "NSGA-II &" in line)
-        assert header.rstrip(r" \hline").endswith("NSGA-II (tuned)")
-
-    def test_should_count_the_results_of_the_test_with_whole_numbers_in_bold(self, saes):
-        # Act
-        document = wilcoxon_pivot_table(_runs(), "EP", PIVOT)
-
-        # Assert: the pivot beats NSGA-II on both problems; MOEA/D once each way
-        counts = next(line for line in document.splitlines() if "+ / - / =" in line)
-        assert r"\textbf{2} / \textbf{0} / \textbf{0}" in counts
-        assert r"\textbf{1} / \textbf{1} / \textbf{0}" in counts
-
-    def test_should_escape_what_latex_reads_as_commands(self, saes):
-        # Act
-        document = wilcoxon_pivot_table(_runs(), "EP", PIVOT)
-
-        # Assert
-        assert r"ZDT\_1 &" in document
-
-    @pytest.mark.skipif(shutil.which("pdflatex") is None, reason="pdflatex is not installed")
-    def test_should_compile(self, saes, tmp_path: Path):
-        # Arrange
-        (tmp_path / "table.tex").write_text(wilcoxon_pivot_table(_runs(), "EP", PIVOT))
-
-        # Act
-        result = subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "table.tex"],
-            cwd=tmp_path,
-            capture_output=True,
-            text=True,
-        )
-
-        # Assert
-        assert result.returncode == 0, result.stdout[-2000:]
