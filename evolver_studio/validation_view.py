@@ -325,6 +325,12 @@ def render_ranking(runs: pd.DataFrame, indicator: str, pivot: str, study_id: str
         "Demšar recommends it to compare two algorithms over several problems."
     )
     signed = signed_rank_against_pivot(median_table, pivot, maximize)
+    if problems < 6:
+        st.caption(
+            f"With {problems} problems the smallest p-value this test can give is "
+            f"2/2^{problems} = {2 / 2**problems:.3f}: it cannot find a difference at {ALPHA} with "
+            "fewer than six problems."
+        )
     st.dataframe(
         signed.rename(
             columns={

@@ -138,13 +138,14 @@ def _needs_problem_catalogue(render: Callable[[Path], None]) -> Callable[[Path],
     return step
 
 
-def _study_directory() -> Path:
+def study_directory() -> Path:
+    """Where the tutorial's study is kept: validation-runs/tutorial-validation."""
     return evolver_client.WORKING_DIRECTORY / VALIDATION_RUNS_DIRECTORY_NAME / STUDY_ID
 
 
 def _is_current(jar: Path) -> bool:
     """Whether the study kept on disk is the tutorial's, run with the Evolver in use."""
-    directory = _study_directory()
+    directory = study_directory()
     marker = directory / VERSION_MARKER
     return (
         study_is_written(tutorial_study(jar), directory, evolver_client.WORKING_DIRECTORY)
@@ -155,7 +156,7 @@ def _is_current(jar: Path) -> bool:
 
 def _start(jar: Path) -> None:
     """Write the study, replacing any earlier one of the tutorial, and run it."""
-    directory = _study_directory()
+    directory = study_directory()
     shutil.rmtree(directory, ignore_errors=True)
     write_study(tutorial_study(jar), directory, evolver_client.WORKING_DIRECTORY)
     (directory / VERSION_MARKER).write_text(str(jar_evolver_version(jar)))
@@ -165,7 +166,7 @@ def _start(jar: Path) -> None:
 
 def _phase(jar: Path) -> RunPhase | None:
     """Where the tutorial's study is, or None when there is no current one to talk about."""
-    return run_phase(_study_directory()) if _is_current(jar) else None
+    return run_phase(study_directory()) if _is_current(jar) else None
 
 
 def _render_run_controls(jar: Path) -> bool:
@@ -204,18 +205,18 @@ def _render_progress() -> None:
 
     @st.fragment(run_every=POLL_EVERY_SECONDS, key=f"{KEY_PREFIX}_poll")
     def _poll() -> None:
-        status = evolver_client.read_status(_study_directory() / "status.yaml")
+        status = evolver_client.read_status(study_directory() / "status.yaml")
         running_badge.render(study_running_label(status))
-        if run_phase(_study_directory()) not in (RunPhase.STARTING, RunPhase.RUNNING):
+        if run_phase(study_directory()) not in (RunPhase.STARTING, RunPhase.RUNNING):
             st.rerun()
 
     _poll()
 
 
-def _runs_or_ask_to_run(jar: Path) -> pd.DataFrame | None:
+def runs_or_ask_to_run(jar: Path) -> pd.DataFrame | None:
     """The runs of the study, or the controls to run it when they are not there yet."""
     if _phase(jar) is RunPhase.FINISHED:
-        runs = collect_runs(_study_directory(), evolver_client.WORKING_DIRECTORY)
+        runs = collect_runs(study_directory(), evolver_client.WORKING_DIRECTORY)
         if not runs.empty:
             return runs
     st.info("The study has not been run yet: run it here to see its results.")
@@ -329,7 +330,7 @@ def _render_study(jar: Path) -> None:
 
 @_needs_problem_catalogue
 def _render_medians(jar: Path) -> None:
-    runs = _runs_or_ask_to_run(jar)
+    runs = runs_or_ask_to_run(jar)
     if runs is None:
         return
     indicator = _choose_indicator(runs, "medians_indicator")
@@ -409,7 +410,7 @@ def _doubtful(comparison: pd.DataFrame) -> pd.Series | None:
 
 @_needs_problem_catalogue
 def _render_significance(jar: Path) -> None:
-    runs = _runs_or_ask_to_run(jar)
+    runs = runs_or_ask_to_run(jar)
     if runs is None:
         return
     indicator = _choose_indicator(runs, "significance_indicator", with_doubtful_case=True)
@@ -492,7 +493,7 @@ def _runs_subset(runs: pd.DataFrame, count: int) -> pd.DataFrame:
 
 @_needs_problem_catalogue
 def _render_number_of_runs(jar: Path) -> None:
-    runs = _runs_or_ask_to_run(jar)
+    runs = runs_or_ask_to_run(jar)
     if runs is None:
         return
     st.markdown(
@@ -567,7 +568,7 @@ def _count_verdict(
 
 @_needs_problem_catalogue
 def _render_seen_and_unseen(jar: Path) -> None:
-    runs = _runs_or_ask_to_run(jar)
+    runs = runs_or_ask_to_run(jar)
     if runs is None:
         return
     st.markdown(
@@ -616,9 +617,9 @@ def _render_next_steps(jar: Path) -> None:
         "- **The indicators.** EP measures convergence and NHV convergence and spread together; "
         "Spread or IGD+ may disagree.\n"
         "- **Many comparisons.** Twelve tests at the 5% level are expected to flag a difference "
-        "now and then by chance. Evolver's tutorial E8 analyzes all the problems at once, with "
-        "the Friedman test and Holm's procedure, and with critical difference plots: the "
-        "*Ranking* tab of Validation analysis does it for this study.\n"
+        "now and then by chance: Validation analysis adjusts them (Holm, Benjamini-Hochberg). "
+        "Evolver's tutorial E8 also analyzes all the problems at once, with the Friedman test, "
+        "Holm's procedure and critical difference plots: the *Ranking* tab does it.\n"
         "- **The problems.** Four of them are a small sample of what a configuration may meet.\n\n"
         "**Explore on your own**, in Validation:\n\n"
         "- Add **SMS-EMOA** or another algorithm to compare with (the ones with a default "
@@ -641,10 +642,18 @@ def _render_next_steps(jar: Path) -> None:
         "*A training run* and one of the configurations of its final front."
     )
     st.page_link("pages/validation.py", label="Open Validation", icon="✅")
-    st.page_link(
-        "pages/validation_analysis.py",
-        label="Open Validation analysis, to read this study tab by tab",
+    st.markdown(
+        "**Next:** the tutorial *Analyzing a validation* reads this same study in Validation "
+        "analysis, tab by tab: the corrections for many comparisons, effect sizes, the ranking, "
+        "a Bayesian test, the fronts and where each algorithm reaches, and what to put in a "
+        "paper."
+    )
+    st.button(
+        "Go on to Analyzing a validation",
         icon="🔬",
+        on_click=open_tutorial,
+        args=("analyzing_a_validation",),
+        key=f"{KEY_PREFIX}_next_tutorial",
     )
     st.button(
         "All the tutorials",

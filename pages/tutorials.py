@@ -10,6 +10,7 @@ from evolver_studio import (
     tutorial_solving,
     tutorial_tour,
     tutorial_validation,
+    tutorial_validation_analysis,
 )
 from evolver_studio.app_state import render_sidebar, require_evolver_jar
 from evolver_studio.tutorial_navigation import (
@@ -33,6 +34,7 @@ TUTORIAL_STEPS = {
     "solving": tutorial_solving.STEPS,
     "analyzing_training_results": tutorial_analysis.STEPS,
     "validating_a_configuration": tutorial_validation.STEPS,
+    "analyzing_a_validation": tutorial_validation_analysis.STEPS,
 }
 
 

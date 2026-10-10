@@ -159,6 +159,17 @@ TUTORIALS: tuple[Tutorial, ...] = (
         ("E8",),
     ),
     Tutorial(
+        "analyzing_a_validation",
+        "S6",
+        "Analyzing a validation",
+        _MID,
+        "Meta-optimization",
+        "Read a validation study tab by tab in Validation analysis: the verdict and the "
+        "correction for many comparisons, effect sizes, the ranking and the critical difference "
+        "plot, a Bayesian test, fronts and attainment, and what to put in a paper.",
+        ("E8",),
+    ),
+    Tutorial(
         "your_own_problem",
         None,
         "Solving your own problem",

@@ -15,6 +15,11 @@ Works with Evolver 2.4.
   for, and where runs and results are kept.
 - *A tour of Evolver-Studio* links Evolver's E4, *Evolver in 10 minutes* (it linked E16), names the
   four steps of meta-optimization, and lists what to read next from the catalogue.
+- **Tutorial *Analyzing a validation*** (pairs with E8): reads the study of *Validating a
+  configuration* with the views of Validation analysis, tab by tab — the verdict and the correction
+  for many comparisons, the Wilcoxon pivot table, effect sizes, the ranking (and why four problems
+  are too few to rank), a Bayesian test, the fronts and the attainment differences, indicator
+  agreement and cost, and what to put in a paper. Its text is read from the study.
 - *Solving a problem with a configurable algorithm* begins with a new step, **Choosing a
   problem**: the listing of Explore › Problems and what it says of each problem, with a quick
   check read from the jar's problem catalogue.
