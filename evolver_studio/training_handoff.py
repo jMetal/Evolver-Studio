@@ -10,7 +10,6 @@ from collections.abc import Mapping
 
 import pandas as pd
 
-from evolver_studio.catalogue import validation_indicators
 from evolver_studio.problem_catalogue import (
     Problem,
 )
@@ -20,7 +19,6 @@ from evolver_studio.training_runs import FinishedTraining
 from evolver_studio.validation import base_algorithm
 from evolver_studio.validation_form import (
     ENCODING_KEY,
-    INDICATORS_KEY,
     PASTED_ALGORITHM_KEY,
     PASTED_CONFIGURATION_KEY,
     POPULATION_KEY,
@@ -44,9 +42,10 @@ def validation_form_state(
     """The values of the Validation form for validating a configuration of a training.
 
     The tuned configuration is the one given; the algorithm to compare it with is the base
-    algorithm's own default configuration, when it has a single one; and the population size and
-    the indicators are the training's. The problems are left empty: the user chooses them (those
-    of the training, or any others).
+    algorithm's own default configuration, when it has a single one; and the population size is
+    the training's. The problems are left empty, for the user to choose (those of the training,
+    or any others). The indicators are not touched: a validation measures every front it gets with
+    the indicators chosen for it, which need not be the ones the training minimized.
 
     Args:
         training: The training.
@@ -70,11 +69,6 @@ def validation_form_state(
         state[defaults_key(training.encoding)] = [algorithm.name]
     if training.population_size:
         state[POPULATION_KEY] = training.population_size
-    # Those of the training that Validation offers (not the negated hypervolume, for instance).
-    offered = {indicator.registry_name for indicator in validation_indicators()}
-    indicators = [name for name in training.indicators if name in offered]
-    if indicators:
-        state[INDICATORS_KEY] = indicators
     state[problems_key(training.encoding)] = []
     state[PROBLEM_ROWS_KEY] = pd.DataFrame(columns=list(PROBLEM_COLUMNS))
     return state

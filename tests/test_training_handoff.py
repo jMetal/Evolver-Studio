@@ -106,24 +106,20 @@ class TestValidationFormState:
         assert state[problems_key("Double")] == []
         assert state[PROBLEM_ROWS_KEY].empty
 
-    def test_should_take_the_population_and_the_indicators_of_the_training(self):
+    def test_should_take_the_population_of_the_training(self):
         # Act
         state = validation_form_state(_training(population_size=150), CONFIGURATION)
 
         # Assert
         assert state is not None
         assert state["validation_population"] == 150
-        assert state[INDICATORS_KEY] == ["Epsilon", "NormalizedHypervolume"]
 
-    def test_should_leave_out_the_indicators_validation_does_not_offer(self):
-        # Arrange
-        training = _training(indicators=("Epsilon", "HypervolumeMinus"))
-
+    def test_should_leave_the_indicators_of_the_validation_to_the_user(self):
         # Act
-        state = validation_form_state(training, CONFIGURATION)
+        state = validation_form_state(_training(), CONFIGURATION)
 
         # Assert
-        assert state is not None and state[INDICATORS_KEY] == ["Epsilon"]
+        assert state is not None and INDICATORS_KEY not in state
 
     def test_should_not_fill_what_it_does_not_know(self):
         # Act

@@ -59,9 +59,10 @@ Works with Evolver 2.4.
 
 - *Training*'s best configurations, while it runs and once it has finished, have a **Validate this
   configuration** button that opens *Validation* with the chosen one as the tuned configuration (the
-  box can still be copied and pasted there by hand). Validation opens with the algorithm, the
-  population size and the indicators of the training, and the list of problems empty, for you to
-  fill.
+  box can still be copied and pasted there by hand). Validation opens with the algorithm and the
+  population size of the training, and the list of problems empty, for you to fill. The
+  indicators are Validation's own, not those the training minimized: a validation measures every
+  front it gets with the indicators chosen for it.
 
 - *Meta-optimization › Training analysis* lists the finished trainings and, for the one chosen, shows how it
   was run and what it took, how its meta-objectives converged, the front and (if it was written) the
