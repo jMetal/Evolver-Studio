@@ -21,10 +21,11 @@ import streamlit as st
 import yaml
 
 from evolver_studio import evolver_client
-from evolver_studio.app_state import registered_problem_names
+from evolver_studio.app_state import registered_problem_names, registered_problems
 from evolver_studio.catalogue import BASE_ALGORITHMS
 from evolver_studio.evolver_client import EVOLVER_VERSION, start_solve, write_pid_file
 from evolver_studio.figure_export import render_chart
+from evolver_studio.problem_browser import render_filters, render_table
 from evolver_studio.resource_files import default_configuration_text
 from evolver_studio.runs import SOLVE_RUNS_DIRECTORY_NAME, RunPhase, run_phase
 from evolver_studio.solve_figures import build_front_figure
@@ -383,6 +384,7 @@ def _render_introduction(jar: Path) -> None:
         "**quality indicators** that measure it against the problem's reference front.\n\n"
         "That is the page **Run algorithm**, which has a section for each of those four things "
         "and a button to run. In this tutorial you will:\n\n"
+        "- choose a problem in Evolver's catalogue, and read what it says of each one;\n"
         "- run NSGA-II with its default configuration on a continuous problem and read the "
         "front and the indicators it gives;\n"
         "- see what else a run leaves: the solutions with their variables, and the files;\n"
@@ -407,6 +409,55 @@ def _render_introduction(jar: Path) -> None:
         f"{TIMINGS_MEASURED_ON}."
     )
     st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+
+
+def _render_choosing_a_problem(jar: Path) -> None:
+    catalogue = registered_problems(str(jar))
+    st.markdown(
+        "Everything starts with the **problem**. **Explore › Problems** lists every problem "
+        "Evolver can resolve by name, and the same listing appears wherever a problem is chosen "
+        "(Run algorithm, Training, Validation). For each one it gives:\n\n"
+        "- its **family** (ZDT, DTLZ, WFG, the real-world RE and RWA problems…), whose problems "
+        "share their constructor's arguments;\n"
+        "- its **encoding**: real numbers (*Double*), bits (*Binary*) or a permutation. An "
+        "algorithm solves only the encodings it supports, so the encoding narrows the "
+        "algorithms you can use;\n"
+        "- its number of **objectives** and **variables**, as built with no arguments;\n"
+        "- the **arguments** its constructor takes, to change them (DTLZ2 with 12 variables and "
+        "2 objectives is `DTLZ2(12, 2)`);\n"
+        "- its **reference fronts**: the best front known, which the quality indicators measure "
+        "a result against. A problem with several numbers of objectives has one per number "
+        "(`DTLZ2.2D.csv`, `DTLZ2.3D.csv`…)."
+    )
+    if catalogue is None:
+        st.info("This needs an Evolver that describes its problems (2.4 or later).")
+        st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
+        return
+    shown = render_filters(catalogue, f"{KEY_PREFIX}_problems")
+    render_table(shown, len(catalogue), f"{KEY_PREFIX}_problems_table")
+    zdt1, dtlz2 = catalogue.get("ZDT1"), catalogue.get("DTLZ2")
+    if zdt1 is not None:
+        st.markdown(
+            f"The first runs of this tutorial use **ZDT1**: {zdt1.encoding} variables, "
+            f"{zdt1.number_of_objectives} objectives and {zdt1.number_of_variables} variables, "
+            "with a convex front; a classic first problem."
+        )
+    if dtlz2 is not None:
+        answer = st.radio(
+            "Quick check: how many objectives does DTLZ2 have, built with no arguments?",
+            ["2", "3", "5"],
+            index=None,
+            key=f"{KEY_PREFIX}_objectives_quiz",
+            help="Filter the listing by the name DTLZ2.",
+        )
+        if answer == str(dtlz2.number_of_objectives):
+            st.success(
+                f"Right: {dtlz2.number_of_objectives}. Its arguments change it: step 6 solves "
+                "it with three, and Validation uses it with two."
+            )
+        elif answer is not None:
+            st.error("Not quite: look at the *Objectives* column of DTLZ2 in the listing.")
+    st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
 
 
 def _render_default_run(jar: Path) -> None:
@@ -659,11 +710,12 @@ def _render_next_steps(jar: Path) -> None:
 
 STEPS: tuple[TutorialStep, ...] = (
     TutorialStep("What does it mean to solve a problem?", _render_introduction),
-    TutorialStep("Step 1: the default NSGA-II on ZDT1", _render_default_run),
-    TutorialStep("Step 2: the results", _render_results),
-    TutorialStep("Step 3: a different configuration", _render_other_configuration),
-    TutorialStep("Step 4: more runs", _render_more_runs),
-    TutorialStep("Step 5: more objectives, other algorithms", _render_more_objectives),
-    TutorialStep("Step 6: take it elsewhere", _render_take_it_elsewhere),
+    TutorialStep("Step 1: choosing a problem", _render_choosing_a_problem),
+    TutorialStep("Step 2: the default NSGA-II on ZDT1", _render_default_run),
+    TutorialStep("Step 3: the results", _render_results),
+    TutorialStep("Step 4: a different configuration", _render_other_configuration),
+    TutorialStep("Step 5: more runs", _render_more_runs),
+    TutorialStep("Step 6: more objectives, other algorithms", _render_more_objectives),
+    TutorialStep("Step 7: take it elsewhere", _render_take_it_elsewhere),
     TutorialStep("Try it yourself", _render_next_steps),
 )

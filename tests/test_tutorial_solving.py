@@ -123,7 +123,7 @@ class TestTutorialS3WalkThrough:
 
     def test_should_run_the_first_step_and_get_the_values_the_text_announces(self, app: AppTest):
         # Arrange
-        self._go_to_step(app, "Step 1: the default NSGA-II on ZDT1")
+        self._go_to_step(app, "Step 2: the default NSGA-II on ZDT1")
 
         # Act
         self._run(app, "default")
@@ -135,7 +135,7 @@ class TestTutorialS3WalkThrough:
 
     def test_should_check_the_answer_about_the_crossover(self, app: AppTest):
         # Arrange
-        self._go_to_step(app, "Step 1: the default NSGA-II on ZDT1")
+        self._go_to_step(app, "Step 2: the default NSGA-II on ZDT1")
 
         # Act
         app.radio(key="tutorial_solving_crossover_quiz").set_value("SBX").run()
@@ -145,7 +145,7 @@ class TestTutorialS3WalkThrough:
 
     def test_should_list_the_files_and_filter_the_solutions_of_the_first_run(self, app: AppTest):
         # Arrange
-        self._go_to_step(app, "Step 1: the default NSGA-II on ZDT1")
+        self._go_to_step(app, "Step 2: the default NSGA-II on ZDT1")
         self._run(app, "default")
         next(button for button in app.button if button.label == "Next →").click().run()
 
@@ -160,9 +160,9 @@ class TestTutorialS3WalkThrough:
 
     def test_should_compare_the_two_configurations_once_both_have_run(self, app: AppTest):
         # Arrange
-        self._go_to_step(app, "Step 1: the default NSGA-II on ZDT1")
+        self._go_to_step(app, "Step 2: the default NSGA-II on ZDT1")
         self._run(app, "default")
-        self._go_to_step(app, "Step 3: a different configuration")
+        self._go_to_step(app, "Step 4: a different configuration")
 
         # Act
         self._run(app, "other")
@@ -176,7 +176,7 @@ class TestTutorialS3WalkThrough:
 
     def test_should_run_five_runs_and_summarize_them(self, app: AppTest):
         # Arrange
-        self._go_to_step(app, "Step 4: more runs")
+        self._go_to_step(app, "Step 5: more runs")
 
         # Act
         self._run(app, "runs")
@@ -188,7 +188,7 @@ class TestTutorialS3WalkThrough:
 
     def test_should_run_moead_and_the_variant_of_rvea_chosen(self, app: AppTest):
         # Arrange
-        self._go_to_step(app, "Step 5: more objectives, other algorithms")
+        self._go_to_step(app, "Step 6: more objectives, other algorithms")
 
         # Act
         self._run(app, "moead")
