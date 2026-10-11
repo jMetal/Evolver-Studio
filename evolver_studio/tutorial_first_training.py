@@ -23,6 +23,7 @@ from evolver_studio.monitor_view import render_convergence
 from evolver_studio.parameter_space import count_parameters, parse_parameter_space
 from evolver_studio.resource_files import parameter_space_text
 from evolver_studio.solve_results import read_indicators
+from evolver_studio.training_presets import open_training, training_state
 from evolver_studio.training_runs import FinishedTraining, list_finished_trainings
 from evolver_studio.tutorial_analysis import tutorial_training
 from evolver_studio.tutorial_navigation import open_tutorial
@@ -67,24 +68,16 @@ DEFAULT_ON_ZDT4 = PreparedRun(
 
 
 def training_form_state() -> dict[str, object]:
-    """The values of the Training form for this tutorial's training, by widget key.
-
-    Most are the page's defaults; the tutorial sets them all, so that the page shows this
-    training whatever was chosen before, and asks for the meta-optimizer's population to be
-    written, for the Population tab of the monitor.
-    """
-    return {
-        "train_base_algorithm": ALGORITHM,
-        f"train_encoding_{ALGORITHM}": "Double",
-        "train_problems_Double": [PROBLEM],
-        "train_meta_algorithm": ALGORITHM,
-        f"train_meta_encoding_{ALGORITHM}": "Flat",
-        "train_meta_stop_by": "Evaluations",
-        "train_meta_evals": META_EVALUATIONS,
-        f"train_meta_population_{ALGORITHM}": META_POPULATION_SIZE,
-        f"train_update_every_{META_POPULATION_SIZE}": UPDATE_EVERY,
-        "train_write_population": True,
-    }
+    """The values of the Training form for this tutorial's training (E3's), by widget key."""
+    return training_state(
+        algorithm=ALGORITHM,
+        problems=(PROBLEM,),
+        meta_algorithm=ALGORITHM,
+        meta_evaluations=META_EVALUATIONS,
+        meta_population=META_POPULATION_SIZE,
+        update_every=UPDATE_EVERY,
+        population_size=POPULATION_SIZE,
+    )
 
 
 def latest_tutorial_training() -> FinishedTraining | None:
@@ -193,9 +186,7 @@ def _render_launch(jar: Path) -> None:
         "tutorial when it has finished."
     )
     if st.button("Open Training with this training", icon="🏋️", type="primary"):
-        st.session_state.pop("training_set_rows", None)
-        st.session_state.update(training_form_state())
-        st.switch_page("pages/training.py")
+        open_training(training_form_state())
     own = latest_tutorial_training()
     if own is not None:
         st.success(f"Your training {own.run_id} has finished: go on to the next step.")

@@ -25,7 +25,12 @@ from evolver_studio.app_state import (
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
-from evolver_studio.catalogue import BASE_ALGORITHMS, META_ALGORITHMS, MetaAlgorithm
+from evolver_studio.catalogue import (
+    BASE_ALGORITHMS,
+    META_ALGORITHMS,
+    BaseAlgorithm,
+    MetaAlgorithm,
+)
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
     RunState,
@@ -53,6 +58,7 @@ from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
 from evolver_studio.problem_catalogue import problems_with_encoding
+from evolver_studio.problems import reference_front_dimension
 from evolver_studio.request import (
     DEFAULT_META_POPULATION_SIZE,
     META_SEARCH_SCALAR_KEYS,
@@ -71,6 +77,16 @@ from evolver_studio.results import (
     read_results_pointer,
 )
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
+from evolver_studio.training_choices import (
+    DEFAULT_INDEPENDENT_RUNS,
+    DEFAULT_INDICATORS,
+    DEFAULT_POPULATION_SIZE,
+    META_OBJECTIVES,
+    BaseLevelChoices,
+    indicator_errors,
+    population_errors,
+    training_indicators,
+)
 from evolver_studio.training_handoff import validation_form_state
 from evolver_studio.training_monitor import tail_text
 from evolver_studio.training_results import TrainedConfiguration
@@ -95,11 +111,9 @@ def _base_level_config(
     extra_config: dict[str, str] | None,
     training_set: TrainingSet,
     problem_specs: list[str | dict],
+    choices: BaseLevelChoices,
 ) -> BaseLevelConfig:
     """Build the base-level config for the selected algorithm and training set.
-
-    Indicators (Epsilon, NormalizedHypervolume) stay fixed for now; see
-    ROADMAP.md for indicator selection as a later step.
 
     Args:
         algorithm_name: The exact string BaseAlgorithmRegistry.resolve() expects
@@ -115,6 +129,7 @@ def _base_level_config(
         problem_specs: The training set's problems as trainingProblemNames'
             entries (a name, or a `{class, args}` map), see
             training_set.training_problem_specs.
+        choices: The population size, the independent runs and the meta-objectives.
 
     Returns:
         The base-level config for the selected algorithm and training set.
@@ -122,14 +137,14 @@ def _base_level_config(
     return BaseLevelConfig(
         algorithm_name=algorithm_name,
         encoding=encoding,
-        population_size=100,
-        number_of_independent_runs=1,
+        population_size=choices.population_size,
+        number_of_independent_runs=choices.independent_runs,
         yaml_parameter_space_file=yaml_parameter_space_file,
         extra_config=extra_config,
         training_problem_names=problem_specs,
         training_reference_front_file_names=training_set.reference_front_file_names,
         training_evaluations=training_set.evaluations,
-        indicator_names=["Epsilon", "NormalizedHypervolume"],
+        indicator_names=list(choices.indicators),
     )
 
 
@@ -189,6 +204,7 @@ def _launch_run(
     number_of_cores: int,
     update_every_evaluations: int,
     write_population: bool,
+    choices: BaseLevelChoices,
 ) -> None:
     """Write the base-level/meta-search/request files, launch training, persist its PID.
 
@@ -229,6 +245,7 @@ def _launch_run(
             every checkpoint, for the population viewer of the monitor.
         update_every_evaluations: Chosen live-preview redraw threshold, also
             used as writeFrequency/statusFrequency for this run.
+        choices: The population size, the independent runs and the meta-objectives.
     """
     run_dir = WORKING_DIRECTORY / RUNS_DIRECTORY_NAME / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -243,6 +260,7 @@ def _launch_run(
         extra_config,
         training_set,
         problem_specs,
+        choices,
     )
     base_level_file = run_dir / "base_level.yaml"
     base_level_file.write_text(base_level_to_yaml(base_level))
@@ -709,6 +727,68 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
     return edited
 
 
+def _render_base_level_choices(
+    algorithm: BaseAlgorithm, extra_config: dict[str, str] | None, objectives: list[int | None]
+) -> tuple[BaseLevelChoices, list[str]]:
+    """Choose the meta-objectives, the independent runs and the base population size.
+
+    Args:
+        algorithm: The base algorithm.
+        extra_config: Its extra settings, with the weight vector directory when it reads one.
+        objectives: The number of objectives of each training problem.
+
+    Returns:
+        The choices, and what is wrong with them.
+    """
+    with st.expander("Meta-objectives and the measure of each configuration", expanded=True):
+        names = [indicator.registry_name for indicator in training_indicators()]
+        indicators = st.multiselect(
+            "Meta-objectives (quality indicators, minimized)",
+            names,
+            default=[name for name in DEFAULT_INDICATORS if name in names],
+            max_selections=META_OBJECTIVES,
+            key="train_indicators",
+            help="The quality indicators of the front a configuration finds, which the "
+            "meta-optimizer minimizes. NormalizedHypervolume and Epsilon are the usual pair: NHV "
+            "measures convergence and spread together, EP tells apart the configurations NHV "
+            "gives 1. IGD+ and EP, EP and Spread, or HypervolumeMinus and EP (it needs only a "
+            "reference point) are others. Explore › Quality indicators describes each.",
+        )
+        columns = st.columns(2)
+        runs = columns[0].number_input(
+            "Independent runs per configuration",
+            min_value=1,
+            value=DEFAULT_INDEPENDENT_RUNS,
+            key="train_independent_runs",
+            help="How many runs, with different seeds, measure each configuration; its "
+            "indicator values are aggregated over them. More runs make lucky configurations "
+            "less likely to win, and multiply the cost of the training by as much.",
+        )
+        population = columns[1].number_input(
+            "Base population size",
+            min_value=2,
+            value=DEFAULT_POPULATION_SIZE,
+            key=f"train_population_{algorithm.name}",
+            help="The population of the base algorithm, in every run of every configuration."
+            + (
+                " MOEA/D and RVEA need a weight vector file for it and for each training "
+                "problem's number of objectives."
+                if extra_config
+                else ""
+            ),
+        )
+    choices = BaseLevelChoices(int(population), int(runs), tuple(indicators))
+    errors = indicator_errors(choices.indicators, objectives)
+    if extra_config:
+        errors += population_errors(
+            choices.population_size,
+            True,
+            objectives,
+            WORKING_DIRECTORY / extra_config["weightVectorFilesDirectory"],
+        )
+    return choices, errors
+
+
 def _monitor_state(active_run: ActiveRun) -> MonitorState:
     """Get or create what the monitor of a run remembers, persisted across fragment reruns."""
     key = f"monitor_{active_run.run_id}"
@@ -858,6 +938,17 @@ else:
     with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
         training_set_table_value = _render_training_set_editor(jar, encoding)
     training_set = parse_training_set(training_set_table_value)
+    objectives = (
+        [
+            reference_front_dimension(WORKING_DIRECTORY / front)
+            for front in training_set.reference_front_file_names
+        ]
+        if training_set is not None
+        else []
+    )
+    choices, choice_errors = _render_base_level_choices(algorithm, extra_config, objectives)
+    for error in choice_errors:
+        st.error(error)
     problem_specs: list[str | dict] = []
     problem_errors: list[str] = []
     if training_set_table_value.empty:
@@ -877,6 +968,7 @@ else:
         and operator_flags is not None
         and training_set is not None
         and not problem_errors
+        and not choice_errors
     )
     if can_launch:
         base_level = _base_level_config(
@@ -886,6 +978,7 @@ else:
             extra_config,
             training_set,
             problem_specs,
+            choices,
         )
         meta_search = _meta_search_config(
             meta_algorithm.name,
@@ -926,6 +1019,7 @@ else:
             int(number_of_cores),
             int(update_every_evaluations),
             write_population,
+            choices,
         )
         st.rerun()
 

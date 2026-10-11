@@ -165,6 +165,10 @@ Works with Evolver 2.4.
   one of them downloadable (*Best so far*); and the runner's log. The files are followed from where
   the last refresh stopped, so a run of days does not slow the page down, and a finished run shows
   the same views. Verified with real runs.
+- **Training**: the **meta-objectives** (two quality indicators that Evolver computes, Spread only
+  for problems with two objectives), the **independent runs** that measure each configuration and
+  the **base population size** (checked against the weight vector files for MOEA/D and RVEA) can be
+  chosen; they were fixed to EP and NHV, one run and 100.
 - **Training**: the size of the meta-optimizer's population can be chosen (Random Search has none),
   the update frequency must be a multiple of it (Evolver writes a checkpoint only then, and a
   frequency that was not gave no checkpoints), SPEA2 and SMPSO say which operators they hardcode
