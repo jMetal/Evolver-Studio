@@ -152,7 +152,7 @@ below; revisit and reorder as real usage surfaces new ones.
   quality indicators. **S3, "Solving a problem with a configurable algorithm"**
   (`evolver_studio/tutorial_solving.py`), the companion of E2, is the first of the solving track:
   each step has a prepared run (`PreparedRun`: fixed seed, the values the text announces) that runs
-  in the tutorial or opens in Run algorithm. **S6, "Validating a configuration"**
+  in the tutorial or opens in Run algorithm. **S7, "Validating a configuration"**
   (`evolver_studio/tutorial_validation.py`), the companion of E8, runs one validation study in the
   background (kept as `validation-runs/tutorial-validation`, reused while it is current) and reads
   its results; the text about them is computed from the data. `tests/test_tutorials.py`,
@@ -185,10 +185,10 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
   documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time. Every
-  section of the app has one for 1.0 (S1 to S7: tour, parameter spaces, solving with the
-  problems, first training, training analysis, validation, validation analysis); the six planned
-  ones (comparing configurations, using a tuned configuration, customizing a training, your own
-  problem, meta-optimizers and encodings, long-running jobs) come after 1.0. As in Evolver, only
+  section of the app has one for 1.0 (S1 to S8: tour, parameter spaces, solving with the
+  problems, first training, customizing a training, training analysis, validation, validation
+  analysis); the five planned ones (comparing configurations, using a tuned configuration, your
+  own problem, meta-optimizers and encodings, long-running jobs) come after 1.0. As in Evolver, only
   the written ones are numbered, consecutively by level: writing a new one renumbers those after
   it.
 

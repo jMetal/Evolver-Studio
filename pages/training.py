@@ -760,8 +760,9 @@ def _render_base_level_choices(
             min_value=1,
             value=DEFAULT_INDEPENDENT_RUNS,
             key="train_independent_runs",
-            help="How many runs, with different seeds, measure each configuration; its "
-            "indicator values are aggregated over them. More runs make lucky configurations "
+            help="How many runs, with different seeds, measure each configuration: each "
+            "indicator is the median over them on each problem, then the mean over the "
+            "problems. More runs make lucky configurations "
             "less likely to win, and multiply the cost of the training by as much.",
         )
         population = columns[1].number_input(

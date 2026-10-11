@@ -29,11 +29,18 @@ Works with Evolver 2.4.
   found (or, until the reader has run one, the training that ships with the app) and runs the
   configuration with the lowest NHV and the default NSGA-II five times each on ZDT4 — which can
   show that a configuration chosen by a single run per configuration was a lucky one.
+- **Tutorial *Customizing a training run*** (pairs with E5, E6, E10): what else a training can
+  choose and why — the training set, the meta-objectives and the runs per configuration (how
+  Evolver aggregates them: the median over the runs, the mean over the problems), a calculator of
+  the cost, the parameter space (how removing crossovers shrinks the flat encoding), the
+  meta-optimizer with its encoding and budget, and binary and permutation problems; each step
+  opens Training with an example.
 - **Tutorial *Analyzing training results*** (pairs with E7): reads a real training that ships
   with the app (`evolver_studio/tutorial_data/analysis/`) with the views of Training analysis —
   summary, convergence, front and population, final-front configurations, parameter agreement.
 - The written tutorials are renumbered, as Evolver does: S1 tour, S2 parameter spaces, S3 solving,
-  S4 first training, S5 training analysis, S6 validation, S7 validation analysis. Their text names
+  S4 first training, S5 customizing a training, S6 training analysis, S7 validation, S8 validation
+  analysis. Their text names
   the other tutorials by title, not by number.
 
 ### Quality indicators: which way is better

@@ -28,8 +28,8 @@ class BaseLevelChoices:
 
     Attributes:
         population_size: The base algorithm's population size.
-        independent_runs: How many runs measure each configuration (its indicator values are
-            aggregated over them).
+        independent_runs: How many runs measure each configuration: each indicator is the median
+            over them on each problem, then the mean over the problems.
         indicators: The meta-objectives, by registry name.
     """
 

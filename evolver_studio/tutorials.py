@@ -132,16 +132,18 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "customizing_a_training",
-        None,
+        "S5",
         "Customizing a training run",
         _MID,
         "Meta-optimization",
-        "Algorithm, encoding, training set, meta-optimizer and parameter space editing.",
+        "What else a training can choose, and why: the training set, the meta-objectives and the "
+        "runs per configuration, the cost, the parameter space, the meta-optimizer with its "
+        "encoding and budget, and binary and permutation problems.",
         ("E5", "E6", "E10"),
     ),
     Tutorial(
         "analyzing_training_results",
-        "S5",
+        "S6",
         "Analyzing training results",
         _MID,
         "Meta-optimization",
@@ -151,7 +153,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "validating_a_configuration",
-        "S6",
+        "S7",
         "Validating a configuration",
         _MID,
         "Meta-optimization",
@@ -161,7 +163,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
     ),
     Tutorial(
         "analyzing_a_validation",
-        "S7",
+        "S8",
         "Analyzing a validation",
         _MID,
         "Meta-optimization",

@@ -31,6 +31,7 @@ class TestTutorialsCatalogue:
             "parameter_spaces",
             "solving",
             "first_training",
+            "customizing_a_training",
             "analyzing_training_results",
             "validating_a_configuration",
             "analyzing_a_validation",
