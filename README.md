@@ -2,93 +2,108 @@
   <img src="assets/logo/studio-logo.svg" alt="Evolver-Studio" width="480">
 </p>
 
-# Evolver-Studio: a graphical interface for Evolver
+<p align="center">
+  <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue.svg">
+  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.4" src="https://img.shields.io/badge/Evolver-2.4-orange.svg"></a>
+  <img alt="Java 21+" src="https://img.shields.io/badge/java-21%2B-red.svg">
+  <a href="https://streamlit.io/"><img alt="Built with Streamlit" src="https://img.shields.io/badge/built%20with-Streamlit-ff4b4b.svg"></a>
+</p>
 
-Evolver-Studio is a Python/[Streamlit](https://streamlit.io/) application for
-[Evolver](https://github.com/jMetal/Evolver), the Java framework for the automated
-meta-optimization of multi-objective metaheuristics. Evolver has no GUI: its algorithms are
-configured through YAML parameter spaces, and training runs are launched from Java code or its
-command-line entry point. Evolver-Studio makes Evolver usable without writing Java or editing YAML
-by hand, and adds an analysis layer on top of its results.
+# Evolver-Studio
 
-It serves two purposes:
+**A graphical workbench for [Evolver](https://github.com/jMetal/Evolver)**, the Java framework for
+the automated design of multi-objective metaheuristics. With Evolver-Studio you configure and run
+Evolver's algorithms, let Evolver find good configurations of them (*meta-optimization*), and
+analyze the results with the statistics a paper needs — without writing Java or editing YAML.
 
-- **Solving problems**: configure and run Evolver's configurable algorithms on a concrete problem,
-  in the style of jMetal's runners. Evolver's configurable core can be used on its own, as an
-  alternative to jMetal.
-- **Meta-optimization**: launch and monitor training runs, then analyze and validate the
-  configurations they find.
+<p align="center">
+  <img src="docs/images/home.png" alt="The home page of Evolver-Studio" width="900">
+</p>
 
-> **Status:** early development, heading to 0.1.0 (see [CHANGELOG.md](CHANGELOG.md)). Exploring
-> parameter spaces, launching and monitoring training runs, analyzing them, running an algorithm
-> on a problem, validating a tuned configuration and analyzing the validation, with a tutorial
-> for each.
-> See [ROADMAP.md](ROADMAP.md).
+## Why Evolver-Studio
 
-## How it works
+- **No Java, no YAML.** Choose an algorithm, a problem and a configuration in forms; the app
+  writes Evolver's request files, runs Evolver and reads its results.
+- **Two uses in one tool.** *Solving*: run Evolver's configurable algorithms on a problem, as with
+  jMetal's runners. *Meta-optimization*: train, analyze, validate.
+- **Made for jobs that last hours.** Trainings and validation studies run in the background; close
+  the browser and come back later. A live monitor shows progress, pace, time left, the front and
+  the meta-optimizer's population as it evolves.
+- **Statistics ready for a paper.** Wilcoxon tests with Holm or Benjamini-Hochberg corrections,
+  Vargha-Delaney A12 effect sizes, Friedman, aligned Friedman and Quade tests with Demšar's
+  critical difference plots, a Bayesian signed-rank test, attainment surfaces and EAF differences;
+  tables in LaTeX, every chart in PNG or PDF, and the files [SAES](https://github.com/jMetal/SAES)
+  reads.
+- **Learn by doing.** Eight interactive tutorials, each paired with a tutorial of Evolver's
+  documentation, run real examples inside the app.
+- **In step with Evolver.** Parameter spaces, problems and indicators are read from Evolver's own
+  release jar, and tests check the app against every new release.
 
-Evolver-Studio runs Evolver's release jar, downloaded from Maven Central, as a subprocess, and
-talks to it through files rather than a server:
+## Gallery
 
-```text
-Evolver-Studio (Streamlit)
-  └─> writes request.yaml (+ reusable baseLevel / metaSearch files)
-       └─> java -cp Evolver-2.4-jar-with-dependencies.jar
-                org.uma.evolver.cli.training.TrainingRunnerMain request.yaml status.yaml
-            ├─> status.yaml   polled for progress (RUNNING / FINISHED / FAILED)
-            └─> METADATA.txt, INDICATORS.csv, CONFIGURATIONS.csv, VAR_CONF.txt
-```
+| | |
+|:---:|:---:|
+| ![Monitoring a training run](docs/images/training-monitor.png) | ![How a training converged](docs/images/training-analysis.png) |
+| **Training** — a training run, followed live | **Training analysis** — how its meta-objectives converged |
+| ![The A12 effect size of a validation study](docs/images/validation-effect-size.png) | ![The fronts of a validation study](docs/images/validation-fronts.png) |
+| **Validation analysis** — effect sizes, shaded by their magnitude | **Validation analysis** — the median front of each algorithm |
 
-Training runs are long batch jobs, so each one runs as a detached process: closing or reloading the
-browser does not stop it, and reopening the app reconnects to it. The parameter spaces the app
-shows and edits are read from the jar itself, and the reference fronts and weight vectors that
-training runs need are copied from Evolver into [`resources/`](resources/README.md). The catalogue
-of algorithms,
-problems and indicators is cross-checked against the manifest printed by Evolver's
-`org.uma.evolver.cli.training.DescribeMain`.
+## The workflow
 
-## Features
+**Solving a problem**: pick a problem in *Explore › Problems*, then configure and run an algorithm
+on it in *Run algorithm*, and inspect its fronts, solutions and quality indicators.
 
-The app opens on a home page with a card for each part of the tool. The menu groups the pages by
-purpose:
+**Meta-optimization** has four steps, a page each:
 
-| Section | Page | Status | What it does |
-|---|---|:---:|---|
-| Explore | Base algorithms | ✅ | Browse an algorithm's parameter space, per encoding, as a filterable table (one row per parameter, with the condition that activates it) |
-| Explore | Meta-optimizers | ✅ | See each meta-optimizer's encodings and the operators it can be configured with |
-| Explore | Quality indicators | ✅ | The indicators a training run can minimize, and what each one measures |
-| Explore | Problems | ✅ | The problems available for training and solving: encoding, objectives, variables, arguments and reference fronts |
-| Solve | Run algorithm | ✅ | Run an algorithm on a problem from its default configuration, adjusted within its parameter space; inspect the fronts and indicators, download `VAR`/`FUN` |
-| Meta-optimization | Training | ✅ | Configure (algorithm, encoding, training set, meta-objectives, runs per configuration, populations, parameter space, meta-optimizer and its encoding, budget by evaluations or time), launch, monitor and cancel a training run |
-| Meta-optimization | Training analysis | ✅ | Study a finished training: how it converged and how its population evolved, its final front of configurations, what they have in common and how they differ from the default; send one to Validation or Run algorithm |
-| Meta-optimization | Validation | ✅ | Compare a tuned configuration with the default configurations of other algorithms, adjustable within their parameter spaces, on a set of problems: design the study, run it many times in the background, follow it |
-| Meta-optimization | Validation analysis | ✅ | Study a validation: the pivot's wins and losses, the Wilcoxon pivot table (with Holm or Benjamini-Hochberg corrections), effect sizes, ranking (Friedman, aligned Friedman, Quade, Holm, critical difference plot, signed-rank test), a Bayesian signed-rank test, boxplots, fronts (2, 3 or more objectives), attainment surfaces and EAF differences, indicator correlations and cost; LaTeX tables, PNG/PDF charts, SAES files |
-| Learn | Tutorials | ✅ | Interactive, step-by-step tutorials that pair with Evolver's documentation |
+1. **Training** — choose the algorithm to configure, the problems to tune it for, the
+   meta-objectives (quality indicators) and the meta-optimizer, and launch it.
+2. **Training analysis** — read what it found: convergence, the front of configurations, what
+   they have in common and how they differ from the default configuration.
+3. **Validation** — run a configuration it found many times, next to the default configurations
+   of other algorithms, on problems it was tuned for and on others.
+4. **Validation analysis** — decide whether to trust it: where it wins, by how much, how it ranks
+   over all the problems, what its fronts look like, and what it costs.
 
-✅ available · 🚧 planned
+A configuration goes from one step to the next with a button, and from a training to *Run
+algorithm*, to be used on a new problem.
 
-The Training page provides:
+## Pages
 
-- A parameter editor for the base-level algorithm, with a **guided** mode (forms, valid by
-  construction) and an **expert** mode (raw YAML, validated on every change).
-- Training sets of one or more problems, each with its reference front and evaluation budget.
-  The problems are chosen from a list (those of the base algorithm's encoding), or from the same
-  listing as Explore › Problems, with each problem's dimensions, arguments and fronts in view; any
-  other jMetal problem can be added by class name. A problem can be given its constructor's
-  arguments (e.g. DTLZ2 with 2 objectives), and one of another encoding than the base algorithm's
-  is reported before launching.
-- A choice of meta-optimizer, with its operator settings pre-filled from Evolver's example files.
-- A monitor for runs that last hours: progress, pace and time left (with a warning when a run
-  seems stuck), the front and, optionally, the meta-optimizer's whole **population** as it evolves
-  (a checkbox before launching), how each meta-objective converges, the configurations found so far
-  (downloadable, to validate one without waiting for the end) and the runner's log. It follows the
-  files Evolver appends to without reading them again at every refresh, and survives closing the
-  page: the run is picked up again when it is reopened.
+| Section | Page | What it does |
+|---|---|---|
+| Explore | Base algorithms | Browse the parameter space of every configurable algorithm, per encoding |
+| Explore | Meta-optimizers | The meta-optimizers, their encodings (flat, tree) and their operators |
+| Explore | Quality indicators | The indicators, what each one measures, and which way is better |
+| Explore | Problems | Every problem: encoding, objectives, variables, arguments, reference fronts |
+| Solve | Run algorithm | Run an algorithm from its default configuration, adjusted as you like; fronts, indicators, `VAR`/`FUN` |
+| Meta-optimization | Training | Configure, launch, monitor and cancel a training run |
+| Meta-optimization | Training analysis | Convergence, fronts, population and configurations of a finished training |
+| Meta-optimization | Validation | Design a validation study, run it in the background and follow it |
+| Meta-optimization | Validation analysis | Verdicts, Wilcoxon table, effect sizes, rankings, Bayesian test, fronts, attainment, cost |
+| Learn | Tutorials | Interactive tutorials, paired with Evolver's documentation |
+
+## Tutorials
+
+| | Tutorial | Track | Pairs with |
+|---|---|---|---|
+| S1 | A tour of Evolver-Studio | Both | E4 |
+| S2 | Exploring a parameter space | Both | E1 |
+| S3 | Solving a problem with a configurable algorithm | Solving | E2 |
+| S4 | Your first guided training | Meta-optimization | E3 |
+| S5 | Customizing a training run | Meta-optimization | E5, E6, E10 |
+| S6 | Analyzing training results | Meta-optimization | E7 |
+| S7 | Validating a configuration | Meta-optimization | E8 |
+| S8 | Analyzing a validation | Meta-optimization | E8 |
+
+E1, E2… are the [tutorials of Evolver's documentation](https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/index.rst),
+which cover the same ground with Java code. More tutorials are planned (comparing configurations,
+using a tuned configuration, your own problem, meta-optimizers and encodings, long-running jobs).
 
 ## Supported algorithms
 
-Evolver-Studio can browse the parameter space of every configurable algorithm in Evolver. The ones
-that can be launched from the app today are:
+Evolver-Studio browses the parameter space of every configurable algorithm in Evolver. Those that
+can be run from the app:
 
 | Level | Algorithms |
 |---|---|
@@ -100,47 +115,79 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 
 ## Requirements
 
-- Python 3.11+ and [Conda](https://docs.conda.io/)
+- Python 3.11 or newer and [Conda](https://docs.conda.io/)
 - Java 21 or newer, on the `PATH`
-- Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF (Kaleido draws them in
-  it). Without it the PNG/PDF buttons are not offered, and each chart's camera icon still saves it
-  as PNG.
+- Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF
 
-Neither an Evolver checkout nor Maven is needed: the app downloads the jar of **Evolver 2.4** (the
-release the app is built against) from Maven Central. Other
-versions are not supported; the expected version is set by `EVOLVER_VERSION` in
-`evolver_studio/evolver_client.py`.
-
-Evolver-Studio is versioned on its own, and works with one Evolver release at a time:
+No Evolver checkout and no Maven: the app downloads the jar of **Evolver 2.4** from Maven Central
+the first time. Evolver-Studio has its own version numbers and works with one Evolver release at a
+time:
 
 | Evolver-Studio | Evolver |
 |---|---|
-| 0.1.0 (in development) | 2.4 |
+| 1.0.0 (in preparation) | 2.4 |
 
 ## Installation
 
 ```bash
 git clone https://github.com/jMetal/Evolver-Studio.git
 cd Evolver-Studio
-make env   # creates (or updates) the 'evolver-studio' environment from environment.yml
+make env   # creates (or updates) the 'evolver-studio' Conda environment
 ```
 
 ## Quick start
 
 ```bash
-make run   # streamlit run app.py
+make run   # opens Evolver-Studio in your browser
 ```
 
-1. The first time, click **Download Evolver 2.4** in the sidebar. The jar (about 130 MB) is
-   downloaded from Maven Central into `lib/` and its checksum is verified.
-2. The home page shows the parts of the app. Open **Base algorithms**, under Explore, to browse the algorithms and their parameter spaces.
-3. Open **Training**, keep the default settings (NSGA-II on ZDT4) or edit them, and click
-   **Launch training**. The indicator front updates as the run progresses.
-4. Paths are relative to the Evolver-Studio directory. Each run's request files (`request.yaml`,
-   `status.yaml`, ...) are kept under `cli-runner-runs/<run_id>/`, and its results under
-   `<output directory>/<run_id>/` (by default, `results/nsgaii/ZDT4/<run_id>/`).
+1. The first time, click **Download Evolver 2.4** in the sidebar (about 130 MB, checksum verified).
+2. Open **Tutorials** and start with **S1. A tour of Evolver-Studio**.
+3. To solve a problem right away, open **Run algorithm**, choose a problem (ZDT1, for instance),
+   keep NSGA-II with its default configuration and click **Run**.
+4. To train, open **Training**, keep the defaults (NSGA-II tuned for ZDT4, about three minutes) and
+   click **Launch training**; when it ends, open **Training analysis**.
 
-New to Evolver? Start with the **Tutorials** page.
+## How it works
+
+Evolver-Studio runs Evolver's release jar as a separate process and talks to it through files, not
+a server:
+
+```text
+Evolver-Studio (Streamlit)
+  ├─> DescribeMain            what Evolver can run: algorithms, problems, indicators
+  ├─> SolveRunnerMain         a run of an algorithm (Run algorithm, each job of a validation study)
+  └─> TrainingRunnerMain      a training run
+        request.yaml  ──>  Evolver  ──>  status.yaml (progress) and the results:
+                                          INDICATORS.csv, VAR_CONF.txt, FUN.csv, VAR.csv, ...
+```
+
+Long jobs run as detached processes: closing or reloading the browser does not stop them, and
+reopening the app reconnects to them. Parameter spaces are read from the jar, and the reference
+fronts and weight vectors the runs need are copied from Evolver into
+[`resources/`](resources/README.md).
+
+### Where your data lives
+
+Everything is kept in plain files next to the app, so that it survives restarts and can be read
+with any tool:
+
+| Folder | Contents |
+|---|---|
+| `cli-runner-runs/` | One folder per training: its request, status and log |
+| `results/` | What Evolver wrote for each training (`INDICATORS.csv`, `VAR_CONF.txt`, `METADATA.txt`…) |
+| `solve-runs/` | The runs of *Run algorithm* |
+| `validation-runs/` | The validation studies, with every run's front and indicators |
+
+## Troubleshooting
+
+- **"Java was not found on the PATH"**: install Java 21 or newer (for example
+  [Temurin](https://adoptium.net/)) and restart the app.
+- **The jar does not download**: check the connection to Maven Central, or download
+  `Evolver-2.4-jar-with-dependencies.jar` by hand into `lib/`.
+- **No PNG/PDF buttons under the charts**: they need Chrome or Chromium; the camera icon of each
+  chart still saves it as PNG.
+- **Port 8501 in use**: `streamlit run app.py --server.port 8502`.
 
 ## Development
 
@@ -150,33 +197,27 @@ make format   # ruff format .
 make test     # pytest tests/ -x
 ```
 
-To run the app against another Evolver build, such as one made from Evolver's `develop` branch
-while working on Evolver itself, point the `EVOLVER_JAR` environment variable at its jar:
+To run the app against another Evolver build, such as one of Evolver's `develop` branch, point the
+`EVOLVER_JAR` environment variable at its jar:
 
 ```bash
-EVOLVER_JAR=/path/to/Evolver-2.5-SNAPSHOT-jar-with-dependencies.jar make run
+EVOLVER_JAR=/path/to/Evolver-3.0-SNAPSHOT-jar-with-dependencies.jar make run
 ```
 
-Tests that use Evolver's jar (downloaded, or set by `EVOLVER_JAR`) are skipped without it. Among
-them, `tests/test_catalogue.py` keeps Evolver-Studio's hand-maintained catalogue
-(`evolver_studio/catalogue.py`) in sync with Evolver: it fails on any parameter space in the jar
-that the catalogue does not account for, and cross-checks the catalogue against the manifest
-printed by Evolver's `DescribeMain`. Evolver has matching tests for its algorithm and
-meta-optimizer registries.
-
-Moving to a new Evolver release means changing `EVOLVER_VERSION` in
-`evolver_studio/evolver_client.py` and refreshing the copied resources with
-`make sync-resources`, which downloads them from the release's source archive on GitHub.
-`tests/test_resources.py` checks the copy against the checksums that command records.
+Tests that need Evolver's jar are skipped without it. `tests/test_catalogue.py` keeps the app's
+catalogue of algorithms (`evolver_studio/catalogue.py`) in sync with Evolver: it fails on any
+parameter space of the jar the catalogue does not account for, and checks the catalogue against
+the manifest Evolver's `DescribeMain` prints. Moving to a new Evolver release means changing
+`EVOLVER_VERSION` in `evolver_studio/evolver_client.py` and running `make sync-resources`.
+`python scripts/screenshots.py` retakes the images of this README from a running app.
 
 Code and commits follow [CODING_GUIDELINES.md](CODING_GUIDELINES.md) and
-[GIT_GUIDELINES.md](GIT_GUIDELINES.md).
+[GIT_GUIDELINES.md](GIT_GUIDELINES.md); changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Roadmap
 
-Next steps include the analysis layer, and more statistics for
-validation studies (Friedman and critical difference plots). See
-[ROADMAP.md](ROADMAP.md) for details and the use cases behind them.
+Evolver-Studio 1.0 will be released with Evolver 3.0. After it: the tutorials still planned, a
+Docker image, and comparisons of several trainings. See [ROADMAP.md](ROADMAP.md).
 
 ## Citation
 
@@ -197,5 +238,4 @@ Evolver:
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 — see the [LICENSE](LICENSE)
-file for details.
+Evolver-Studio is licensed under the GNU General Public License v3.0 — see [LICENSE](LICENSE).

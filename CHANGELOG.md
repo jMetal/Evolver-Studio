@@ -8,6 +8,13 @@ version works with.
 
 Works with Evolver 2.4.
 
+### Documentation
+
+- The **README** is rewritten for new users: why Evolver-Studio, a gallery of screenshots of the
+  home page, the training monitor, a training's convergence and a validation's effect sizes and
+  fronts, the workflow, the pages, the tutorials, where the data lives and troubleshooting.
+  `scripts/screenshots.py` retakes the screenshots from a running app with headless Chrome.
+
 ### Tutorials
 
 - **Tutorial S1, *A tour of Evolver-Studio*** (pairs with E4): how the app connects to Evolver (Java
