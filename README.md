@@ -4,10 +4,10 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
-  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue.svg">
-  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.4" src="https://img.shields.io/badge/Evolver-2.4-orange.svg"></a>
-  <img alt="Java 21+" src="https://img.shields.io/badge/java-21%2B-red.svg">
-  <a href="https://streamlit.io/"><img alt="Built with Streamlit" src="https://img.shields.io/badge/built%20with-Streamlit-ff4b4b.svg"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB.svg?logo=python&logoColor=white">
+  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.4" src="https://img.shields.io/badge/Evolver-2.4-blue.svg"></a>
+  <img alt="Java 21+" src="https://img.shields.io/badge/java-21%2B-5382A1.svg?logo=openjdk&logoColor=white">
+  <a href="https://streamlit.io/"><img alt="Built with Streamlit" src="https://img.shields.io/badge/built%20with-Streamlit-555555.svg?logo=streamlit"></a>
 </p>
 
 # Evolver-Studio
