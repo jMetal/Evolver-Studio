@@ -49,6 +49,7 @@ from evolver_studio.figure_export import render_chart
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_catalogue import ArgumentValue, Problem, number_of_objectives
+from evolver_studio.problem_form import defaults_help, render_argument_inputs
 from evolver_studio.problems import (
     default_reference_front,
     reference_front_candidates,
@@ -210,35 +211,18 @@ def _render_problem_arguments(problem: Problem) -> tuple[ArgumentValue, ...] | N
     """
     if not problem.arguments:
         return ()
-    shape = ", ".join(
-        part
-        for part in (
-            f"{problem.number_of_objectives} objectives" if problem.number_of_objectives else "",
-            f"{problem.number_of_variables} variables" if problem.number_of_variables else "",
-        )
-        if part
-    )
     custom = st.checkbox(
         "Set its arguments",
         key=problem_arguments_key(problem.name),
-        help=f"Without them, {problem.name} is built with its defaults"
-        + (f" ({shape})." if shape else "."),
+        help=defaults_help(problem),
     )
     if not custom:
         return ()
-    columns = st.columns(min(len(problem.arguments), 4))
-    values: list[ArgumentValue | None] = []
-    for index, argument in enumerate(problem.arguments):
-        column = columns[index % len(columns)]
-        key = problem_argument_key(problem.name, argument.name)
-        if argument.type == "boolean":
-            values.append(column.checkbox(argument.name, value=bool(argument.default), key=key))
-        elif argument.type == "integer":
-            value = column.number_input(argument.name, value=argument.default, step=1, key=key)
-            values.append(None if value is None else int(value))
-        else:
-            value = column.number_input(argument.name, value=argument.default, key=key)
-            values.append(None if value is None else float(value))
+    values = render_argument_inputs(
+        problem,
+        lambda argument: problem_argument_key(problem.name, argument),
+        [argument.default for argument in problem.arguments],
+    )
     if any(value is None for value in values):
         st.warning("Give every argument a value: Evolver takes all of them, or none.")
         return None

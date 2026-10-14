@@ -117,6 +117,12 @@ Works with Evolver 2.4.
 - The algorithms the tuned configuration is compared with start from their default configuration,
   and each has an **Adjust the parameters** form, the one of *Run algorithm*: a changed algorithm
   enters the study as "<name> (adjusted)", and *Open in Validation* brings it back adjusted.
+- The problems of a study, and those of a training set in *Training*, are set with the form of *Run
+  algorithm* instead of a text table: **Set its arguments** gives an input per argument, with its
+  name and its default, and the reference front is chosen among the problem's own and follows its
+  number of objectives (DTLZ1 with 6 objectives offers DTLZ1.6D.csv); another file can still be
+  typed. With Evolver 3.0, whose manifest names the objectives of WFG as those of the other
+  families, this also lets WFG run with 3 objectives.
 
 ### Training analysis
 

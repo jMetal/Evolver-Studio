@@ -3,6 +3,7 @@
 import time
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import yaml
 from streamlit.testing.v1 import AppTest
@@ -256,6 +257,78 @@ class TestRunAStudy:
         labels = [button.proto.label for button in app.get("download_button")]
         assert "Download the table (LaTeX)" in labels
         assert "Results for SAES (CSV)" in labels
+
+
+class TestProblemArguments:
+    """The form of each problem's arguments, whose reference front follows its objectives."""
+
+    @staticmethod
+    def _widget(widgets, suffix: str):
+        return next(widget for widget in widgets if (widget.key or "").endswith(suffix))
+
+    def _set_objectives(self, app: AppTest, problem: str, objectives: int) -> AppTest:
+        app.multiselect(key="validation_problems_Double").select(problem).run()
+        self._widget(app.checkbox, f"_set_arguments_{problem}").check().run()
+        self._widget(app.number_input, f"_argument_{problem}_numberOfObjectives").set_value(
+            objectives
+        ).run()
+        return app
+
+    def test_should_offer_the_front_of_the_objectives_chosen(self, app: AppTest):
+        """Given DTLZ1 with 6 objectives, the study takes its 6D front, with no error."""
+        # Arrange
+        _needs_problem_catalogue()
+
+        # Act
+        app = self._set_objectives(app, "DTLZ1", 6)
+
+        # Assert
+        rows = app.session_state["validation_problem_rows"]
+        assert rows["reference_front"].tolist() == ["resources/referenceFronts/DTLZ1.6D.csv"]
+        assert rows["arguments"].tolist()[0].endswith(", 6")
+        assert not app.error
+        assert not app.exception
+
+    def test_should_take_wfg_with_three_objectives(self, app: AppTest):
+        """Given WFG1 with 3 objectives, the study takes its 3D front, with no error."""
+        # Arrange
+        _needs_problem_catalogue()
+        catalogue = parse_problem_catalogue(describe(WORKING_DIRECTORY, jar_path()).value)
+        if "numberOfObjectives" not in [a.name for a in catalogue["WFG1"].arguments]:
+            pytest.skip("The Evolver jar in use names the objectives of WFG m (before 3.0)")
+
+        # Act
+        app = self._set_objectives(app, "WFG1", 3)
+
+        # Assert
+        rows = app.session_state["validation_problem_rows"]
+        assert rows["reference_front"].tolist() == ["resources/referenceFronts/WFG1.3D.csv"]
+        assert not app.error
+
+    def test_should_start_again_from_the_rows_of_a_study_run_again(self, app: AppTest):
+        """Given rows set from outside the form, the widgets show them."""
+        # Arrange
+        _needs_problem_catalogue()
+        app.multiselect(key="validation_problems_Double").select("DTLZ1").run()
+
+        # Act
+        app.session_state["validation_problem_rows"] = pd.DataFrame(
+            [
+                {
+                    "problem": "DTLZ1",
+                    "arguments": "9, 4",
+                    "reference_front": "resources/referenceFronts/DTLZ1.4D.csv",
+                }
+            ]
+        )
+        app.run()
+
+        # Assert
+        assert self._widget(app.checkbox, "_set_arguments_DTLZ1").value
+        assert self._widget(app.number_input, "_argument_DTLZ1_numberOfObjectives").value == 4
+        assert app.session_state["validation_problem_rows"]["reference_front"].tolist() == [
+            "resources/referenceFronts/DTLZ1.4D.csv"
+        ]
 
 
 class TestProblemBrowser:

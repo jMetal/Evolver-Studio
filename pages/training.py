@@ -58,6 +58,7 @@ from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
 from evolver_studio.problem_catalogue import problems_with_encoding
+from evolver_studio.problem_form import render_problem_rows
 from evolver_studio.problems import reference_front_dimension
 from evolver_studio.request import (
     DEFAULT_META_POPULATION_SIZE,
@@ -654,7 +655,7 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
 
     The problems are chosen from a list (those of the base algorithm's encoding when the jar
     describes them), and a fully-qualified class name can be typed to add any other one; each
-    chosen problem is a row of a table with its arguments, its reference front file and its
+    chosen problem is a block of the form with its arguments, its reference front file and its
     evaluation budget — BaseLevelConfig's parallel lists, spelled out explicitly since the CLI
     does not resolve training sets by name.
 
@@ -693,37 +694,19 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
     )
     if not names:
         return pd.DataFrame(columns=list(TRAINING_SET_COLUMNS))
-    st.caption(
-        "Reference front files live under resources/referenceFronts/ (or "
-        "resources/referenceFrontsTSP/ for TSP problems); some "
-        "problems use a dimension suffix (e.g. DTLZ1.3D.csv)."
-    )
     table = training_set_table(
         names,
         catalogue or {},
         WORKING_DIRECTORY,
         st.session_state.get(TRAINING_SET_ROWS_KEY),
     )
-    edited = st.data_editor(
+    edited = render_problem_rows(
         table,
-        column_config={
-            "problem": st.column_config.TextColumn("Problem", disabled=True),
-            "arguments": st.column_config.TextColumn(
-                "Arguments",
-                help="Optional: the problem's constructor arguments, all of them or none, "
-                "comma-separated (e.g. 12, 2 for DTLZ2 with 12 variables and 2 objectives). "
-                "Explore › Problems lists each problem's arguments.",
-            ),
-            "reference_front": st.column_config.TextColumn("Reference front file", required=True),
-            "evaluations": st.column_config.NumberColumn(
-                "Evaluations", min_value=1, step=100, required=True
-            ),
-        },
-        hide_index=True,
-        width="stretch",
-        key=f"train_set_table_{encoding}_{'|'.join(names)}",
+        catalogue or {},
+        TRAINING_SET_ROWS_KEY,
+        f"train_problem_{encoding}",
+        WORKING_DIRECTORY,
     )
-    st.session_state[TRAINING_SET_ROWS_KEY] = edited[list(TRAINING_SET_COLUMNS)]
     return edited
 
 

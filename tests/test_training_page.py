@@ -57,8 +57,11 @@ class TestTrainingSetProblems:
         app.multiselect(key="train_problems_Double").select("DTLZ2").run()
 
         # Assert
-        table = next(d.value for d in app.dataframe if "reference_front" in d.value.columns)
+        table = app.session_state["training_set_rows"]
         assert list(table["problem"]) == ["ZDT4", "DTLZ2"]
+        # ZDT4 has a single front; DTLZ2's depends on its objectives, which the fronts of the
+        # temporary working directory (none) cannot tell
+        assert table["reference_front"].tolist()[0] == "resources/referenceFronts/ZDT4.csv"
         assert not app.exception
 
     def test_should_ask_for_a_problem_when_none_is_chosen(self, app: AppTest):
