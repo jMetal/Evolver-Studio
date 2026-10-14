@@ -21,6 +21,16 @@ from evolver_studio.validation_stats import magnitude
 COLORS = px.colors.qualitative.Plotly
 PANEL_HEIGHT = 260
 EAF_LEVELS = 5
+# The critical difference plot: a fixed size and font, as it goes into a paper.
+CD_WIDTH = 900
+CD_ROW_PIXELS = 46
+CD_FONT_SIZE = 14
+CD_FONT_FAMILY = "Helvetica, Arial, sans-serif"
+CD_GROUP_WIDTH = 2.5
+CD_GROUP_SPACING = 0.3
+CD_LABEL_SPACING = 0.75
+# How far beyond the ends of the axis the lines to the names reach, in rank units.
+CD_LINE_OVERHANG = 0.25
 SIMPLEX_POINTS = 3000
 COLOR_SCHEME = "color"
 GRAY_SCHEME = "gray"
@@ -171,61 +181,111 @@ def cost_figure(runs: pd.DataFrame) -> go.Figure:
     return figure
 
 
-def critical_difference_figure(ranks: pd.Series, difference: float, groups: list[list[str]]):
-    """Demšar's critical difference plot.
+def critical_difference_figure(
+    ranks: pd.Series, difference: float, groups: list[list[str]], highlight: str | None = None
+) -> go.Figure:
+    """Demšar's critical difference plot, in the layout papers use.
 
-    An axis of average ranks (1, the best, on the left), each algorithm hanging from its rank,
-    the critical difference as a segment above the axis, and below it a bar joining each group of
-    algorithms that are not significantly different.
+    An axis of average ranks on top (1, the best, on the left), the critical difference as a
+    segment above it, each algorithm hanging from its rank to its name (the better half on the
+    left), and between the axis and the names a thin bar joining each group of algorithms that are
+    not significantly different, each bar on a row of its own. Black on white, a fixed size and
+    font, so that the PNG or PDF of it goes into a paper as it is.
 
     Args:
-        ranks: The average ranks, best first.
+        ranks: The average ranks.
         difference: Nemenyi's critical difference.
         groups: The groups of `validation_stats.nonsignificant_groups`.
+        highlight: An algorithm whose name is written in bold (the pivot), or None.
 
     Returns:
         The figure.
     """
     ordered = ranks.sort_values(kind="stable")
     count = len(ordered)
-    figure = go.Figure()
-    axis_y = 0.0
-    figure.add_shape(type="line", x0=1, x1=count, y0=axis_y, y1=axis_y, line={"color": "black"})
-    for tick in range(1, count + 1):
-        figure.add_shape(
-            type="line", x0=tick, x1=tick, y0=axis_y, y1=axis_y + 0.08, line={"color": "black"}
-        )
-        figure.add_annotation(x=tick, y=axis_y + 0.18, text=str(tick), showarrow=False)
-    figure.add_shape(
-        type="line", x0=1, x1=1 + difference, y0=0.55, y1=0.55, line={"color": "black", "width": 2}
-    )
-    figure.add_annotation(
-        x=1 + difference / 2, y=0.72, text=f"CD = {difference:.2f}", showarrow=False
-    )
+    labels = {
+        name: (f"<b>{name}</b>" if name == highlight else name) + f" ({rank:.2f})"
+        for name, rank in ordered.items()
+    }
     half = (count + 1) // 2
+    # Vertical layout, in rows of the plot: the CD segment above the axis, the groups' bars
+    # below it, then a row for each name of the longer side.
+    group_rows = [-0.45 - CD_GROUP_SPACING * index for index in range(len(groups))]
+    first_label = (group_rows[-1] if group_rows else -0.2) - 0.55
+    label_rows = [first_label - CD_LABEL_SPACING * index for index in range(half)]
+    top, bottom = 1.15, label_rows[-1] - 0.35
+    # Horizontal layout: room on each side for the longest name, in rank units.
+    longest = max(len(f"{name} ({rank:.2f})") for name, rank in ordered.items())
+    label_px = longest * CD_FONT_SIZE * 0.5 + 12
+    span = max(count - 1, 1)
+    pad = label_px * span / max(CD_WIDTH - 2 * label_px - 40, 200) + CD_LINE_OVERHANG
+    low, high = 1 - pad, count + pad
+    black = {"color": "black", "width": 1}
+    figure = go.Figure()
+    figure.add_shape(type="line", x0=1, x1=count, y0=0, y1=0, line={**black, "width": 1.5})
+    for tick in range(1, count + 1):
+        figure.add_shape(type="line", x0=tick, x1=tick, y0=0, y1=0.22, line=black)
+        figure.add_annotation(
+            x=tick,
+            y=0.26,
+            text=str(tick),
+            showarrow=False,
+            yanchor="bottom",
+            font={"size": CD_FONT_SIZE, "color": "black"},
+        )
+        if tick < count:
+            figure.add_shape(type="line", x0=tick + 0.5, x1=tick + 0.5, y0=0, y1=0.12, line=black)
+    cd_y = 0.95
+    figure.add_shape(
+        type="line", x0=1, x1=1 + difference, y0=cd_y, y1=cd_y, line={**black, "width": 1.5}
+    )
+    for end in (1, 1 + difference):
+        figure.add_shape(type="line", x0=end, x1=end, y0=cd_y - 0.08, y1=cd_y + 0.08, line=black)
+    figure.add_annotation(
+        x=1 + difference / 2,
+        y=cd_y + 0.1,
+        text=f"CD = {difference:.2f}",
+        showarrow=False,
+        yanchor="bottom",
+        font={"size": CD_FONT_SIZE, "color": "black"},
+    )
     for position, (name, rank) in enumerate(ordered.items()):
         left = position < half
-        level = -0.35 - 0.3 * (position if left else count - 1 - position)
-        edge = 0.6 if left else count + 0.4
-        figure.add_shape(
-            type="line", x0=rank, x1=rank, y0=axis_y, y1=level, line={"color": "black"}
-        )
-        figure.add_shape(type="line", x0=rank, x1=edge, y0=level, y1=level, line={"color": "black"})
+        row = label_rows[position if left else count - 1 - position]
+        edge = 1 - CD_LINE_OVERHANG if left else count + CD_LINE_OVERHANG
+        figure.add_shape(type="line", x0=rank, x1=rank, y0=0, y1=row, line=black)
+        figure.add_shape(type="line", x0=rank, x1=edge, y0=row, y1=row, line=black)
         figure.add_annotation(
             x=edge,
-            y=level,
-            text=f"{name} ({rank:.2f})",
+            y=row,
+            text=labels[name],
             showarrow=False,
             xanchor="right" if left else "left",
+            xshift=-4 if left else 4,
+            font={"size": CD_FONT_SIZE, "color": "black"},
         )
-    for index, group in enumerate(groups):
-        low, high = ordered[group[0]], ordered[group[-1]]
-        y = -0.12 - 0.08 * index
-        figure.add_shape(type="line", x0=low - 0.03, x1=high + 0.03, y0=y, y1=y, line={"width": 5})
-    lowest = -0.35 - 0.3 * half
-    figure.update_xaxes(visible=False, range=[0.6 - 0.25 * count, count + 0.4 + 0.25 * count])
-    figure.update_yaxes(visible=False, range=[lowest - 0.2, 0.9])
-    figure.update_layout(height=max(260, 70 * half + 160), plot_bgcolor="white")
+    for row, group in zip(group_rows, groups, strict=False):
+        start, end = ordered[group[0]], ordered[group[-1]]
+        figure.add_shape(
+            type="line",
+            x0=start - 0.05,
+            x1=end + 0.05,
+            y0=row,
+            y1=row,
+            line={"color": "black", "width": CD_GROUP_WIDTH},
+        )
+    rows = top - bottom
+    figure.update_xaxes(visible=False, range=[low, high], fixedrange=True)
+    figure.update_yaxes(visible=False, range=[bottom, top], fixedrange=True)
+    figure.update_layout(
+        width=CD_WIDTH,
+        height=round(rows * CD_ROW_PIXELS) + 20,
+        margin={"l": 10, "r": 10, "t": 10, "b": 10},
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        font={"family": CD_FONT_FAMILY, "size": CD_FONT_SIZE, "color": "black"},
+        showlegend=False,
+    )
     return figure
 
 

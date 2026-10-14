@@ -111,6 +111,10 @@ Works with Evolver 2.4.
 - **Every chart** of the app (fronts, solutions, boxplots, convergence, population, parameters, in
   the pages and in the tutorials) has **PNG** and **PDF** buttons. The images are made with Kaleido
   (a new dependency) in the Chrome installed on the computer, only when a button is pressed.
+- The **critical difference plot** is drawn for papers: black on white, thin lines, a scale with
+  half-rank ticks, the critical difference as a rule above it, each group of algorithms that do not
+  differ significantly as a thin bar on a row of its own, and each name with its average rank (the
+  pivot in bold), on both sides of the scale.
 
 ### Validation
 

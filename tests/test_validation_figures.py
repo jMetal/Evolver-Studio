@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import pytest
 
 from evolver_studio.validation_figures import (
+    CD_GROUP_WIDTH,
     EFFECT_GRAYS,
     GRAY_SCHEME,
     attainment_figure,
@@ -178,7 +179,21 @@ class TestOtherFigures:
         # Act
         figure = critical_difference_figure(ranks, 1.0, [["A", "B"]])
 
-        # Assert: one thick bar among the shapes, and a label per algorithm
-        assert sum(1 for shape in figure.layout.shapes if shape.line.width == 5) == 1
+        # Assert: one bar for the group, and a label per algorithm with its average rank
+        assert sum(1 for shape in figure.layout.shapes if shape.line.width == CD_GROUP_WIDTH) == 1
         labels = [a.text for a in figure.layout.annotations]
         assert {"A (1.00)", "B (1.50)", "C (3.50)"} <= set(labels)
+
+    def test_should_write_the_pivot_in_bold_and_keep_every_name_inside_the_figure(self):
+        # Arrange
+        ranks = pd.Series({"NSGA-II (tuned)": 1.2, "B": 2.4, "C": 2.9, "A long name": 3.5})
+
+        # Act
+        figure = critical_difference_figure(ranks, 1.0, [], highlight="NSGA-II (tuned)")
+
+        # Assert: the lines to the names end inside the range, which leaves room for them
+        labels = [a.text for a in figure.layout.annotations]
+        assert "<b>NSGA-II (tuned)</b> (1.20)" in labels
+        low, high = figure.layout.xaxis.range
+        name_rows = [a for a in figure.layout.annotations if "(" in a.text]
+        assert all(low < a.x < high for a in name_rows)

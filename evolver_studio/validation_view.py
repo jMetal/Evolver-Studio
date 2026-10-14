@@ -271,7 +271,9 @@ def render_ranking(runs: pd.DataFrame, indicator: str, pivot: str, study_id: str
         f"CD = {difference:.2f})."
     )
     render_chart(
-        critical_difference_figure(ranks, difference, nonsignificant_groups(ranks, difference)),
+        critical_difference_figure(
+            ranks, difference, nonsignificant_groups(ranks, difference), highlight=pivot
+        ),
         f"validation_analysis_cd_{study_id}_{indicator}",
         f"cd_{indicator}",
         width="stretch",
