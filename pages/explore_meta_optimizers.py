@@ -2,8 +2,8 @@
 
 Read-only, like the base algorithms page, and empty until a meta-optimizer is chosen. Its operators
 are shown from the real ParameterSpace YAML backing them (`operator_parameter_space_file` for the
-flat encoding, `tree_operator_parameter_space_file` for the tree one) when there is one; SPEA2 and
-SMPSO hardcode their operators in Java instead, so the hand-maintained name list is shown for them.
+flat encoding, `tree_operator_parameter_space_file` for the tree one) when there is one; SMPSO
+hardcodes its operators in Java instead, so the hand-maintained name list is shown for it.
 """
 
 from pathlib import Path

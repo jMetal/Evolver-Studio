@@ -198,7 +198,7 @@ class TestMetaAlgorithms:
         }
 
         # Assert
-        assert tree_wired == {"NSGA-II", "AGE-MOEA", "AsyncNSGA-II", "RandomSearch"}
+        assert tree_wired == {"NSGA-II", "AGE-MOEA", "SPEA2", "AsyncNSGA-II", "RandomSearch"}
 
     def test_should_have_a_tree_operator_catalogue_only_when_tree_is_supported(self):
         """A tree operator catalogue on a flat-only algorithm would never be used."""
@@ -276,7 +276,7 @@ class TestMetaAlgorithmFlatOnly:
         fixed = {m.name for m in META_ALGORITHMS if m.fixed_operators_note}
 
         # Assert: they have no operator parameter space, which is what makes them fixed
-        assert fixed == {"SPEA2", "SMPSO"}
+        assert fixed == {"SMPSO"}
         for meta in META_ALGORITHMS:
             if meta.name in fixed:
                 assert meta.operator_parameter_space_file is None

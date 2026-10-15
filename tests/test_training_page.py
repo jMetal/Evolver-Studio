@@ -183,10 +183,10 @@ class TestMetaOptimizerEncoding:
 
     def test_should_offer_only_flat_to_a_meta_optimizer_without_tree_support(self, app: AppTest):
         # Act
-        app.selectbox(key="train_meta_algorithm").select("SPEA2").run()
+        app.selectbox(key="train_meta_algorithm").select("SMPSO").run()
 
         # Assert
-        radio = app.radio(key="train_meta_encoding_SPEA2")
+        radio = app.radio(key="train_meta_encoding_SMPSO")
         assert list(radio.options) == ["Flat"]
         assert any("supports only the flat encoding" in c.value for c in app.caption)
 
@@ -536,19 +536,13 @@ class TestPreviewOfTheRequestFiles:
 
 
 class TestMetaOptimizersWithFixedOperators:
-    def test_should_explain_why_spea2_has_no_flags_to_choose_and_no_tree_encoding(
-        self, app: AppTest
-    ):
+    def test_should_offer_spea2_its_operators_and_the_tree_encoding(self, app: AppTest):
         # Act
         app.selectbox(key="train_meta_algorithm").select("SPEA2").run()
 
-        # Assert
-        assert any("hardcodes its operators" in i.value for i in app.info)
-        assert any("mutationProbabilityFactor" in i.value for i in app.info)
-        assert any(
-            "supports only the flat encoding: its operators are written for real-valued" in c.value
-            for c in app.caption
-        )
+        # Assert: it is configured as NSGA-II, with both encodings
+        assert not any("hardcodes" in i.value for i in app.info)
+        assert list(app.radio(key="train_meta_encoding_SPEA2").options) == ["Flat", "Tree"]
 
     def test_should_say_smpso_takes_no_flags(self, app: AppTest):
         # Act

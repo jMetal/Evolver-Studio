@@ -16,7 +16,7 @@ parameter spaces packaged in Evolver's jar.
 parameter space" (true for everything here — it's just reading a YAML file) from "Evolver-Studio can
 actually launch a training run with it" (true only where org.uma.evolver.cli.training already
 supports it: every base algorithm but MOPSO (not registered); NSGA-II/AGE-MOEA/SPEA2/SMPSO/
-AsyncNSGA-II/RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/AsyncNSGA-II/
+AsyncNSGA-II/RandomSearch as flat-encoding meta-optimizers, NSGA-II/AGE-MOEA/SPEA2/AsyncNSGA-II/
 RandomSearch for tree).
 """
 
@@ -101,7 +101,7 @@ class MetaAlgorithm:
             algorithm's own `yamlParameterSpaceFile`) — mirrors Evolver's
             MetaAlgorithmRegistry.MetaAlgorithmDescriptor.operatorParameterSpaceFile.
             None when the algorithm hardcodes its operators in Java instead
-            (SPEA2, SMPSO); `flat_parameters` is the fallback for those.
+            (SMPSO); `flat_parameters` is the fallback for those.
         tree_operator_parameter_space_file: Same as `operator_parameter_space_file`,
             for the tree encoding (Evolver's *MetaTree.yaml files, whose
             crossover/mutation are fixed to subtree/tree). None when the
@@ -184,7 +184,13 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         runnable_today=True,
         registry_name="AGE-MOEA",
         runnable_encodings=("Double",),
-        default_configurations={"Double": (("Default", "AGEMOEADoubleDefault.txt"),)},
+        # AGE-MOEA and AGE-MOEA-II differ in their `replacement` parameter.
+        default_configurations={
+            "Double": (
+                ("AGE-MOEA", "AGEMOEADoubleDefault.txt"),
+                ("AGE-MOEA-II", "AGEMOEAIIDoubleDefault.txt"),
+            )
+        },
     ),
     # org.uma.evolver.algorithm.rvea.DoubleRVEA (Double only)
     BaseAlgorithm(
@@ -267,6 +273,7 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         "AsyncNSGAIIMetaDouble.yaml",
         "AsyncNSGAIIMetaTree.yaml",
         "SPEA2MetaDouble.yaml",
+        "SPEA2MetaTree.yaml",
     }
 )
 
@@ -316,46 +323,42 @@ META_ALGORITHMS: tuple[MetaAlgorithm, ...] = (
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("AGE-MOEA") — built on DoubleAGEMOEA
     # (flat) and org.uma.evolver.meta.algorithm.TreeAGEMOEA (tree); same operator catalogue as
-    # NSGA-II plus its environmental selection variant (agemoeaVariant: agemoea/agemoea2).
+    # NSGA-II plus its environmental selection variant (replacement: agemoea/agemoeaII).
     MetaAlgorithm(
         name="AGE-MOEA",
         supports_flat=True,
         supports_tree=True,
-        flat_parameters=(*_FLAT_NSGAII_PARAMETERS, "agemoeaVariant"),
-        tree_parameters=(*_TREE_NSGAII_PARAMETERS, "agemoeaVariant"),
+        flat_parameters=(*_FLAT_NSGAII_PARAMETERS, "replacement"),
+        tree_parameters=(*_TREE_NSGAII_PARAMETERS, "replacement"),
         wired_into_cli_runner=True,
         example_config_file="MetaAGEMOEAFlatConfiguration.yaml",
         tree_example_config_file="MetaAGEMOEATreeConfiguration.yaml",
         operator_parameter_space_file="AGEMOEAMetaDouble.yaml",
         tree_operator_parameter_space_file="AGEMOEAMetaTree.yaml",
     ),
-    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SPEA2") — built via MetaSPEA2Builder,
-    # which hardcodes its own operators (SBX, polynomial mutation, KNN density estimator,
-    # tournament selection); only mutationProbabilityFactor is configurable (optional).
+    # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SPEA2") — built on DoubleRDEMOEA (flat)
+    # and org.uma.evolver.meta.algorithm.TreeSPEA2 (tree) configured as SPEA2: strength ranking and
+    # the k-nearest-neighbour density estimator are fixed, the operators are set as for NSGA-II,
+    # plus the optional knnNeighborhoodSize (1) and knnNormalizeObjectives (false).
     MetaAlgorithm(
         name="SPEA2",
         supports_flat=True,
-        supports_tree=False,
+        supports_tree=True,
         flat_parameters=(
-            "populationSize",
-            "maxEvaluations",
-            "numberOfCores",
-            "mutationProbabilityFactor",
+            *_FLAT_NSGAII_PARAMETERS,
+            "knnNeighborhoodSize",
+            "knnNormalizeObjectives",
         ),
-        tree_parameters=(),
+        tree_parameters=(
+            *_TREE_NSGAII_PARAMETERS,
+            "knnNeighborhoodSize",
+            "knnNormalizeObjectives",
+        ),
         wired_into_cli_runner=True,
         example_config_file="MetaSPEA2FlatConfiguration.yaml",
-        fixed_operators_note=(
-            "SPEA2 hardcodes its operators (SBX crossover, polynomial mutation, strength "
-            "ranking, KNN density estimator and tournament selection): there is no catalogue to "
-            "choose from. The only flag it takes is the optional `mutationProbabilityFactor` "
-            "(1.0 if left out), e.g. `mutationProbabilityFactor: 1.5`."
-        ),
-        flat_only_reason=(
-            "its operators are written for real-valued solutions, and Evolver has no tree "
-            "version of it (the tree encoding has NSGA-II, AGE-MOEA, AsyncNSGA-II and Random "
-            "Search)"
-        ),
+        tree_example_config_file="MetaSPEA2TreeConfiguration.yaml",
+        operator_parameter_space_file="SPEA2MetaDouble.yaml",
+        tree_operator_parameter_space_file="SPEA2MetaTree.yaml",
     ),
     # org.uma.evolver.cli.training.MetaAlgorithmRegistry ("SMPSO") — built via MetaSMPSOBuilder,
     # which exposes no operator catalogue at all (swarm size/evaluations/cores only); structurally
