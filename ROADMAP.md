@@ -95,6 +95,13 @@ below; revisit and reorder as real usage surfaces new ones.
   `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
   `frontDelayMillis`, unused by the page.
 
+- **Moved to Evolver 2.5 (October 2026)**: the app downloads Evolver 2.5 and its resources come from
+  tag `v2.5`. SPEA2 as a meta-optimizer is configured as NSGA-II (its operators from
+  `SPEA2MetaDouble.yaml`, plus `knnNeighborhoodSize` and `knnNormalizeObjectives`) and gains the tree
+  encoding (`SPEA2MetaTree.yaml`, `MetaSPEA2TreeConfiguration.yaml`); AGE-MOEA's variant is the
+  `replacement` parameter (`agemoea`/`agemoeaII`), and Run algorithm offers its two default
+  configurations, AGE-MOEA and AGE-MOEA-II, as it does for RVEA's variants.
+
 - **Moved to Evolver 2.4 (October 2026)**: the app downloads Evolver 2.4 and its resources come from
   tag `v2.4` (unchanged since 2.3). Everything of the sync with `develop` above holds with the
   release: the 18 registered base algorithms, the problem catalogue (Explore › Problems, Run
@@ -172,14 +179,6 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 
 ## Next up
 
-- **With Evolver 2.5** (`/bump-evolver 2.5`, then `/sync-catalogue`): SPEA2 gets the tree encoding
-  (`TreeSPEA2`, `SPEA2MetaTree.yaml`, `MetaSPEA2TreeConfiguration.yaml`, already on Evolver's
-  `develop`), so the catalogue's SPEA2 becomes `supports_tree=True` with its tree example file, and
-  the notes Training shows for it (`fixed_operators_note`, `flat_only_reason`) must be reviewed.
-  Still open on the Evolver side: the *flat* SPEA2 only takes `mutationProbabilityFactor`, while
-  its `SPEA2MetaDouble.yaml` already holds the operators of NSGA-II (SBX, polynomial mutation,
-  tournament selection) and SPEA2's own (k-nearest-neighbour density, strength ranking); making it
-  configurable like NSGA-II is a small change in `MetaAlgorithmRegistry.buildSPEA2`.
 - **Solving track, next steps** (the first version of Run algorithm is done): start from a
   configuration a Training run found (`VAR_CONF.txt`/`CONFIGURATIONS.csv`) and compare several
   configurations on a problem.
@@ -229,7 +228,7 @@ Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
   `tests/test_explore_*.py`.)*
-- Track Evolver's releases: the app is built against Evolver 2.4 (`evolver_client.EVOLVER_VERSION`)
+- Track Evolver's releases: the app is built against Evolver 2.5 (`evolver_client.EVOLVER_VERSION`)
   and follows stable releases only; moving to a newer release is the `/bump-evolver` command
   (bumping that constant, `make sync-resources`, `/sync-catalogue` and the drift-detection tests).
   Work against a `develop` jar set by `EVOLVER_JAR` goes on an `experiment/*` branch. The rename

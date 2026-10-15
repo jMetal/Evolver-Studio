@@ -6,7 +6,7 @@ version works with.
 
 ## 0.1.0 (unreleased)
 
-Works with Evolver 2.4.
+Works with Evolver 2.5.
 
 ### Documentation
 
@@ -137,6 +137,19 @@ Works with Evolver 2.4.
   downloaded, sent to *Validation* as the tuned configuration, or to *Run algorithm* on one of the
   training's problems. A *Parameters* tab shows, per parameter, how much the front's configurations
   agree and where they differ from the algorithm's default configuration.
+
+### Moving to Evolver 2.5
+
+- **SPEA2** as a meta-optimizer takes the operators of NSGA-II (crossover, mutation and selection,
+  from `SPEA2MetaDouble.yaml`) plus the optional `knnNeighborhoodSize` and `knnNormalizeObjectives`,
+  and supports the tree encoding (`SPEA2MetaTree.yaml`, `MetaSPEA2TreeConfiguration.yaml`).
+- **AGE-MOEA**: Run algorithm offers its two default configurations, AGE-MOEA and AGE-MOEA-II, as
+  for the variants of RVEA; the parameter that selects the variant is `replacement` (`agemoea` or
+  `agemoeaII`), also in AGE-MOEA as meta-optimizer.
+- The problems of the WFG family name their arguments as the others (`numberOfPositionParameters`,
+  `numberOfDistanceParameters`, `numberOfObjectives`), so their number of objectives is recognized.
+- The bundled resources come from tag `v2.5` (MaF's reference fronts are still left out, now also
+  the new three-objective ones).
 
 ### Moving to Evolver 2.4
 

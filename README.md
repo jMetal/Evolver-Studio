@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB.svg?logo=python&logoColor=white">
-  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.4" src="https://img.shields.io/badge/Evolver-2.4-blue.svg"></a>
+  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.5" src="https://img.shields.io/badge/Evolver-2.5-blue.svg"></a>
   <img alt="Java 21+" src="https://img.shields.io/badge/java-21%2B-5382A1.svg?logo=openjdk&logoColor=white">
   <a href="https://streamlit.io/"><img alt="Built with Streamlit" src="https://img.shields.io/badge/built%20with-Streamlit-555555.svg?logo=streamlit"></a>
 </p>
@@ -108,7 +108,7 @@ can be run from the app:
 | Level | Algorithms |
 |---|---|
 | Base level | NSGA-II, MOEA/D, SMS-EMOA, PAES (Double, Binary, Permutation); RDE-MOEA (Double, Permutation); NSGA-III, AGE-MOEA, RVEA, SSMOEA (Double) |
-| Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding); NSGA-II, AGE-MOEA, Async NSGA-II, Random Search (tree encoding) |
+| Meta level | NSGA-II, AGE-MOEA, SPEA2, SMPSO, Async NSGA-II, Random Search (flat encoding); NSGA-II, AGE-MOEA, SPEA2, Async NSGA-II, Random Search (tree encoding) |
 
 MOPSO is browsable only, until Evolver's command-line runner supports it. See Evolver's
 [supported algorithms](https://github.com/jMetal/Evolver#supported-algorithms) for the full list.
@@ -119,13 +119,13 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 - Java 21 or newer, on the `PATH`
 - Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF
 
-No Evolver checkout and no Maven: the app downloads the jar of **Evolver 2.4** from Maven Central
+No Evolver checkout and no Maven: the app downloads the jar of **Evolver 2.5** from Maven Central
 the first time. Evolver-Studio has its own version numbers and works with one Evolver release at a
 time:
 
 | Evolver-Studio | Evolver |
 |---|---|
-| 1.0.0 (in preparation) | 2.4 |
+| 1.0.0 (in preparation) | 2.5 |
 
 ## Installation
 
@@ -141,7 +141,7 @@ make env   # creates (or updates) the 'evolver-studio' Conda environment
 make run   # opens Evolver-Studio in your browser
 ```
 
-1. The first time, click **Download Evolver 2.4** in the sidebar (about 130 MB, checksum verified).
+1. The first time, click **Download Evolver 2.5** in the sidebar (about 130 MB, checksum verified).
 2. Open **Tutorials** and start with **S1. A tour of Evolver-Studio**.
 3. To solve a problem right away, open **Run algorithm**, choose a problem (ZDT1, for instance),
    keep NSGA-II with its default configuration and click **Run**.
@@ -184,7 +184,7 @@ with any tool:
 - **"Java was not found on the PATH"**: install Java 21 or newer (for example
   [Temurin](https://adoptium.net/)) and restart the app.
 - **The jar does not download**: check the connection to Maven Central, or download
-  `Evolver-2.4-jar-with-dependencies.jar` by hand into `lib/`.
+  `Evolver-2.5-jar-with-dependencies.jar` by hand into `lib/`.
 - **No PNG/PDF buttons under the charts**: they need Chrome or Chromium; the camera icon of each
   chart still saves it as PNG.
 - **Port 8501 in use**: `streamlit run app.py --server.port 8502`.
