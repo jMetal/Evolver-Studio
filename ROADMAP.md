@@ -243,6 +243,79 @@ Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum
   has no Evolver registry to introspect and stays hand-maintained regardless (see `catalogue.py`'s
   module docstring).
 
+## Docker image (after 1.0)
+
+A container image of Evolver-Studio, so that it runs with one command and no local Python, Conda,
+Java, Evolver jar or Chrome. Decided: after the 1.0 release (with Evolver 3.0), and keeping
+Streamlit.
+
+**Why.** Installation in one command (teaching, workshops, reviewers); reproducibility (the image
+pins Evolver, Java, Python and every dependency, and a paper can cite it, e.g.
+`evolver-studio:1.0-evolver3.0`); long trainings on a server or in the cloud, used from a browser;
+HPC clusters through Apptainer/Singularity (next to Evolver's Slurm scripts for replications,
+E18); CI with the real jar; one image for Linux, macOS (Apple Silicon) and Windows (WSL2).
+
+**Costs.** About 1 GB with Chromium (PNG/PDF export), about 600 MB without; results need a volume;
+Streamlit has no login and Studio starts processes, writes files and loads classes by name, so an
+exposed server needs `localhost` + SSH tunnel, a proxy with authentication, or `st.login` (OIDC);
+Docker Desktop runs in a VM on macOS and Windows; the image is rebuilt at every release.
+
+**Phase D0 — Decisions** (before any code)
+
+- Base image: `python:3.11-slim` + Temurin JRE 21, or `eclipse-temurin:21-jre` + Python.
+- Variants: full (with Chromium) and `-slim` (without), or only the full one.
+- Registry and names: GHCR, `ghcr.io/jmetal/evolver-studio:<studio>` plus
+  `:<studio>-evolver<evolver>` and `:latest`; architectures `linux/amd64` and `linux/arm64`.
+
+**Phase D1 — Prepare the code** (small, no behaviour change outside the container)
+
+- A configurable data directory: `WORKING_DIRECTORY` from an environment variable
+  (`EVOLVER_STUDIO_DATA`, default the repository, as now) in `evolver_studio/evolver_client.py`;
+  everything the runs write (`cli-runner-runs/`, `results/`, `solve-runs/`, `validation-runs/`)
+  goes there.
+- `resources/` reachable from the data directory (the requests' paths are relative to it): a
+  link or copy made at start-up when it is missing.
+- The jar directory configurable too (`JAR_DIRECTORY`), so that the image's jar lives outside the
+  data volume; the sidebar's download button stays for local installs.
+- Tests: the data directory variable, the link to the resources.
+
+**Phase D2 — Image** (`Dockerfile`, `.dockerignore`, `docker-compose.yml`)
+
+- Multi-stage build; `pip install .` (no Conda, smaller image).
+- The jar of `EVOLVER_VERSION` downloaded from Maven Central at build time, its SHA-1 checked (as
+  `download_jar` does); `resources/` copied; Chromium from the distribution for Kaleido.
+- A non-root user; `VOLUME /data`; `EXPOSE 8501`; `tini` as init, so that the detached
+  trainings and studies are reaped; `streamlit run app.py --server.address=0.0.0.0
+  --server.headless=true --browser.gatherUsageStats=false`; a `HEALTHCHECK` on
+  `/_stcore/health`.
+- `docker-compose.yml`: port bound to `127.0.0.1:8501`, a named volume, `cpus` set.
+
+**Phase D3 — Verification**
+
+- Build for both architectures (`docker buildx`); note the image size and the start-up time.
+- In the container: Run algorithm, a short training (and its monitor), a validation study and its
+  analysis, PNG/PDF export, the tutorials that run things (S3, S4, S7, S8).
+- Stop and restart the container: the results are still in the volume and the analysis pages
+  list them; a training running when the container stopped is shown as lost.
+- `pytest` inside the image, with its jar.
+
+**Phase D4 — Documentation**
+
+- README: a *Docker* section (run, the volume, ports, cores, updating); security (localhost by
+  default, SSH tunnel, a proxy with authentication, optional `st.login`); Apptainer for HPC
+  (`apptainer build evolver-studio.sif docker://ghcr.io/...`, port forwarding).
+- CHANGELOG; this file.
+
+**Phase D5 — Publishing** (needs the maintainers' permission on GHCR)
+
+- A GitHub Actions workflow: on a `v*` tag, build both architectures and push to GHCR with the
+  tags of D0; optionally an SBOM and a vulnerability scan.
+- `/bump-evolver` also updates the jar version the image builds with; the release checklist adds
+  "the image is published and starts".
+
+**Later**, if Studio becomes a server for a group: a data directory per user (from `st.user`
+with `st.login`), and limits on the trainings each user may run at once.
+
 ## Use cases considered
 
 Tentative catalogue behind the phases above, grouped by the kind of goal they serve. "Covered by"

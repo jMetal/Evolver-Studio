@@ -33,6 +33,7 @@ from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_problem_selector
 from evolver_studio.problem_catalogue import Problem, problems_with_encoding
+from evolver_studio.problem_form import render_problem_rows
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
 from evolver_studio.runs import RunPhase, find_run_in_progress, mark_cancelled, run_phase
@@ -56,7 +57,6 @@ from evolver_studio.validation_form import (
     PASTED_ALGORITHM_KEY,
     PASTED_CONFIGURATION_KEY,
     POPULATION_KEY,
-    PROBLEM_COLUMNS,
     PROBLEM_ROWS_KEY,
     RUNS_KEY,
     SEED_KEY,
@@ -86,10 +86,6 @@ ENCODINGS = ("Double", "Binary", "Permutation")
 FINISHED_KEY = "validation_finished_study"
 # Validation analysis's selector of the study.
 ANALYSIS_STUDY_KEY = "validation_analysis_study"
-SPACE_COLUMN_HELP = (
-    "Optional: the constructor's arguments, all of them or none, comma-separated "
-    "(e.g. 12, 2 for DTLZ2 with 12 variables and 2 objectives). Explore › Problems lists them."
-)
 
 
 @dataclass(slots=True, frozen=True)
@@ -135,22 +131,9 @@ def _render_problems(catalogue: dict[str, Problem]) -> tuple[str, tuple[StudyPro
     table = problem_table(
         names, catalogue, WORKING_DIRECTORY, st.session_state.get(PROBLEM_ROWS_KEY)
     )
-    edited = st.data_editor(
-        table,
-        column_config={
-            "problem": st.column_config.TextColumn("Problem", disabled=True),
-            "arguments": st.column_config.TextColumn("Arguments", help=SPACE_COLUMN_HELP),
-            "reference_front": st.column_config.TextColumn(
-                "Reference front file",
-                help="The indicators compare each front with it; fronts with a dimension suffix "
-                "(3D) belong to the problem with that number of objectives.",
-            ),
-        },
-        hide_index=True,
-        width="stretch",
-        key=f"validation_problem_table_{encoding}_{'|'.join(names)}",
+    edited = render_problem_rows(
+        table, catalogue, PROBLEM_ROWS_KEY, f"validation_problem_{encoding}", WORKING_DIRECTORY
     )
-    st.session_state[PROBLEM_ROWS_KEY] = edited[list(PROBLEM_COLUMNS)]
     problems, errors = parse_problem_table(edited, catalogue, encoding, WORKING_DIRECTORY)
     for error in errors:
         st.error(error)
