@@ -6,6 +6,7 @@ and a native window (pywebview) shows it. Not part of a release yet.
 ```bash
 python -m venv build/spike-venv
 build/spike-venv/bin/pip install -e . pyinstaller pywebview
+sh packaging/build_jre.sh                    # a reduced Java runtime, carried by the bundle
 build/spike-venv/bin/pyinstaller packaging/evolver-studio.spec --noconfirm \
     --distpath build/dist --workpath build/work
 build/dist/evolver-studio/evolver-studio          # the window
@@ -23,7 +24,7 @@ written inside the bundle; the app copies `resources/` there.
 ## What the spike found
 
 - Packaging the app as it is works: Explore, Run algorithm (Java run, front, figures) in the
-  bundle (about 440 MB, without a JRE or the Evolver jar). No framework change is needed.
+  bundle (about 440 MB, plus 49 MB of Java runtime; the Evolver jar is downloaded on first use). No framework change is needed.
 - `kaleido.mocker` parses `sys.argv` when imported, which aborts PyInstaller's analysis: the spec
   leaves it out.
 - In a frozen app `sys.executable` is the app itself. Kaleido starts Chrome with
@@ -41,6 +42,8 @@ written inside the bundle; the app copies `resources/` there.
 
 ## Not done yet
 
-- A JRE: an app opened from the Finder does not inherit the shell's `PATH`, and macOS's
-  `/usr/bin/java` is only a stub.
+- The Java runtime is built with jlink (`build_jre.sh`) and put first on the server's `PATH`: an
+  app opened from the Finder does not inherit the shell's `PATH`, and macOS's `/usr/bin/java` is
+  only a stub. Checked with an empty environment; the module list is a cautious guess, checked
+  with `DescribeMain` only.
 - Untested: Training, Validation, the tutorials, code signing and notarization, Windows and Linux.
