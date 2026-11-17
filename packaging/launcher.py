@@ -14,6 +14,8 @@ import urllib.request
 from pathlib import Path
 
 HEALTH_TIMEOUT_SECONDS = 60
+# The directory the app writes to (see evolver_studio.evolver_client.DATA_DIRECTORY).
+DATA_DIRECTORY_VARIABLE = "EVOLVER_STUDIO_DATA"
 
 
 def bundle_root() -> Path:
@@ -27,6 +29,16 @@ def free_port() -> int:
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def user_data_directory() -> Path:
+    """Where the packaged app keeps the jar, the runs and the results: the platform's own place."""
+    home = Path.home()
+    if sys.platform == "darwin":
+        return home / "Library" / "Application Support" / "Evolver-Studio"
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "Evolver-Studio"
+    return Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share")) / "evolver-studio"
 
 
 def serve(port: int) -> None:
@@ -62,8 +74,12 @@ def main() -> None:
     import webview
 
     port = free_port()
+    data_directory = os.environ.get(DATA_DIRECTORY_VARIABLE) or str(user_data_directory())
     command = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, __file__]
-    server = subprocess.Popen([*command, "--serve", str(port)])
+    server = subprocess.Popen(
+        [*command, "--serve", str(port)],
+        env={**os.environ, DATA_DIRECTORY_VARIABLE: data_directory},
+    )
     try:
         wait_until_healthy(port)
         webview.create_window("Evolver-Studio", f"http://127.0.0.1:{port}", width=1400, height=900)
