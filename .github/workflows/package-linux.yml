@@ -1,0 +1,72 @@
+name: Package for Linux
+
+# Builds the desktop bundle (see packaging/README.md) on Ubuntu and smoke-tests it without a
+# window. Run by hand from the Actions tab; the bundle is kept as an artifact.
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install the build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pyinstaller "pywebview[qt]"
+
+      - name: Build the Java runtime
+        run: sh packaging/build_jre.sh
+
+      - name: Build the bundle
+        run: pyinstaller packaging/evolver-studio.spec --noconfirm --distpath build/dist --workpath build/work
+
+      - name: Smoke test, the Python side
+        run: |
+          bundle=build/dist/evolver-studio
+          # The server answers.
+          "$bundle/evolver-studio" --serve 8765 > server.log 2>&1 &
+          server=$!
+          for _ in $(seq 1 90); do
+            curl -sf http://127.0.0.1:8765/_stcore/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8765/_stcore/health || { cat server.log; exit 1; }
+          kill "$server"
+          # The executable runs scripts, as Kaleido and the validation worker need.
+          echo 'print("interpreter ok")' > hello.py
+          "$bundle/evolver-studio" hello.py | grep "interpreter ok"
+          # Kaleido draws an image with the Chrome of the runner.
+          cat > image.py <<'PY'
+          import plotly.graph_objects as go
+          from evolver_studio.figure_export import figure_image
+          assert figure_image(go.Figure(), "png").startswith(b"\x89PNG")
+          print("image ok")
+          PY
+          "$bundle/evolver-studio" image.py | grep "image ok"
+
+      - name: Smoke test, the Java side
+        run: |
+          bundle=build/dist/evolver-studio
+          "$bundle/_internal/jre/bin/java" -version
+          url=$(python -c "from evolver_studio.evolver_client import MAVEN_CENTRAL_JAR_URL as u; print(u)")
+          curl -sfL -o evolver.jar "$url"
+          "$bundle/_internal/jre/bin/java" -cp evolver.jar org.uma.evolver.cli.training.DescribeMain | head -c 200
+
+      - name: Archive the bundle
+        run: tar -C build/dist -czf evolver-studio-linux-x86_64.tar.gz evolver-studio
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evolver-studio-linux-x86_64
+          path: evolver-studio-linux-x86_64.tar.gz
