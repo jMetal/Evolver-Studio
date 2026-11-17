@@ -23,16 +23,21 @@ SOLVE_RUNNER_MAIN_CLASS = "org.uma.evolver.cli.solving.SolveRunnerMain"
 DESCRIBE_MAIN_CLASS = "org.uma.evolver.cli.training.DescribeMain"
 
 STUDIO_HOME = Path(__file__).resolve().parent.parent
+# Where the app keeps what it writes (the jar it downloads, the runs and their results): the
+# installation itself, unless this environment variable names another directory. A packaged app
+# needs one, since its installation is read-only; resources/ is then copied there.
+DATA_DIRECTORY_VARIABLE = "EVOLVER_STUDIO_DATA"
+DATA_DIRECTORY = Path(os.environ.get(DATA_DIRECTORY_VARIABLE) or STUDIO_HOME).expanduser()
 # The JVM's working directory. Evolver resolves the relative paths of a training request
 # (resources/referenceFronts/..., resources/weightVectors, the output directory) against it,
 # so it must hold the resources/ directory copied from Evolver.
-WORKING_DIRECTORY = STUDIO_HOME
+WORKING_DIRECTORY = DATA_DIRECTORY
 
 # Evolver release this app is built against (the `v2.5` tag of jMetal/Evolver). Only stable
 # releases: evolver_studio/catalogue.py mirrors this one.
 EVOLVER_VERSION = "2.5"
 JAR_FILE_NAME = f"Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar"
-JAR_DIRECTORY = STUDIO_HOME / "lib"
+JAR_DIRECTORY = DATA_DIRECTORY / "lib"
 MAVEN_CENTRAL_JAR_URL = (
     f"https://repo1.maven.org/maven2/org/uma/jmetal/Evolver/{EVOLVER_VERSION}/{JAR_FILE_NAME}"
 )

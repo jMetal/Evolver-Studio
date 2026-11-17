@@ -8,6 +8,7 @@ resources/SHA256SUMS.
 """
 
 import hashlib
+import shutil
 from pathlib import Path
 
 RESOURCES_DIRECTORY = Path(__file__).resolve().parent.parent / "resources"
@@ -87,3 +88,32 @@ def write_manifest(
         "".join(f"{sha256(resources_directory / name)}  {name}\n" for name in files)
     )
     return len(files)
+
+
+def provision_resources(data_directory: Path, source: Path = RESOURCES_DIRECTORY) -> bool:
+    """Make a data directory hold the resources/ the JVM reads, copying them if it does not.
+
+    The JVM resolves resources/... against its working directory, which is the data directory
+    when the app does not run from its own installation (see EVOLVER_STUDIO_DATA). The files
+    are copied over, never removed: whatever the user added there stays. The manifest is copied
+    last, so an interrupted copy is done again.
+
+    Args:
+        data_directory: The directory whose resources/ is to hold the files.
+        source: The resources/ directory to copy from.
+
+    Returns:
+        True if the files were copied, False if the data directory already held them (or is
+        the installation itself).
+    """
+    target = data_directory / "resources"
+    if target.resolve() == source.resolve():
+        return False
+    manifest, copied_manifest = source / MANIFEST_FILE.name, target / MANIFEST_FILE.name
+    if copied_manifest.is_file() and copied_manifest.read_bytes() == manifest.read_bytes():
+        return False
+    shutil.copytree(
+        source, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns(MANIFEST_FILE.name)
+    )
+    shutil.copy2(manifest, copied_manifest)
+    return True

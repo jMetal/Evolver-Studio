@@ -12,6 +12,8 @@ from pathlib import Path
 
 import streamlit as st
 
+from evolver_studio.bundled_resources import provision_resources
+from evolver_studio.evolver_client import DATA_DIRECTORY
 from evolver_studio.sections import HOME_PAGE, SECTIONS
 
 LOGO_DIRECTORY = Path(__file__).parent / "assets" / "logo"
@@ -26,6 +28,15 @@ st.logo(
     icon_image=str(LOGO_DIRECTORY / "studio-icon.svg"),
     size="large",
 )
+
+
+@st.cache_resource(show_spinner="Copying Evolver's resources to the data directory...")
+def prepare_data_directory() -> None:
+    """Make the data directory hold the resources/ the JVM reads (once per server)."""
+    provision_resources(DATA_DIRECTORY)
+
+
+prepare_data_directory()
 
 pg = st.navigation(
     {
