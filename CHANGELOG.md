@@ -8,6 +8,13 @@ version works with.
 
 Works with Evolver 2.5.
 
+### Data directory
+
+- The `EVOLVER_STUDIO_DATA` environment variable moves what the app writes (the downloaded jar,
+  `cli-runner-runs/`, `results/`, `solve-runs/` and `validation-runs/`) out of its own folder, for
+  an installation that cannot be written to. The `resources/` the runs read are copied there when
+  the app starts and whenever they change, without removing the files you added.
+
 ### Documentation
 
 - The **README** is rewritten for new users: why Evolver-Studio, a gallery of screenshots of the

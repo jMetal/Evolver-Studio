@@ -16,6 +16,10 @@ build/dist/evolver-studio/evolver-studio --serve 8765   # only the server, to op
 installs signal handlers, which need a main thread, and so does the native window) and waits for
 its health endpoint before opening the window.
 
+The launcher points `EVOLVER_STUDIO_DATA` at the platform's user-data directory (for example
+`~/Library/Application Support/Evolver-Studio`), so that the jar, the runs and the results are not
+written inside the bundle; the app copies `resources/` there.
+
 ## What the spike found
 
 - Packaging the app as it is works: Explore, Run algorithm (Java run, front, figures) in the
@@ -32,8 +36,6 @@ its health endpoint before opening the window.
 
 ## Not done yet
 
-- The jar, the runs and the results are written inside the bundle (`STUDIO_HOME` comes from
-  `__file__`): they need a user-data directory.
 - A JRE: an app opened from the Finder does not inherit the shell's `PATH`, and macOS's
   `/usr/bin/java` is only a stub.
 - Untested: Training, Validation, the tutorials, code signing and notarization, Windows and Linux.

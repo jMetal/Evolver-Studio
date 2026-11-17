@@ -179,6 +179,11 @@ with any tool:
 | `solve-runs/` | The runs of *Run algorithm* |
 | `validation-runs/` | The validation studies, with every run's front and indicators |
 
+These folders, and `lib/` with the downloaded jar, are in the app's own folder. Set the
+`EVOLVER_STUDIO_DATA` environment variable to another directory to keep them there instead (for an
+installation you cannot write to, or a folder you back up): the app copies the `resources/` the
+runs read into it the first time, and again when a new version changes them, leaving what you added.
+
 ## Troubleshooting
 
 - **"Java was not found on the PATH"**: install Java 21 or newer (for example

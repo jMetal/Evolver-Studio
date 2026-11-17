@@ -147,7 +147,8 @@ At runtime the app needs Java ≥ 21 and Evolver's release jar (`EVOLVER_VERSION
 `evolver_studio/evolver_client.py`, currently 2.5), which the sidebar downloads from Maven Central
 into `lib/`. No Evolver checkout is needed: parameter spaces and meta-optimizer configurations are
 read from the jar, and the reference fronts/weight vectors training runs need are copied into
-`resources/` (the JVM runs with this repo's root as working directory). Set `EVOLVER_JAR` to run
+`resources/` (the JVM runs with this repo's root as working directory, or with the
+directory `EVOLVER_STUDIO_DATA` names, which then gets a copy of `resources/`). Set `EVOLVER_JAR` to run
 against a locally built Evolver jar instead — e.g. one built from Evolver's `develop` branch, to
 run the drift-detection tests against changes not yet released. Tests that need the jar are skipped
 without it. `make sync-resources` refreshes `resources/` (and its `SHA256SUMS` manifest) from the
