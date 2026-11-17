@@ -16,7 +16,17 @@ datas = [
 binaries = []
 # The pages are run by Streamlit as scripts, so PyInstaller cannot see what they import.
 hiddenimports = collect_submodules("evolver_studio")
-for package in ("streamlit", "plotly", "kaleido", "moocore", "scipy", "pandas", "webview"):
+for package in (
+    "streamlit",
+    "plotly",
+    "kaleido",
+    # Kaleido runs Chrome through a script of this package, so it must be a file on disk.
+    "choreographer",
+    "moocore",
+    "scipy",
+    "pandas",
+    "webview",
+):
     # kaleido.mocker parses sys.argv when imported, which aborts the analysis.
     package_datas, package_binaries, package_hidden = collect_all(
         package, filter_submodules=lambda name: "mocker" not in name
