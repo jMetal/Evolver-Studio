@@ -41,6 +41,16 @@ def user_data_directory() -> Path:
     return Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share")) / "evolver-studio"
 
 
+def bundled_java_directories() -> list[str]:
+    """The bin/ of the Java runtime inside the app, if it carries one, to go first on the PATH.
+
+    An app opened from the Finder does not get the shell's PATH, so it cannot rely on the
+    user's Java.
+    """
+    java = bundle_root() / "jre" / "bin"
+    return [str(java)] if java.is_dir() else []
+
+
 def serve(port: int) -> None:
     from streamlit.web import bootstrap
 
@@ -80,7 +90,11 @@ def main() -> None:
     command = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, __file__]
     server = subprocess.Popen(
         [*command, "--serve", str(port)],
-        env={**os.environ, DATA_DIRECTORY_VARIABLE: data_directory},
+        env={
+            **os.environ,
+            DATA_DIRECTORY_VARIABLE: data_directory,
+            "PATH": os.pathsep.join([*bundled_java_directories(), os.environ.get("PATH", "")]),
+        },
     )
     try:
         wait_until_healthy(port)

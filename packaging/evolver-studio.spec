@@ -13,6 +13,9 @@ datas = [
     (os.path.join(ROOT, "resources"), "resources"),
     (os.path.join(ROOT, "evolver_studio", "tutorial_data"), "evolver_studio/tutorial_data"),
 ]
+# The Java runtime made by packaging/build_jre.sh, if it was built.
+if os.path.isdir(os.path.join(ROOT, "build", "jre")):
+    datas.append((os.path.join(ROOT, "build", "jre"), "jre"))
 binaries = []
 # The pages are run by Streamlit as scripts, so PyInstaller cannot see what they import.
 hiddenimports = collect_submodules("evolver_studio")
