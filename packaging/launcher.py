@@ -73,6 +73,8 @@ def wait_until_healthy(port: int) -> None:
 def main() -> None:
     import webview
 
+    # The charts' PNG/PDF buttons are download links, which the window only follows otherwise.
+    webview.settings["ALLOW_DOWNLOADS"] = True
     port = free_port()
     data_directory = os.environ.get(DATA_DIRECTORY_VARIABLE) or str(user_data_directory())
     command = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, __file__]
