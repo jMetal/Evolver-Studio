@@ -12,6 +12,9 @@ import plotly.graph_objects as go
 import streamlit as st
 
 PNG_SCALE = 2
+# Kaleido sometimes runs its script in another JavaScript context of Chrome than the page's
+# ("kaleido_scopes is not defined"), often in a packaged app: drawing the chart again works.
+IMAGE_ATTEMPTS = 4
 # The size of a chart that does not set its own, in pixels.
 DEFAULT_WIDTH = 1000
 DEFAULT_HEIGHT = 600
@@ -27,12 +30,20 @@ def figure_image(figure: go.Figure, image_format: str) -> bytes:
     Returns:
         The image.
     """
-    return figure.to_image(
-        format=image_format,
-        width=figure.layout.width or DEFAULT_WIDTH,
-        height=figure.layout.height or DEFAULT_HEIGHT,
-        scale=PNG_SCALE if image_format == "png" else 1,
-    )
+    from kaleido.errors import JavascriptError
+
+    arguments = {
+        "format": image_format,
+        "width": figure.layout.width or DEFAULT_WIDTH,
+        "height": figure.layout.height or DEFAULT_HEIGHT,
+        "scale": PNG_SCALE if image_format == "png" else 1,
+    }
+    for _ in range(IMAGE_ATTEMPTS - 1):
+        try:
+            return figure.to_image(**arguments)
+        except JavascriptError:
+            continue
+    return figure.to_image(**arguments)
 
 
 @st.cache_resource(show_spinner=False)
