@@ -95,6 +95,7 @@ algorithm*, to be used on a new problem.
 | S6 | Analyzing training results | Meta-optimization | E7 |
 | S7 | Validating a configuration | Meta-optimization | E8 |
 | S8 | Analyzing a validation | Meta-optimization | E8 |
+| S9 | Problems with constraints | Both | E12 |
 
 E1, E2… are the [tutorials of Evolver's documentation](https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/index.rst),
 which cover the same ground with Java code. More tutorials are planned (comparing configurations,

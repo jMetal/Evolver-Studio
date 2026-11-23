@@ -6,6 +6,7 @@ import streamlit as st
 
 from evolver_studio import (
     tutorial_analysis,
+    tutorial_constraints,
     tutorial_customizing_training,
     tutorial_first_training,
     tutorial_parameter_spaces,
@@ -39,6 +40,7 @@ TUTORIAL_STEPS = {
     "analyzing_training_results": tutorial_analysis.STEPS,
     "validating_a_configuration": tutorial_validation.STEPS,
     "analyzing_a_validation": tutorial_validation_analysis.STEPS,
+    "problems_with_constraints": tutorial_constraints.STEPS,
 }
 
 

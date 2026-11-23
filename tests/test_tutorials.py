@@ -35,6 +35,7 @@ class TestTutorialsCatalogue:
             "analyzing_training_results",
             "validating_a_configuration",
             "analyzing_a_validation",
+            "problems_with_constraints",
         ]
 
     def test_should_identify_every_tutorial_by_a_distinct_topic(self):

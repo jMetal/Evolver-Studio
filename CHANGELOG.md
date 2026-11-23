@@ -93,6 +93,11 @@ Works with Evolver 2.7.
 
 ### Tutorials
 
+- **Tutorial S9, *Problems with constraints*** (pairs with E12): the constraint-handling techniques;
+  how ICMOP measures a run that may find no feasible solution; NSGA-II without a technique, with
+  cdp and with push and pull on DASCMOP2 and DASCMOP5; and a training that chooses the technique,
+  with how it reaches the configurations that find feasible solutions. Its text is computed from
+  the reader's runs.
 - **Tutorial S1, *A tour of Evolver-Studio*** (pairs with E4): how the app connects to Evolver (Java
   and the jar, checked live), what Evolver offers (read from the jar's manifest), what each page is
   for, and where runs and results are kept.

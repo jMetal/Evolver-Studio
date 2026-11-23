@@ -173,6 +173,16 @@ TUTORIALS: tuple[Tutorial, ...] = (
         ("E8",),
     ),
     Tutorial(
+        "problems_with_constraints",
+        "S9",
+        "Problems with constraints",
+        _MID,
+        "Both",
+        "What a constraint-handling technique does, how a run is measured when it may find no "
+        "feasible solution, and a training that chooses the technique.",
+        ("E12",),
+    ),
+    Tutorial(
         "your_own_problem",
         None,
         "Solving your own problem",
