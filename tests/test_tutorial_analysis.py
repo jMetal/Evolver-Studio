@@ -30,7 +30,7 @@ class TestWalkThrough:
         if not jar_path().is_file():
             pytest.skip(f"Evolver jar not found at {jar_path()}")
         app = AppTest.from_file(str(APP_SCRIPT), default_timeout=60).run()
-        app.switch_page("pages/tutorials.py").run()
+        app.switch_page("app_pages/tutorials.py").run()
         key = "tutorial_open_analyzing_training_results"
         next(button for button in app.button if button.key == key).click().run()
         return app

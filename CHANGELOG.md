@@ -18,6 +18,11 @@ Works with Evolver 2.7.
   2.7, which differ from those of 2.5 with the same seed, and the tutorials name those of Evolver
   with their new numbers.
 
+### Fixes
+
+- A page opened **by its URL** before any other showed Streamlit's own sidebar instead of the menu:
+  the folder of the pages is now `app_pages/`.
+
 ### Explore
 
 - **Problems** shows the number of constraints of each problem and filters those with or without

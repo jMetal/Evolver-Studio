@@ -188,7 +188,7 @@ def _render_next_steps(jar: Path) -> None:
         "is across repeated trainings, and how the configurations do on problems it did not "
         "see, are questions for *Validation*, and for several trainings with different seeds."
     )
-    st.page_link("pages/training_analysis.py", label="Open Training analysis", icon="🔍")
+    st.page_link("app_pages/training_analysis.py", label="Open Training analysis", icon="🔍")
     st.button(
         "All the tutorials",
         icon="🎓",

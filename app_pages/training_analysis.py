@@ -37,7 +37,7 @@ if not trainings:
         "There is no finished training run to analyze: the ones you run in Training are kept "
         "and listed here."
     )
-    st.page_link("pages/training.py", label="Go to Training", icon="🏋️")
+    st.page_link("app_pages/training.py", label="Go to Training", icon="🏋️")
     st.stop()
 
 training = st.selectbox("Training run", trainings, format_func=lambda t: t.label, key=SELECTION_KEY)

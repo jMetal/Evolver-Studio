@@ -18,7 +18,7 @@ from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.runs import RunPhase, run_phase
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "solve.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "solve.py"
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
 NSGAII_DEFAULT = (
     "--algorithmResult population --createInitialSolutions default "

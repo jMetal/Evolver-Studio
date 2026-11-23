@@ -476,7 +476,7 @@ def _render_finished_study() -> None:
     if st.button("Analyze it in Validation analysis", icon="🔬", type="primary"):
         st.session_state[ANALYSIS_STUDY_KEY] = study_id
         st.session_state.pop(FINISHED_KEY, None)
-        st.switch_page("pages/validation_analysis.py")
+        st.switch_page("app_pages/validation_analysis.py")
 
 
 st.title("Validation")
@@ -499,7 +499,7 @@ else:
     _render_finished_study()
 _render_form(catalogue, jar, can_run=in_progress is None)
 st.page_link(
-    "pages/validation_analysis.py",
+    "app_pages/validation_analysis.py",
     label="The results of the studies are in Validation analysis",
     icon="🔬",
 )

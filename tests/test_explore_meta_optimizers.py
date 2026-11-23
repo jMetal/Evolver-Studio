@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 
 from evolver_studio.evolver_client import jar_path
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore_meta_optimizers.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "explore_meta_optimizers.py"
 META_KEY = "explorer_meta_algorithm"
 
 

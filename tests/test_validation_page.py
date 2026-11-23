@@ -29,7 +29,7 @@ def _open_page() -> AppTest:
     """The page, through the app so that its links to other pages resolve."""
     return (
         AppTest.from_file(str(APP_SCRIPT), default_timeout=60)
-        .switch_page("pages/validation.py")
+        .switch_page("app_pages/validation.py")
         .run()
     )
 
@@ -240,7 +240,7 @@ class TestRunAStudy:
         while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
             assert time.monotonic() < deadline, "the study did not finish"
             time.sleep(0.3)
-        app.switch_page("pages/validation_analysis.py")
+        app.switch_page("app_pages/validation_analysis.py")
         app.session_state["validation_analysis_study"] = study_dir.name
         app.run()
 
@@ -326,7 +326,7 @@ class TestProblemsWithConstraints:
         while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
             assert time.monotonic() < deadline, "the study did not finish"
             time.sleep(0.3)
-        app.switch_page("pages/validation_analysis.py")
+        app.switch_page("app_pages/validation_analysis.py")
         app.session_state["validation_analysis_study"] = study_dir.name
         app.run()
 

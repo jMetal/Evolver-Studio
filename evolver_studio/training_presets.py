@@ -100,4 +100,4 @@ def open_training(state: dict[str, object]) -> None:
     """
     st.session_state.pop(TRAINING_SET_ROWS_KEY, None)
     st.session_state.update(state)
-    st.switch_page("pages/training.py")
+    st.switch_page("app_pages/training.py")

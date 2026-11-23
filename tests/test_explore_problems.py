@@ -9,7 +9,7 @@ from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
 from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.result import Ok
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore_problems.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "explore_problems.py"
 ENCODING_KEY = "explore_problems_encoding"
 CONSTRAINTS_KEY = "explore_problems_constraints"
 FAMILY_KEY = "explore_problems_family"

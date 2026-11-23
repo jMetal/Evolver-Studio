@@ -34,7 +34,7 @@ if not studies:
         "There is no validation study to analyze: the ones you run in Validation are kept and "
         "listed here."
     )
-    st.page_link("pages/validation.py", label="Go to Validation", icon="✅")
+    st.page_link("app_pages/validation.py", label="Go to Validation", icon="✅")
     st.stop()
 
 if st.session_state.get(STUDY_KEY) not in studies:

@@ -107,7 +107,9 @@ def _render_what_evolver_offers(jar: Path) -> None:
         "- **Problems** are the benchmark and real-world problems to solve or to train on.\n"
         "- **Quality indicators** measure how good a front is; a training minimizes them."
     )
-    st.page_link("pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬")
+    st.page_link(
+        "app_pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬"
+    )
 
 
 def _render_pages(jar: Path) -> None:

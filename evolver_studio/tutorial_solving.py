@@ -341,7 +341,7 @@ def _open_in_run_algorithm(request: SolveRequest, jar: Path) -> None:
     )
     if state is not None:
         st.session_state.update(state)
-    st.switch_page("pages/solve.py")
+    st.switch_page("app_pages/solve.py")
 
 
 def _render_outcome(prepared: PreparedRun, run_dir: Path, show_front: bool) -> None:
@@ -420,7 +420,7 @@ def _render_introduction(jar: Path) -> None:
         f"The runs of this tutorial take a few seconds or less each. Timings measured on: "
         f"{TIMINGS_MEASURED_ON}."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
 
 
 def _render_choosing_a_problem(jar: Path) -> None:
@@ -443,7 +443,7 @@ def _render_choosing_a_problem(jar: Path) -> None:
     )
     if catalogue is None:
         st.info("This needs an Evolver that describes its problems (2.4 or later).")
-        st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
+        st.page_link("app_pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
         return
     shown = render_filters(catalogue, f"{KEY_PREFIX}_problems")
     render_table(shown, len(catalogue), f"{KEY_PREFIX}_problems_table")
@@ -469,7 +469,7 @@ def _render_choosing_a_problem(jar: Path) -> None:
             )
         elif answer is not None:
             st.error("Not quite: look at the *Objectives* column of DTLZ2 in the listing.")
-    st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
+    st.page_link("app_pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
 
 
 def _render_default_run(jar: Path) -> None:
@@ -585,7 +585,7 @@ def _render_other_configuration(jar: Path) -> None:
         "the ✏️ that marks each changed parameter and the count of parameters changed. "
         "**Reset to the default configuration** undoes everything."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
     st.markdown("Or run the prepared one here:")
     other = render_prepared_run(OTHER_ON_ZDT1, jar, show_front=False)
     standard = remembered_run(DEFAULT_ON_ZDT1)
@@ -713,7 +713,7 @@ def _render_next_steps(jar: Path) -> None:
         "problem; running your own problem and comparing configurations rigorously come in "
         "later tutorials."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
     st.button(
         "All the tutorials",
         icon="🎓",

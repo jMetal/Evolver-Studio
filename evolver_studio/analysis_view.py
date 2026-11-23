@@ -126,7 +126,7 @@ def render_configurations(training: FinishedTraining, jar: Path, hand_off: bool 
             st.warning("Validation does not offer this algorithm.")
         else:
             st.session_state.update(state)
-            st.switch_page("pages/validation.py")
+            st.switch_page("app_pages/validation.py")
     _render_run_it(training, chosen, jar, columns[2])
 
 
@@ -156,7 +156,7 @@ def _render_run_it(training: FinishedTraining, chosen, jar: Path, column) -> Non
             st.warning("Run algorithm cannot take this configuration or this problem.")
         else:
             st.session_state.update(state)
-            st.switch_page("pages/solve.py")
+            st.switch_page("app_pages/solve.py")
 
 
 def _space_of(training: FinishedTraining, jar: Path) -> list[ParameterSpec] | None:

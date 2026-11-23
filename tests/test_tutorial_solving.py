@@ -95,7 +95,7 @@ class TestTutorialS3WalkThrough:
         (tmp_path / "resources").symlink_to(RESOURCES)
         monkeypatch.setattr(evolver_client, "WORKING_DIRECTORY", tmp_path)
         app = AppTest.from_file(str(APP_SCRIPT), default_timeout=120).run()
-        app.switch_page("pages/tutorials.py").run()
+        app.switch_page("app_pages/tutorials.py").run()
         app.button(key="tutorial_open_solving").click().run()
         return app
 

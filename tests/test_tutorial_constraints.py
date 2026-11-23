@@ -30,7 +30,7 @@ def working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _open() -> AppTest:
     app = AppTest.from_file(str(APP_SCRIPT), default_timeout=180).run()
-    app.switch_page("pages/tutorials.py").run()
+    app.switch_page("app_pages/tutorials.py").run()
     app.button(key="tutorial_open_problems_with_constraints").click().run()
     return app
 
@@ -123,7 +123,7 @@ class TestTraining:
         for key, value in training_form_state().items():
             app.session_state[key] = value
         app.session_state["train_meta_evals"] = 150
-        app.switch_page("pages/training.py").run()
+        app.switch_page("app_pages/training.py").run()
         assert not app.exception and not app.error
 
         # Act

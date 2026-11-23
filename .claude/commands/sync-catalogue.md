@@ -58,7 +58,7 @@ algorithm's space or a meta-level one).
 - `evolver_studio/catalogue.py`: the entries above, with the one-line comment naming the Java
   class(es) each entry mirrors, as the existing ones do; the module docstring's list of runnable
   algorithms.
-- `pages/training.py`: if a newly runnable algorithm needs extra configuration
+- `app_pages/training.py`: if a newly runnable algorithm needs extra configuration
   (`required_extra_config_keys`), check that the page asks for it (it does for
   `weightVectorFilesDirectory`; anything else needs a new input).
 - `tests/test_catalogue.py`: the tests that pin exact sets (runnable base algorithms, wired

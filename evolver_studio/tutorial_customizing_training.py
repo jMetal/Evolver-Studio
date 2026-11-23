@@ -309,7 +309,7 @@ def _render_next_steps(jar: Path) -> None:
         "the test in **Validation**: tutorials *Analyzing training results* and *Validating a "
         "configuration*."
     )
-    st.page_link("pages/training.py", label="Open Training", icon="🏋️")
+    st.page_link("app_pages/training.py", label="Open Training", icon="🏋️")
     st.button(
         "All the tutorials",
         icon="🎓",

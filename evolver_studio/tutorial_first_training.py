@@ -281,7 +281,7 @@ def _render_next_steps(jar: Path) -> None:
         "And go on reading what a training leaves, in **Training analysis**: the tutorial "
         "*Analyzing training results* does it step by step."
     )
-    st.page_link("pages/training_analysis.py", label="Open Training analysis", icon="📊")
+    st.page_link("app_pages/training_analysis.py", label="Open Training analysis", icon="📊")
     st.button(
         "Go on to Analyzing training results",
         icon="📊",

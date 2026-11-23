@@ -1,6 +1,9 @@
 """Evolver-Studio entrypoint: navigation shell over the app's sections.
 
-Each page is its own script under pages/ (Streamlit's st.navigation model —
+The folder of the pages is not called pages/, which Streamlit would serve by itself, without this
+script and so without the menu, when the first thing opened is the URL of a page.
+
+Each page is its own script under app_pages/ (Streamlit's st.navigation model —
 nothing at Python module level survives between pages, only st.session_state
 does). The home page leads to the others, which are grouped (see
 evolver_studio/sections.py) by purpose: Explore (what is available), Solve

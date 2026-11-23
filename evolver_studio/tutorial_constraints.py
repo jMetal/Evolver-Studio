@@ -210,7 +210,7 @@ def _render_introduction(jar: Path) -> None:
         "The sets of runs of this tutorial take up to 10 seconds each, and its training about "
         f"three minutes with 8 cores. Timings measured on: {TIMINGS_MEASURED_ON}."
     )
-    st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
+    st.page_link("app_pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
 
 
 def _render_techniques(jar: Path) -> None:
@@ -244,7 +244,7 @@ def _render_techniques(jar: Path) -> None:
         st.success("Right: with cdp a feasible solution is always better than an infeasible one.")
     elif answer is not None:
         st.error("Not quite: cdp compares the violations only between two infeasible solutions.")
-    st.page_link("pages/explore_base_algorithms.py", label="Open Base algorithms", icon="🧬")
+    st.page_link("app_pages/explore_base_algorithms.py", label="Open Base algorithms", icon="🧬")
 
 
 def _render_measuring(jar: Path) -> None:
@@ -453,8 +453,8 @@ def _render_next_steps(jar: Path) -> None:
         "- In **Validation**, compare your tuned configuration with other algorithms on problems "
         "*with constraints*, or on *both* kinds."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
-    st.page_link("pages/validation.py", label="Open Validation", icon="✅")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/validation.py", label="Open Validation", icon="✅")
     st.button(
         "All the tutorials",
         icon="🎓",

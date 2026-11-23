@@ -14,7 +14,7 @@ from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.runs import RunPhase, run_phase
 from evolver_studio.training_runs import read_training
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "training.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "training.py"
 
 
 @pytest.fixture

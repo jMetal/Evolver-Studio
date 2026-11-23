@@ -384,7 +384,7 @@ def _validator(run_dir: Path) -> Callable[[TrainedConfiguration], None]:
             st.warning("Validation does not offer this algorithm.")
             return
         st.session_state.update(state)
-        st.switch_page("pages/validation.py")
+        st.switch_page("app_pages/validation.py")
 
     return validate
 

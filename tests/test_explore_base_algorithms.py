@@ -9,7 +9,7 @@ from evolver_studio.catalogue import is_older_than_catalogue
 from evolver_studio.evolver_client import jar_path
 from evolver_studio.resource_files import jar_evolver_version
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore_base_algorithms.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "explore_base_algorithms.py"
 ALGORITHM_KEY = "explorer_algorithm"
 BASE_FILTER_KEY = "explorer_base_filter"
 

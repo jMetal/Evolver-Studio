@@ -325,7 +325,7 @@ def _render_study(jar: Path) -> None:
         help="Fills the form of Validation with this study, to make it by hand.",
     ):
         st.session_state.update(form_state_from_study(study))
-        st.switch_page("pages/validation.py")
+        st.switch_page("app_pages/validation.py")
 
 
 @_needs_problem_catalogue
@@ -641,7 +641,7 @@ def _render_next_steps(jar: Path) -> None:
         "The configurations of your own trainings are offered by Validation directly: choose "
         "*A training run* and one of the configurations of its final front."
     )
-    st.page_link("pages/validation.py", label="Open Validation", icon="✅")
+    st.page_link("app_pages/validation.py", label="Open Validation", icon="✅")
     st.markdown(
         "**Next:** the tutorial *Analyzing a validation* reads this same study in Validation "
         "analysis, tab by tab: the corrections for many comparisons, effect sizes, the ranking, "

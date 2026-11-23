@@ -91,7 +91,7 @@ below; revisit and reorder as real usage surfaces new ones.
 - **A running label instead of a live view**: Run algorithm no longer offers the
   progress bar and live front modes, which a benchmark run, over in a second or two, rarely gave
   time to see. A run in progress shows a blinking label with the evaluation it is at (its status is
-  updated every 1000 evaluations, `pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
+  updated every 1000 evaluations, `app_pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
   `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
   `frontDelayMillis`, unused by the page.
 
@@ -129,7 +129,7 @@ below; revisit and reorder as real usage surfaces new ones.
   selector as base algorithms (they were a list of expanders). Quality indicators come from
   `catalogue.QUALITY_INDICATORS`, checked against the manifest's `indicators`.
 
-- **Run algorithm (solving track, first version)**: `pages/solve.py` builds a `cli.solving` request
+- **Run algorithm (solving track, first version)**: `app_pages/solve.py` builds a `cli.solving` request
   in five sections that appear as the previous one is chosen: problem (and its reference front,
   found by `problems.reference_front_candidates`), algorithm and encoding, configuration, budget
   (population, evaluations, independent runs, seed, indicators) and Run. The configuration starts
@@ -146,9 +146,9 @@ below; revisit and reorder as real usage surfaces new ones.
   is at (`progress.running_label`, from `statusFrequency` with Evolver 2.3 or later).
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
-  `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
-  `pages/tutorials.py`).
-- **Home page**: the app opens on `pages/home.py`, which presents Evolver-Studio's two uses and
+  `app_pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
+  `app_pages/tutorials.py`).
+- **Home page**: the app opens on `app_pages/home.py`, which presents Evolver-Studio's two uses and
   shows a card for each page (its section, what it does, whether it is available or coming soon,
   and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
   cards are built from the same list of pages (`evolver_studio/sections.py`).
@@ -196,7 +196,7 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
 
 ## Phase 3 — Analysis layer
 
-First version shipped (`pages/training_analysis.py`, *Training analysis*): the history of finished trainings, and for one of them
+First version shipped (`app_pages/training_analysis.py`, *Training analysis*): the history of finished trainings, and for one of them
 its summary, convergence, front, population, final-front configurations (to download or send to
 Validation / Run algorithm) and a parameter analysis against the default configuration.
 
@@ -204,14 +204,14 @@ Validation / Run algorithm) and a parameter analysis against the default configu
   analysis-layer goal, not started yet).
 
 Meta-optimization has four steps, a page each: Training, Training analysis, Validation and
-**Validation analysis** (`pages/validation_analysis.py`, `evolver_studio/validation_view.py`): its
+**Validation analysis** (`app_pages/validation_analysis.py`, `evolver_studio/validation_view.py`): its
 tabs Verdict, Wilcoxon, Effect size, Ranking, Bayesian, Distributions, Fronts, Attainment,
 Indicators, Cost and Runs & details (`validation_stats.py`, `attainment.py`, `latex_tables.py`;
 the tests checked against SAES and baycomp, without depending on them).
 
 ## Phase 4 — Validation runs
 
-First version shipped (`pages/validation.py`, with the Evolver 2.4 sync): a study compares a
+First version shipped (`app_pages/validation.py`, with the Evolver 2.4 sync): a study compares a
 tuned configuration, the pivot (from a finished training run's `VAR_CONF.txt`, or pasted), with the
 default configurations of Evolver's algorithms for the encoding of the problems. It needs no change
 in Evolver: a study is a `cli.solving` request per algorithm and problem
