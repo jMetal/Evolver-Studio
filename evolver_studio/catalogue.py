@@ -653,6 +653,17 @@ def quality_indicator(name: str) -> QualityIndicator | None:
     return next((i for i in QUALITY_INDICATORS if name in (i.registry_name, i.short_name)), None)
 
 
+def configuration_handles_constraints(configuration: str) -> bool:
+    """Whether a configuration says how it handles constraints, and so belongs to a parameter space
+    for problems with constraints.
+
+    Args:
+        configuration: The configuration, "--parameter value ...".
+    """
+    words = configuration.split()
+    return any(f"--{parameter}" in words for parameter in CONSTRAINT_HANDLING_PARAMETERS)
+
+
 def is_maximized(name: str) -> bool:
     """Whether higher values of an indicator are better; False for an unknown one.
 
@@ -668,9 +679,15 @@ def evolver_indicators() -> tuple[QualityIndicator, ...]:
     return tuple(i for i in QUALITY_INDICATORS if not i.computed_by_studio)
 
 
-def validation_indicators() -> tuple[QualityIndicator, ...]:
-    """The quality indicators Validation offers."""
-    return tuple(i for i in QUALITY_INDICATORS if i.in_validation)
+def validation_indicators(constrained: bool = False) -> tuple[QualityIndicator, ...]:
+    """The quality indicators Validation offers.
+
+    Args:
+        constrained: Whether the study has problems with constraints, which have their own.
+    """
+    return tuple(
+        i for i in QUALITY_INDICATORS if i.in_validation and (constrained or not i.for_constraints)
+    )
 
 
 def is_older_than_catalogue(version: str) -> bool:

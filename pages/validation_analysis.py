@@ -11,9 +11,10 @@ import streamlit as st
 
 from evolver_studio import validation_view
 from evolver_studio.app_state import require_evolver_jar
+from evolver_studio.catalogue import quality_indicator
 from evolver_studio.evolver_client import WORKING_DIRECTORY
 from evolver_studio.runs import RunPhase, run_phase
-from evolver_studio.validation import collect_runs, list_studies
+from evolver_studio.validation import collect_runs, feasibility, list_studies
 from evolver_studio.validation_runner import VALIDATION_RUNS_DIRECTORY_NAME
 from evolver_studio.validation_stats import indicator_names
 
@@ -78,9 +79,23 @@ st.caption(
     f"pivot **{pivot}** · {indicator}: {validation_view.direction(indicator)}"
 )
 
-tabs = iter(st.tabs(list(validation_view.TAB_NAMES)))
+feasible = feasibility(study.directory)
+if not feasible.empty and not feasible["feasible"].all():
+    chosen = quality_indicator(indicator)
+    if chosen is not None and not chosen.for_constraints and not chosen.computed_by_studio:
+        st.warning(
+            f"Some runs found no feasible solution, and {indicator} measures them as if their "
+            "solutions were feasible: prefer ICMOP or CEP, and see the Feasibility tab."
+        )
+names = list(validation_view.TAB_NAMES)
+if not feasible.empty:
+    names.insert(1, validation_view.FEASIBILITY_TAB)
+tabs = iter(st.tabs(names))
 with next(tabs):
     validation_view.render_verdict(runs, pivot, correction)
+if not feasible.empty:
+    with next(tabs):
+        validation_view.render_feasibility(feasible)
 with next(tabs):
     validation_view.render_wilcoxon(runs, indicator, pivot, study_id, correction)
 with next(tabs):

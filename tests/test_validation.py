@@ -11,6 +11,7 @@ from evolver_studio.validation import (
     ValidationStudy,
     collect_runs,
     default_contenders,
+    feasibility,
     list_studies,
     plan_jobs,
     read_manifest,
@@ -290,6 +291,15 @@ class TestDefaultContenders:
                 "PAES",
             ]
 
+    def test_should_offer_the_defaults_that_handle_constraints(self):
+        # Act
+        contenders = default_contenders("Double", self._read, constrained=True)
+
+        # Assert: RVEA has a single variant for them, and RDE-MOEA has a default
+        names = [c.name for c in contenders]
+        assert names.count("RVEA") == 1 and "RVEA*" not in names and "RDE-MOEA" in names
+        assert all("Constrained" in c.configuration for c in contenders)
+
     def test_should_take_the_first_line_of_the_configuration_file(self):
         # Act
         nsgaii = default_contenders("Double", self._read)[0]
@@ -346,3 +356,76 @@ class TestStudyIsWritten:
     def test_should_not_recognize_a_directory_without_a_study(self, working_directory: Path):
         # Act / Assert
         assert not study_is_written(_study(), working_directory / "nothing", working_directory)
+
+
+class TestProblemsWithConstraints:
+    def test_should_run_each_configuration_with_its_own_parameter_space(
+        self, working_directory: Path, tmp_path: Path
+    ):
+        # Arrange
+        contenders = (
+            Contender("A", "NSGA-II", "--constraintHandling cdp --crossover SBX"),
+            Contender("B", "MOEAD", "--subproblemUpdateCriterion feasibilityRules"),
+            Contender("C", "NSGA-II", NSGAII_DEFAULT),
+        )
+
+        # Act
+        jobs, _ = plan_jobs(
+            _study(contenders=contenders, pivot="A"), tmp_path / "s", working_directory
+        )
+
+        # Assert
+        assert [job.request.yaml_parameter_space_file for job in jobs] == [
+            "NSGAIIDoubleConstrained.yaml",
+            "MOEADDoubleConstrained.yaml",
+            "NSGAIIDouble.yaml",
+        ]
+
+    @pytest.fixture
+    def study_directory(self, working_directory: Path) -> Path:
+        """Job 1, with a run that has a feasible solution and one that has none; job 2, on a
+        problem without constraints."""
+        directory = working_directory / "validation-runs" / "x"
+        write_study(_study(runs=2, indicators=("Hypervolume",)), directory, working_directory)
+        output = directory / "jobs" / "001" / "output"
+        for run, violations in ((1, "0.0\n3.0\n"), (2, "2.0\n3.0\n")):
+            (output / f"run-{run}").mkdir(parents=True)
+            (output / f"run-{run}" / "FUN.csv").write_text("0.5,0.5\n0.0,0.0\n")
+            (output / f"run-{run}" / "CV.csv").write_text(violations)
+        (output / "INDICATORS.csv").write_text("Run,Seed,TimeMs\n1,1,10\n2,2,10\n")
+        return directory
+
+    def test_should_tell_the_runs_that_found_feasible_solutions(self, study_directory: Path):
+        # Act
+        table = feasibility(study_directory)
+
+        # Assert
+        assert table["feasible"].tolist() == [True, False]
+        assert table["violation"].tolist() == [0.0, 2.0]
+
+    def test_should_measure_only_the_feasible_solutions_with_the_hypervolume(
+        self, study_directory: Path, working_directory: Path
+    ):
+        # Act
+        runs = collect_runs(study_directory, working_directory)
+
+        # Assert: the infeasible (0, 0) would have the hypervolume of the whole space
+        assert runs["HV"].tolist() == [pytest.approx(0.25), 0.0]
+
+    def test_should_read_only_the_feasible_front(self, study_directory: Path):
+        # Act
+        manifest = read_manifest(study_directory)
+        first = read_study_front(study_directory, manifest, "NSGA-II (tuned)", "ZDT1", 1)
+        second = read_study_front(study_directory, manifest, "NSGA-II (tuned)", "ZDT1", 2)
+
+        # Assert
+        assert first is not None and first["f1"].tolist() == [0.5]
+        assert second is None
+
+    def test_should_have_no_feasibility_without_constraints(self, working_directory: Path):
+        # Arrange
+        directory = working_directory / "validation-runs" / "y"
+        write_study(_study(), directory, working_directory)
+
+        # Act / Assert
+        assert feasibility(directory).empty

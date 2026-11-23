@@ -20,7 +20,12 @@ from evolver_studio.app_state import (
     require_evolver_jar,
     warn_if_jar_older_than_catalogue,
 )
-from evolver_studio.catalogue import BASE_ALGORITHMS, validation_indicators
+from evolver_studio.catalogue import (
+    BASE_ALGORITHMS,
+    configuration_handles_constraints,
+    quality_indicator,
+    validation_indicators,
+)
 from evolver_studio.configuration import (
     complete_values,
     configuration_string,
@@ -31,8 +36,8 @@ from evolver_studio.configuration import (
 from evolver_studio.evolver_client import WORKING_DIRECTORY, read_pid, read_status
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
-from evolver_studio.problem_browser import render_problem_selector
-from evolver_studio.problem_catalogue import Problem, problems_with_encoding
+from evolver_studio.problem_browser import render_group, render_problem_selector
+from evolver_studio.problem_catalogue import WITHOUT_CONSTRAINTS, Problem, problems_with_encoding
 from evolver_studio.problem_form import render_problem_rows
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
@@ -46,14 +51,15 @@ from evolver_studio.validation import (
     StudyProblem,
     ValidationStudy,
     base_algorithm,
+    contender_space_file,
     default_contenders,
     plan_jobs,
     write_study,
 )
 from evolver_studio.validation_form import (
+    CONSTRAINTS_KEY,
     ENCODING_KEY,
     EVALUATIONS_KEY,
-    INDICATORS_KEY,
     PASTED_ALGORITHM_KEY,
     PASTED_CONFIGURATION_KEY,
     POPULATION_KEY,
@@ -67,6 +73,7 @@ from evolver_studio.validation_form import (
     adjusted_name,
     configuration_errors,
     defaults_key,
+    indicators_key,
     parse_problem_table,
     problem_table,
     problems_key,
@@ -81,6 +88,7 @@ from evolver_studio.validation_runner import (
 RUNS_DIRECTORY = WORKING_DIRECTORY / VALIDATION_RUNS_DIRECTORY_NAME
 POLL_EVERY_SECONDS = 1
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
+DEFAULT_CONSTRAINED_INDICATORS = ("ConstrainedMultiobjectiveIndicator", "ConstrainedEpsilon")
 ENCODINGS = ("Double", "Binary", "Permutation")
 # The study that has just finished, to offer to analyze it.
 FINISHED_KEY = "validation_finished_study"
@@ -101,14 +109,17 @@ class TunedChoice:
     errors: list[str]
 
 
-def _render_problems(catalogue: dict[str, Problem]) -> tuple[str, tuple[StudyProblem, ...]]:
+def _render_problems(
+    catalogue: dict[str, Problem],
+) -> tuple[str, tuple[StudyProblem, ...], bool]:
     """Section 1: the encoding and the problems, each with its arguments and reference front.
 
     Args:
         catalogue: The problem catalogue.
 
     Returns:
-        The encoding and the problems (empty while any row of the table is wrong).
+        The encoding, the problems (empty while any row of the table is wrong) and whether they
+        may have constraints.
     """
     st.subheader("1. Problems")
     encoding = st.selectbox(
@@ -118,16 +129,19 @@ def _render_problems(catalogue: dict[str, Problem]) -> tuple[str, tuple[StudyPro
         help="All the problems of a study share it: an algorithm solves the problems of the "
         "encodings it supports, so the algorithms to compare are those of this encoding.",
     )
+    group = render_group(catalogue, encoding, CONSTRAINTS_KEY, problems_key(encoding))
+    constrained = group != WITHOUT_CONSTRAINTS
     names = render_problem_selector(
         catalogue,
-        problems_with_encoding(catalogue, encoding),
+        problems_with_encoding(catalogue, encoding, group),
         encoding,
         "Problems",
         problems_key(encoding),
         "validation",
+        group=group,
     )
     if not names:
-        return encoding, ()
+        return encoding, (), constrained
     table = problem_table(
         names, catalogue, WORKING_DIRECTORY, st.session_state.get(PROBLEM_ROWS_KEY)
     )
@@ -137,18 +151,33 @@ def _render_problems(catalogue: dict[str, Problem]) -> tuple[str, tuple[StudyPro
     problems, errors = parse_problem_table(edited, catalogue, encoding, WORKING_DIRECTORY)
     for error in errors:
         st.error(error)
-    return encoding, () if errors else problems
+    return encoding, () if errors else problems, constrained
 
 
-def _tuned_from_training(encoding: str) -> tuple[str, str] | None:
+def _tuned_from_training(encoding: str, constrained: bool) -> tuple[str, str] | None:
     """Choose a configuration a finished training run found.
+
+    Args:
+        encoding: The encoding of the problems.
+        constrained: Whether they may have constraints: only the trainings whose configurations
+            handle them are then offered.
 
     Returns:
         The algorithm's registry name and the configuration, or None while none is chosen.
     """
-    trainings = [t for t in list_finished_trainings(WORKING_DIRECTORY) if t.encoding == encoding]
+    trainings = [
+        t
+        for t in list_finished_trainings(WORKING_DIRECTORY)
+        if t.encoding == encoding
+        and (
+            not constrained or configuration_handles_constraints(t.configurations[0].configuration)
+        )
+    ]
     if not trainings:
-        st.info(f"No finished training run for {encoding} problems: paste a configuration.")
+        st.info(
+            f"No finished training run for {encoding} problems"
+            f"{' with constraints' if constrained else ''}: paste a configuration."
+        )
         return None
     training: FinishedTraining = st.selectbox(
         "Training run",
@@ -189,7 +218,7 @@ def _tuned_pasted(encoding: str) -> tuple[str, str] | None:
     return algorithm.registry_name, configuration.strip()
 
 
-def _render_tuned(encoding: str, jar: Path) -> TunedChoice:
+def _render_tuned(encoding: str, constrained: bool, jar: Path) -> TunedChoice:
     """Section 2a: the tuned configuration, the pivot every other contender is compared with."""
     source = st.radio(
         "Tuned configuration from",
@@ -198,7 +227,9 @@ def _render_tuned(encoding: str, jar: Path) -> TunedChoice:
         key=TUNED_SOURCE_KEY,
     )
     chosen = (
-        _tuned_from_training(encoding) if source == TUNED_FROM_TRAINING else _tuned_pasted(encoding)
+        _tuned_from_training(encoding, constrained)
+        if source == TUNED_FROM_TRAINING
+        else _tuned_pasted(encoding)
     )
     if chosen is None:
         return TunedChoice(None, [])
@@ -211,7 +242,10 @@ def _render_tuned(encoding: str, jar: Path) -> TunedChoice:
         key=tuned_name_key(registry_name),
     )
     errors = configuration_errors(
-        configuration, parameter_space_text(jar, algorithm.encodings[encoding]), name
+        configuration,
+        parameter_space_text(jar, contender_space_file(algorithm, encoding, configuration)),
+        name,
+        constrained,
     )
     for error in errors:
         st.error(error)
@@ -220,7 +254,7 @@ def _render_tuned(encoding: str, jar: Path) -> TunedChoice:
 
 
 def _render_contenders(
-    encoding: str, jar: Path
+    encoding: str, constrained: bool, jar: Path
 ) -> tuple[tuple[Contender, ...], str | None, list[str]]:
     """Section 2: the tuned configuration (the pivot) and the algorithms to compare it with.
 
@@ -228,25 +262,25 @@ def _render_contenders(
         The contenders, the pivot's name (None while there is none), and what is wrong.
     """
     st.subheader("2. Contenders")
-    tuned = _render_tuned(encoding, jar)
+    tuned = _render_tuned(encoding, constrained, jar)
     defaults = default_contenders(
-        encoding, lambda file_name: default_configuration_text(jar, file_name)
+        encoding, lambda file_name: default_configuration_text(jar, file_name), constrained
     )
     chosen = st.multiselect(
         "Algorithms to compare it with",
         [c.name for c in defaults],
         default=["NSGA-II"] if any(c.name == "NSGA-II" for c in defaults) else [],
-        key=defaults_key(encoding),
+        key=defaults_key(encoding, constrained),
         help="Every algorithm of Evolver that has a default configuration for this encoding. "
         "Each starts from it; adjust its parameters below if you want.",
     )
-    others = tuple(_adjust(c, encoding, jar) for c in defaults if c.name in chosen)
+    others = tuple(_adjust(c, encoding, constrained, jar) for c in defaults if c.name in chosen)
     if tuned.contender is None:
         return others, None, tuned.errors
     return (tuned.contender, *others), tuned.contender.name, tuned.errors
 
 
-def _adjust(contender: Contender, encoding: str, jar: Path) -> Contender:
+def _adjust(contender: Contender, encoding: str, constrained: bool, jar: Path) -> Contender:
     """Let the user adjust the default configuration of an algorithm compared with.
 
     The form of Run algorithm, within the algorithm's parameter space; the marks show what
@@ -255,6 +289,7 @@ def _adjust(contender: Contender, encoding: str, jar: Path) -> Contender:
     Args:
         contender: The algorithm with its default configuration.
         encoding: The encoding of the problems.
+        constrained: Whether they may have constraints.
         jar: Path to Evolver's jar, which holds the parameter space.
 
     Returns:
@@ -263,9 +298,10 @@ def _adjust(contender: Contender, encoding: str, jar: Path) -> Contender:
     algorithm = base_algorithm(contender.algorithm)
     if algorithm is None or encoding not in algorithm.encodings:
         return contender
-    parameters = parse_parameter_space(parameter_space_text(jar, algorithm.encodings[encoding]))
+    space_file = contender_space_file(algorithm, encoding, contender.configuration)
+    parameters = parse_parameter_space(parameter_space_text(jar, space_file))
     reference = parse_configuration(contender.configuration)
-    start_key = adjusted_key(encoding, contender.name)
+    start_key = adjusted_key(encoding, contender.name, constrained)
     start = st.session_state.get(start_key) or reference
     values = complete_values(parameters, start)
     version_key = f"{start_key}_version"
@@ -306,8 +342,8 @@ class Budget:
     processes: int
 
 
-def _render_budget() -> Budget:
-    """Section 3: what every contender runs with."""
+def _render_budget(constrained: bool) -> Budget:
+    """Section 3: what every contender runs with (its indicators, for the problems chosen)."""
     st.subheader("3. Budget")
     columns = st.columns(5)
     population = columns[0].number_input(
@@ -344,13 +380,19 @@ def _render_budget() -> Budget:
     )
     indicators = st.multiselect(
         "Quality indicators",
-        [indicator.registry_name for indicator in validation_indicators()],
-        default=list(DEFAULT_INDICATORS),
-        key=INDICATORS_KEY,
+        [indicator.registry_name for indicator in validation_indicators(constrained)],
+        default=list(DEFAULT_CONSTRAINED_INDICATORS if constrained else DEFAULT_INDICATORS),
+        key=indicators_key(constrained),
         help="Computed on each run's front, normalized with the problem's reference front. "
         "HypervolumeMinus, the hypervolume negated so that a training can minimize it, is not "
         "offered: NormalizedHypervolume tells the same about a validation.",
     )
+    if constrained and any(not quality_indicator(name).for_constraints for name in indicators):
+        st.info(
+            "Only the indicators for constraints, and Hypervolume, take into account whether a run "
+            "found feasible solutions: the others measure a run without them as if its solutions "
+            "were feasible."
+        )
     return Budget(
         int(population), int(evaluations), int(runs), int(seed), tuple(indicators), int(processes)
     )
@@ -367,9 +409,9 @@ def _launch(study: ValidationStudy, processes: int, jar: Path) -> None:
 
 def _render_form(catalogue: dict[str, Problem], jar: Path, can_run: bool) -> None:
     """The three sections that build a study, and the button that launches it."""
-    encoding, problems = _render_problems(catalogue)
-    contenders, pivot, errors = _render_contenders(encoding, jar)
-    budget = _render_budget()
+    encoding, problems, constrained = _render_problems(catalogue)
+    contenders, pivot, errors = _render_contenders(encoding, constrained, jar)
+    budget = _render_budget(constrained)
     study = ValidationStudy(
         encoding=encoding,
         problems=problems,

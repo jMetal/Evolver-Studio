@@ -11,10 +11,13 @@ import pandas as pd
 import streamlit as st
 
 from evolver_studio.problem_catalogue import (
+    BOTH_CONSTRAINTS,
     WITH_CONSTRAINTS,
     WITHOUT_CONSTRAINTS,
     Problem,
     format_arguments,
+    in_group,
+    problems_with_encoding,
 )
 from evolver_studio.problems import reference_front_candidates
 
@@ -183,6 +186,45 @@ def render_problem_adder(
     )
 
 
+def render_group(
+    catalogue: Mapping[str, Problem] | None, encoding: str, key: str, selector_key: str
+) -> str:
+    """Let the user choose which problems of an encoding to offer: without constraints, with them
+    or both. An encoding whose problems have none offers no choice.
+
+    Args:
+        catalogue: The problem catalogue, or None when the jar does not describe the problems.
+        encoding: The encoding of the problems.
+        key: The widget's key.
+        selector_key: The widget key of the selector of the problems: those of it that are not of
+            the group chosen are dropped.
+
+    Returns:
+        The group.
+    """
+    if catalogue is None or not problems_with_encoding(catalogue, encoding, WITH_CONSTRAINTS):
+        return WITHOUT_CONSTRAINTS
+
+    def drop_the_others() -> None:
+        st.session_state[selector_key] = [
+            name
+            for name in st.session_state.get(selector_key) or []
+            if name not in catalogue or in_group(catalogue[name], st.session_state[key])
+        ]
+
+    return st.radio(
+        "Problems to choose from",
+        (WITHOUT_CONSTRAINTS, WITH_CONSTRAINTS, BOTH_CONSTRAINTS),
+        format_func=lambda g: f"{g} ({len(problems_with_encoding(catalogue, encoding, g))})",
+        horizontal=True,
+        key=key,
+        on_change=drop_the_others,
+        help="With constraints, or with both, every algorithm uses its parameter space for "
+        "problems with constraints: on a problem without them its technique changes nothing, "
+        "since all the solutions are feasible.",
+    )
+
+
 def render_problem_selector(
     catalogue: Mapping[str, Problem] | None,
     options: list[str],
@@ -193,6 +235,7 @@ def render_problem_selector(
     default: list[str] | None = None,
     help_text: str | None = None,
     accept_class_names: bool = False,
+    group: str = BOTH_CONSTRAINTS,
 ) -> list[str]:
     """Let the user choose problems: from a list, or with their details in a listing.
 
@@ -212,6 +255,7 @@ def render_problem_selector(
         help_text: The selector's help.
         accept_class_names: Whether a fully-qualified class name can be typed to add a problem
             that is not in the list.
+        group: The problems offered: without constraints, with them or both.
 
     Returns:
         The names chosen.
@@ -228,5 +272,6 @@ def render_problem_selector(
         help=help_text,
     )
     if catalogue is not None:
-        render_problem_adder(catalogue, encoding, selector_key, key_prefix)
+        offered = {name: p for name, p in catalogue.items() if in_group(p, group)}
+        render_problem_adder(offered, encoding, selector_key, key_prefix)
     return names

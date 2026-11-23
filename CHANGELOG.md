@@ -42,6 +42,14 @@ Works with Evolver 2.7.
   0 does not pause; Evolver 2.4 or later): every front adds that pause, a few seconds in all, and
   every one can be seen.
 
+### Validation and Validation analysis
+
+- **Problems with constraints**: a study chooses its problems among those without constraints, with
+  them or both. With constraints every algorithm uses its parameter space and default configuration
+  for them, the tuned configuration must say how it handles them, and ICMOP and CEP are the default
+  indicators. The analysis has a **Feasibility** tab (in how many runs each algorithm found feasible
+  solutions); the hypervolume, the fronts and the attainment use only the feasible solutions.
+
 ### Installation
 
 - `make env` installs **Java 21** (`openjdk` from conda-forge) in the Conda environment, so Java

@@ -24,11 +24,17 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from evolver_studio.catalogue import BASE_ALGORITHMS, BaseAlgorithm, quality_indicator
+from evolver_studio.catalogue import (
+    BASE_ALGORITHMS,
+    BaseAlgorithm,
+    configuration_handles_constraints,
+    quality_indicator,
+)
 from evolver_studio.hypervolume import hypervolume
 from evolver_studio.problem_catalogue import ArgumentValue, format_problem_spec, problem_spec
 from evolver_studio.problems import reference_front_dimension
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
+from evolver_studio.solve_results import read_violations
 from evolver_studio.weight_vectors import available_population_sizes
 
 MANIFEST_NAME = "study.yaml"
@@ -160,13 +166,15 @@ class ValidationStudy:
 
 
 def default_contenders(
-    encoding: str, default_configuration: Callable[[str], str]
+    encoding: str, default_configuration: Callable[[str], str], constrained: bool = False
 ) -> list[Contender]:
     """The algorithms that have a default configuration for an encoding, as contenders.
 
     Args:
         encoding: The encoding of the study's problems.
         default_configuration: Reads a default configuration file of the jar by its name.
+        constrained: Whether the study has problems with constraints: the configurations are then
+            those that handle them.
 
     Returns:
         A contender per default configuration (RVEA has three variants), named as the algorithm
@@ -176,8 +184,9 @@ def default_contenders(
     for algorithm in BASE_ALGORITHMS:
         if not algorithm.runnable_today or encoding not in algorithm.runnable_encodings:
             continue
-        for label, file_name in algorithm.default_configurations.get(encoding, ()):
-            variants = len(algorithm.default_configurations[encoding])
+        defaults = algorithm.defaults(encoding, constrained)
+        for label, file_name in defaults:
+            variants = len(defaults)
             name = algorithm.name if variants == 1 or label == algorithm.name else label
             configuration = default_configuration(file_name).strip().splitlines()[0]
             contenders.append(Contender(name, algorithm.registry_name, configuration))
@@ -187,6 +196,21 @@ def default_contenders(
 def base_algorithm(registry_name: str) -> BaseAlgorithm | None:
     """The catalogue entry of an algorithm, by its registry name."""
     return next((a for a in BASE_ALGORITHMS if a.registry_name == registry_name), None)
+
+
+def contender_space_file(algorithm: BaseAlgorithm, encoding: str, configuration: str) -> str:
+    """The parameter space a configuration is run with: the one for problems with constraints if
+    the configuration says how it handles them.
+
+    Args:
+        algorithm: Its algorithm.
+        encoding: The encoding of the study.
+        configuration: The configuration, "--parameter value ...".
+    """
+    constrained = algorithm.handles_constraints(encoding) and configuration_handles_constraints(
+        configuration
+    )
+    return algorithm.parameter_space_file(encoding, constrained)
 
 
 def plan_jobs(
@@ -399,7 +423,7 @@ def studio_indicator_values(
     rows = []
     for run in runs:
         row: dict[str, float | int | None] = {"Run": run}
-        front = _read_front(output / f"run-{run}" / "FUN.csv")
+        front = _read_feasible_front(output, run)
         for name, column in zip(indicators, columns, strict=True):
             usable = front is not None and reference_front is not None
             row[column] = (
@@ -427,8 +451,9 @@ def read_study_front(
         run: The run's number.
 
     Returns:
-        The objective values of its solutions, with columns f1, f2, ...; None when the job or the
-        run has no front.
+        The objective values of its solutions (only the feasible ones, on a problem with
+        constraints), with columns f1, f2, ...; None when the job or the run has no front, or no
+        feasible solution.
     """
     job = next(
         (j for j in manifest["jobs"] if j["contender"] == contender and j["problem"] == problem),
@@ -436,9 +461,34 @@ def read_study_front(
     )
     if job is None:
         return None
-    return _read_objectives(
-        _job_output(study_directory, job["directory"]) / f"run-{run}" / "FUN.csv"
-    )
+    front = _read_feasible_front(_job_output(study_directory, job["directory"]), run)
+    if front is None or len(front) == 0:
+        return None
+    return _as_objectives(front)
+
+
+def feasibility(study_directory: Path) -> pd.DataFrame:
+    """Whether each run on a problem with constraints found feasible solutions.
+
+    Args:
+        study_directory: The study's directory.
+
+    Returns:
+        One row per run of a contender on a problem with constraints: `contender`, `problem`,
+        `Run`, `feasible` and `violation`, the least of its solutions (0 if it is feasible). Empty
+        when no problem of the study has constraints.
+    """
+    columns = ["contender", "problem", "Run", "feasible", "violation"]
+    manifest = read_manifest(study_directory)
+    rows = []
+    for job in manifest["jobs"] if manifest is not None else []:
+        output = _job_output(study_directory, job["directory"])
+        for run in range(1, manifest.get("runs", 0) + 1):
+            violations = read_violations(output, run)
+            if violations is not None:
+                least = float(violations.min())
+                rows.append((job["contender"], job["problem"], run, least <= 0, max(least, 0.0)))
+    return pd.DataFrame(rows, columns=columns)
 
 
 def read_study_reference_front(
@@ -451,9 +501,20 @@ def read_study_reference_front(
 
 def _read_objectives(front_file: Path) -> pd.DataFrame | None:
     front = _read_front(front_file)
-    if front is None:
-        return None
+    return None if front is None else _as_objectives(front)
+
+
+def _as_objectives(front) -> pd.DataFrame:
     return pd.DataFrame(front, columns=[f"f{i}" for i in range(1, front.shape[1] + 1)])
+
+
+def _read_feasible_front(output: Path, run: int):
+    """The front of a run without its infeasible solutions, if the problem has constraints."""
+    front = _read_front(output / f"run-{run}" / "FUN.csv")
+    violations = read_violations(output, run)
+    if front is None or violations is None or len(violations) != len(front):
+        return front
+    return front[(violations <= 0).to_numpy()]
 
 
 def _computed_by_studio(name: str) -> bool:
@@ -533,7 +594,9 @@ def _request(
         algorithm_name=algorithm.registry_name,
         encoding=study.encoding,
         population_size=study.population_size,
-        yaml_parameter_space_file=algorithm.encodings[study.encoding],
+        yaml_parameter_space_file=contender_space_file(
+            algorithm, study.encoding, contender.configuration
+        ),
         extra_config=extra_config,
         configuration=contender.configuration,
         problem=problem.name,
