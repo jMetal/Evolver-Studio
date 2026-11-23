@@ -302,6 +302,34 @@ class TestRunInProgress:
             process.kill()
             process.wait()
 
+    def test_should_draw_the_front_the_run_has_written_so_far(self, app: AppTest, tmp_path: Path):
+        # Arrange: a run in progress that has written its current front
+        process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        try:
+            run_dir = tmp_path / "solve-runs" / "20260101-000000"
+            run_dir.mkdir(parents=True)
+            (run_dir / "request.yaml").write_text("outputDirectory: out\n")
+            (run_dir / "status.yaml").write_text(
+                "status: RUNNING\nevaluationsDone: 2500\nmaxEvaluations: 10000\nupdatedAt: x\n"
+            )
+            (tmp_path / "out").mkdir()
+            (tmp_path / "out" / "CURRENT_FRONT.csv").write_text(
+                "Run,Evaluations,NonDominated,F1,F2\n1,2500,1,0.1,0.9\n1,2500,1,0.6,0.3\n"
+            )
+            write_pid_file(run_dir / "pid.txt", process.pid)
+
+            # Act
+            app.run()
+
+            # Assert
+            assert not app.exception
+            assert any(
+                "Run 1, 2,500 evaluations: 2 solutions." in caption.value for caption in app.caption
+            )
+        finally:
+            process.kill()
+            process.wait()
+
     def test_should_say_only_running_until_the_run_reports_its_evaluations(
         self, app: AppTest, tmp_path: Path
     ):
@@ -323,6 +351,27 @@ class TestRunInProgress:
         finally:
             process.kill()
             process.wait()
+
+
+class TestLiveFrontOption:
+    def test_should_offer_to_show_the_front_while_it_runs_by_default(self, app: AppTest):
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert not app.exception
+        assert app.checkbox(key="solve_live_front").value is True
+        assert app.number_input(key="solve_live_front_every").value == 2500
+
+    def test_should_not_ask_for_the_update_interval_when_it_is_off(self, app: AppTest):
+        # Arrange
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.checkbox(key="solve_live_front").uncheck().run()
+
+        # Assert
+        assert app.number_input(key="solve_live_front_every").disabled
 
 
 class TestSolutions:

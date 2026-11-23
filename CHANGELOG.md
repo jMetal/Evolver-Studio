@@ -8,6 +8,14 @@ version works with.
 
 Works with Evolver 2.5.
 
+### Run algorithm
+
+- **The front while it runs**: a run in progress draws the non-dominated solutions it has found so
+  far (Evolver's `CURRENT_FRONT.csv`), over the problem's reference front, with the run and the
+  evaluation they belong to. The option is on by default, every 2500 evaluations (the more often,
+  the slower the run), can be turned off or changed in the budget, is restored when a past run is
+  reopened, and needs Evolver 2.3 or later.
+
 ### Installation
 
 - `make env` installs **Java 21** (`openjdk` from conda-forge) in the Conda environment, so Java

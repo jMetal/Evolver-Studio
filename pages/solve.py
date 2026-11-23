@@ -75,6 +75,8 @@ from evolver_studio.solve_form import (
     CONFIGURATION_VERSION_KEY,
     EVALUATIONS_KEY,
     FIX_SEED_KEY,
+    LIVE_FRONT_EVERY_KEY,
+    LIVE_FRONT_KEY,
     LOADED_CONFIGURATION_KEY,
     NO_REFERENCE_FRONT,
     POPULATION_CHOICE_KEY,
@@ -90,6 +92,7 @@ from evolver_studio.solve_form import (
     problem_arguments_key,
     reference_front_key,
 )
+from evolver_studio.solve_live import read_current_front
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
 from evolver_studio.solve_results import (
     SolveRunInfo,
@@ -116,8 +119,12 @@ LOG_LINES_SHOWN = 15
 # Every how many evaluations a run updates its status, for the page to show the evaluation it is
 # at: often enough to follow it, and seldom enough to cost little (a few percent at most).
 STATUS_FREQUENCY = 1000
-# The Evolver release from which a run reports its progress while it runs.
+# The Evolver release from which a run reports its progress, and writes its front, while it runs.
 PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
+# Every how many evaluations the front of a run in progress is shown, unless the user chooses: a
+# new front every few seconds in a typical run, at a cost of a few percent.
+LIVE_FRONT_EVERY = 2500
+LIVE_FRONT_HEIGHT = 380
 
 
 @dataclass(slots=True, frozen=True)
@@ -393,6 +400,8 @@ class Budget:
         runs: The number of independent runs.
         seed: The seed of the first run, or None to draw one.
         indicators: The quality indicators to compute.
+        live_front_every: Every how many evaluations to show the front while a run is in
+            progress, or None not to.
     """
 
     population_size: int
@@ -400,6 +409,7 @@ class Budget:
     runs: int
     seed: int | None
     indicators: list[str]
+    live_front_every: int | None = None
 
 
 def _render_budget(has_reference_front: bool, population_sizes: list[int] | None) -> Budget:
@@ -432,13 +442,55 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
         "the seed + i - 1.",
         key=indicators_key(has_reference_front),
     )
+    live_front_every = _render_live_front()
     return Budget(
         population_size=int(population_size),
         max_evaluations=int(max_evaluations),
         runs=int(runs),
         seed=int(seed) if fix_seed else None,
         indicators=indicators,
+        live_front_every=live_front_every,
     )
+
+
+def _render_live_front() -> int | None:
+    """The option to follow the front while a run is in progress.
+
+    Returns:
+        Every how many evaluations to show it, or None not to (the user chose not to, or the jar
+        cannot write it).
+    """
+    supported = _live_front_supported()
+    live_column, every_column = st.columns(2)
+    live = live_column.checkbox(
+        "Show the front while it runs",
+        value=True,
+        disabled=not supported,
+        help="Evolver writes the non-dominated solutions of the run every so many evaluations "
+        "and this page draws them, so you can see the front take shape. The more often, the "
+        "slower the run.",
+        key=LIVE_FRONT_KEY,
+    )
+    every = every_column.number_input(
+        "Update it every (evaluations)",
+        100,
+        value=LIVE_FRONT_EVERY,
+        step=500,
+        disabled=not (live and supported),
+        key=LIVE_FRONT_EVERY_KEY,
+    )
+    if not supported:
+        st.caption(
+            f"Showing the front while a run is in progress needs Evolver "
+            f"{PROGRESS_WITHIN_A_RUN_SINCE} or later."
+        )
+    return int(every) if live and supported else None
+
+
+def _live_front_supported() -> bool:
+    """Whether the jar can write the front while a run is in progress."""
+    version = jar_evolver_version(jar)
+    return version is None or is_at_least(version, PROGRESS_WITHIN_A_RUN_SINCE)
 
 
 def _launch(request_for: Callable[[str], SolveRequest]) -> None:
@@ -519,7 +571,7 @@ def _render_form(can_run: bool) -> None:
             seed=budget.seed,
             indicator_names=budget.indicators,
             status_frequency=_status_frequency(),
-            front_frequency=None,
+            front_frequency=budget.live_front_every,
             write_population=False,
             output_directory=output_directory,
         )
@@ -534,10 +586,7 @@ def _render_form(can_run: bool) -> None:
 
 def _status_frequency() -> int | None:
     """How often a run updates its status, when the jar can do it while a run is in progress."""
-    version = jar_evolver_version(jar)
-    if version is not None and not is_at_least(version, PROGRESS_WITHIN_A_RUN_SINCE):
-        return None
-    return STATUS_FREQUENCY
+    return STATUS_FREQUENCY if _live_front_supported() else None
 
 
 def _cancel(run_dir: Path) -> None:
@@ -553,12 +602,16 @@ def _render_run_in_progress(run_dir: Path) -> None:
     ends."""
     request = read_request(run_dir) or {}
     runs = int(request.get("numberOfIndependentRuns", 1))
+    output_directory = WORKING_DIRECTORY / request.get("outputDirectory", "")
+    reference_file = request.get("referenceFrontFileName")
+    reference = read_front(WORKING_DIRECTORY / reference_file) if reference_file else None
     running_badge.inject_style()
 
     @st.fragment(run_every=POLL_EVERY_SECONDS, key=f"solve_poll_{run_dir.name}")
     def _poll() -> None:
         label = running_label(read_status(run_dir / "status.yaml"), runs)
         running_badge.render(label)
+        _render_live_front_of(output_directory, reference)
         if run_phase(run_dir) not in (RunPhase.STARTING, RunPhase.RUNNING):
             st.session_state["solve_history"] = run_dir.name
             st.rerun()
@@ -567,6 +620,19 @@ def _render_run_in_progress(run_dir: Path) -> None:
     if st.button("Cancel"):
         _cancel(run_dir)
         st.rerun()
+
+
+def _render_live_front_of(output_directory: Path, reference: pd.DataFrame | None) -> None:
+    """The front the run in progress has written so far, if it was asked to write one."""
+    front = read_current_front(output_directory)
+    if front is None:
+        return
+    figure = build_front_figure({front.run: front.objectives}, reference)
+    figure.update_layout(height=LIVE_FRONT_HEIGHT, margin={"l": 0, "r": 0, "t": 10, "b": 0})
+    st.plotly_chart(figure, config={"displayModeBar": False}, width="stretch")
+    st.caption(
+        f"Run {front.run}, {front.evaluations:,} evaluations: {len(front.objectives)} solutions."
+    )
 
 
 def _render_results(run: SolveRunInfo) -> None:
