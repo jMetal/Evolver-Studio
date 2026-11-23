@@ -39,6 +39,7 @@ from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_browser import render_group, render_problem_selector
 from evolver_studio.problem_catalogue import WITHOUT_CONSTRAINTS, Problem, problems_with_encoding
 from evolver_studio.problem_form import render_problem_rows
+from evolver_studio.problems import normalized_hypervolume_warning
 from evolver_studio.progress import study_running_label
 from evolver_studio.resource_files import default_configuration_text, parameter_space_text
 from evolver_studio.runs import RunPhase, find_run_in_progress, mark_cancelled, run_phase
@@ -429,6 +430,11 @@ def _render_form(catalogue: dict[str, Problem], jar: Path, can_run: bool) -> Non
     )
     for error in errors:
         st.warning(error)
+    slow = normalized_hypervolume_warning(
+        study.indicators, [p.reference_front for p in study.problems], WORKING_DIRECTORY
+    )
+    if slow is not None:
+        st.warning(slow)
     for job in skipped:
         st.warning(f"{job.contender} is left out of {job.problem}: {job.reason}.")
     if jobs:

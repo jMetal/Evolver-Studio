@@ -6,6 +6,7 @@ import pytest
 
 from evolver_studio.problems import (
     default_reference_front,
+    normalized_hypervolume_warning,
     reference_front_candidates,
     reference_front_dimension,
     reference_front_for_objectives,
@@ -171,3 +172,34 @@ class TestSuggestedReferenceFront:
         # Act / Assert
         assert suggested_reference_front("DTLZ2", None, working_directory) == ""
         assert suggested_reference_front("Nothing", 2, working_directory) == ""
+
+
+class TestNormalizedHypervolumeWarning:
+    def _front(self, directory: Path, objectives: int, points: int) -> str:
+        line = ",".join(["0.5"] * objectives) + "\n"
+        (directory / "front.csv").write_text(line * points)
+        return "front.csv"
+
+    @pytest.mark.parametrize(
+        ("objectives", "points", "warns"),
+        [(3, 9000, False), (4, 1000, False), (4, 2000, True), (5, 2500, True), (6, 100, True)],
+    )
+    def test_should_warn_with_many_objectives_or_points(
+        self, tmp_path: Path, objectives: int, points: int, warns: bool
+    ):
+        # Arrange
+        front = self._front(tmp_path, objectives, points)
+
+        # Act
+        message = normalized_hypervolume_warning(["NormalizedHypervolume"], [front], tmp_path)
+
+        # Assert
+        assert (message is not None) is warns
+
+    def test_should_not_warn_about_other_indicators_or_a_missing_front(self, tmp_path: Path):
+        # Arrange
+        front = self._front(tmp_path, 10, 500)
+
+        # Act / Assert
+        assert normalized_hypervolume_warning(["Epsilon"], [front], tmp_path) is None
+        assert normalized_hypervolume_warning(["NormalizedHypervolume"], ["no"], tmp_path) is None

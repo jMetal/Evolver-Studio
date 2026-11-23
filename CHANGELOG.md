@@ -22,6 +22,8 @@ Works with Evolver 2.7.
 
 - A page opened **by its URL** before any other showed Streamlit's own sidebar instead of the menu:
   the folder of the pages is now `app_pages/`.
+- Run algorithm, Training and Validation **warn** when NormalizedHypervolume may take minutes, or not
+  finish: with reference fronts of 6 objectives or more, or of 4 and 5 with many points.
 
 ### Explore
 

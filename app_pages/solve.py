@@ -58,6 +58,7 @@ from evolver_studio.problem_catalogue import (
 from evolver_studio.problem_form import defaults_help, render_argument_inputs
 from evolver_studio.problems import (
     default_reference_front,
+    normalized_hypervolume_warning,
     reference_front_candidates,
     reference_front_dimension,
     reference_front_for_objectives,
@@ -676,6 +677,11 @@ def _render_form(can_run: bool) -> None:
             output_directory=output_directory,
         )
 
+    slow = normalized_hypervolume_warning(
+        budget.indicators, [reference_front] if reference_front else [], WORKING_DIRECTORY
+    )
+    if slow is not None:
+        st.warning(slow)
     errors = request_for("").validation_errors()
     for error in errors:
         st.warning(error)
