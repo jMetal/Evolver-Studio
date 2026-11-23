@@ -7,6 +7,8 @@ st.navigation has no single "shell" script that wraps every page's body.
 """
 
 import shutil
+import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 import streamlit as st
@@ -109,25 +111,60 @@ def _manifest(jar_str: str) -> dict | None:
     return result.value if isinstance(result, Ok) else None
 
 
-def evolver_facts(jar_str: str) -> dict[str, int] | None:
+@dataclass(slots=True, frozen=True)
+class Fact:
+    """Something Evolver offers, counted, with a few examples.
+
+    Attributes:
+        count: How many there are.
+        examples: Some of them (by name), the first ones in alphabetical order.
+    """
+
+    count: int
+    examples: tuple[str, ...] = ()
+
+    def detail(self, limit: int = 3) -> str:
+        """The examples in one line, e.g. "AGE-MOEA, MOEAD, NSGA-II, …"."""
+        shown = ", ".join(self.examples[:limit])
+        return f"{shown}, …" if len(self.examples) > limit else shown
+
+
+def evolver_facts(jar_str: str) -> dict[str, Fact] | None:
     """Count what Evolver offers, from DescribeMain's manifest.
 
     Args:
         jar_str: Path to Evolver's jar, as a string.
 
     Returns:
-        The number of base algorithms, meta-optimizers, problems and quality indicators, by
-        name, or None if DescribeMain could not be run.
+        The base algorithms, meta-optimizers, problems (with their families as examples) and
+        quality indicators, by name, or None if DescribeMain could not be run.
     """
     manifest = _manifest(jar_str)
     if manifest is None:
         return None
+    algorithms = sorted({entry["name"] for entry in manifest["baseAlgorithms"]})
+    meta = sorted(entry["name"] for entry in manifest["metaAlgorithms"])
+    families = sorted({entry["family"] for entry in manifest.get("problemCatalogue", [])})
+    indicators = sorted(manifest["indicators"])
     return {
-        "Base algorithms": len({entry["name"] for entry in manifest["baseAlgorithms"]}),
-        "Meta-optimizers": len(manifest["metaAlgorithms"]),
-        "Problems": len(manifest["problems"]),
-        "Quality indicators": len(manifest["indicators"]),
+        "Base algorithms": Fact(len(algorithms), tuple(algorithms)),
+        "Meta-optimizers": Fact(len(meta), tuple(meta)),
+        "Problems": Fact(len(manifest["problems"]), tuple(families)),
+        "Quality indicators": Fact(len(indicators), tuple(indicators)),
     }
+
+
+@st.cache_data(show_spinner=False, ttl=60)
+def java_version() -> str | None:
+    """The first line `java -version` prints, or None when Java is not on the PATH.
+
+    Cached for a minute: it starts a JVM, too slow to repeat on every rerun.
+    """
+    if shutil.which("java") is None:
+        return None
+    result = subprocess.run(["java", "-version"], capture_output=True, text=True)
+    lines = (result.stderr or result.stdout).strip().splitlines()
+    return lines[0] if lines else None
 
 
 def registered_problem_names(jar_str: str) -> list[str] | None:

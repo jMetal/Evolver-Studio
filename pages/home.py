@@ -9,8 +9,10 @@ from pathlib import Path
 import streamlit as st
 
 from evolver_studio import home_panel
-from evolver_studio.app_state import evolver_facts, render_jar_status
+from evolver_studio.app_state import Fact, evolver_facts, java_version, render_jar_status
 from evolver_studio.evolver_client import EVOLVER_VERSION, WORKING_DIRECTORY
+from evolver_studio.resource_files import jar_evolver_version
+from evolver_studio.runs import RunPhase
 from evolver_studio.sections import SECTIONS, Page, Section
 from evolver_studio.tutorial_navigation import open_tutorial
 from evolver_studio.tutorials import TUTORIALS, Tutorial, TutorialLevel, tutorials_by_level
@@ -25,6 +27,14 @@ TRAINING_ANALYSIS_PAGE = "pages/training_analysis.py"
 TUTORIALS_PAGE = "pages/tutorials.py"
 TOUR = "tour"
 PICTURE_HEIGHT = 320
+PHASE_BADGES = {
+    RunPhase.STARTING: ("Starting", "blue"),
+    RunPhase.RUNNING: ("Running", "blue"),
+    RunPhase.FINISHED: ("Finished", "green"),
+    RunPhase.FAILED: ("Failed", "red"),
+    RunPhase.CANCELLED: ("Cancelled", "gray"),
+    RunPhase.LOST: ("Interrupted", "orange"),
+}
 # The colors of the logo: navy and blue for the tile, teal for the slider, and the light green,
 # cyan and white of the fronts. A stripe as the fronts (green, cyan, teal), the facts on a navy
 # band, and the steps on pale blue with a teal edge. Containers with a key get the class
@@ -47,6 +57,9 @@ STYLE = f"""
 }}
 .st-key-home_facts [data-testid="stMetric"] {{
   border-left: 4px solid {CYAN}; padding-left: 0.75rem;
+}}
+.st-key-home_facts [data-testid="stCaptionContainer"] {{
+  color: #FFFFFF; opacity: 0.9; padding-left: 0.95rem;
 }}
 .st-key-home_facts [data-testid="stMetricLabel"],
 .st-key-home_facts [data-testid="stMetricLabel"] *,
@@ -112,6 +125,11 @@ def render_presentation(jar: Path | None) -> None:
             "start.",
             icon=":material/rocket_launch:",
         )
+    if jar is not None:
+        version = jar_evolver_version(jar) or EVOLVER_VERSION
+        st.caption(
+            f":material/check_circle: Evolver {version} · {java_version() or 'Java not found'}"
+        )
     first, second, third = st.columns(3, vertical_alignment="center")
     first.page_link(
         SOLVE_PAGE,
@@ -126,13 +144,30 @@ def render_presentation(jar: Path | None) -> None:
         start_tour()
 
 
-def render_facts(jar: Path | None) -> None:
-    facts = evolver_facts(str(jar)) if jar is not None else None
-    facts = {**(facts or {}), "Tutorials": sum(tutorial.available for tutorial in TUTORIALS)}
+def render_recent(summary: home_panel.Activity) -> None:
+    """The newest runs of either use, one line each."""
+    st.markdown("**Recent runs**")
+    if not summary.recent:
+        st.caption("No runs yet: run an algorithm to start.")
+        return
+    for run in summary.recent:
+        label, color = PHASE_BADGES[run.phase]
+        when = run.launched.strftime("%d %b, %H:%M") if run.launched else run.run_id
+        st.markdown(f"**{run.label}** :gray[{run.kind} · {when}] :{color}-badge[{label}]")
+
+
+def render_facts(facts: dict[str, Fact] | None) -> None:
+    written = sum(tutorial.available for tutorial in TUTORIALS)
+    planned = len(TUTORIALS) - written
+    shown = {
+        **(facts or {}),
+        "Tutorials": Fact(written, (f"{planned} more planned",) if planned else ()),
+    }
     st.html('<div class="studio-stripe"></div>')
     with st.container(key="home_facts"):
-        for column, (label, value) in zip(st.columns(len(facts)), facts.items(), strict=True):
-            column.metric(label, value)
+        for column, (label, fact) in zip(st.columns(len(shown)), shown.items(), strict=True):
+            column.metric(label, fact.count)
+            column.caption(fact.detail(limit=2))
 
 
 def render_page(page: Page) -> None:
@@ -146,15 +181,15 @@ def render_page(page: Page) -> None:
         st.caption(page.description)
 
 
-def step_state(name: str, summary: home_panel.Activity, facts: dict[str, int] | None) -> str:
+def step_state(name: str, summary: home_panel.Activity, facts: dict[str, Fact] | None) -> str:
     """What a step has now, in a few words."""
     if name == "Explore":
         if facts is None:
             return "Needs Evolver's jar"
         return (
-            f"{plural(facts['Base algorithms'], 'algorithm')} · "
-            f"{plural(facts['Problems'], 'problem')} · "
-            f"{plural(facts['Quality indicators'], 'indicator')}"
+            f"{plural(facts['Base algorithms'].count, 'algorithm')} · "
+            f"{plural(facts['Problems'].count, 'problem')} · "
+            f"{plural(facts['Quality indicators'].count, 'indicator')}"
         )
     if name == "Solve":
         return plural(summary.solve_runs, "run")
@@ -162,7 +197,7 @@ def step_state(name: str, summary: home_panel.Activity, facts: dict[str, int] | 
 
 
 def render_step(
-    number: int, section: Section, summary: home_panel.Activity, facts: dict[str, int] | None
+    number: int, section: Section, summary: home_panel.Activity, facts: dict[str, Fact] | None
 ) -> None:
     with st.container(key=f"home_step_{number}"):
         st.html(f'<div class="studio-step"><span>{number}</span>{section.name}</div>')
@@ -205,9 +240,10 @@ st.html(STYLE)
 text, picture = st.columns([5, 4], vertical_alignment="top", gap="large")
 with text:
     render_presentation(jar)
+    render_recent(summary)
 with picture:
     render_picture(summary)
-render_facts(jar)
+render_facts(facts)
 sections = {section.name: section for section in SECTIONS}
 for number, (column, name) in enumerate(zip(st.columns(3, gap="large"), STEPS), start=1):
     with column:

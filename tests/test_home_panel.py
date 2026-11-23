@@ -7,6 +7,7 @@ import pytest
 
 from evolver_studio import home_panel
 from evolver_studio.home_panel import SOLVE, activity, front_figure
+from evolver_studio.training_runs import FinishedTraining
 
 
 def write_solve_run(root: Path, run_id: str, state: str, objectives: list[list[float]]) -> Path:
@@ -91,3 +92,48 @@ class TestFrontFigure:
 
         # Act / Assert
         assert front_figure(front, height=300) is None
+
+
+class TestRecentRuns:
+    def test_should_list_the_newest_runs_with_their_labels_and_dates(self, tmp_path: Path):
+        # Arrange
+        write_solve_run(tmp_path, "20261001-100000", "FINISHED", [[0.0, 1.0]])
+        write_solve_run(tmp_path, "20261002-153045", "FINISHED", [[0.0, 1.0]])
+
+        # Act
+        recent = activity(tmp_path).recent
+
+        # Assert
+        assert [run.run_id for run in recent] == ["20261002-153045", "20261001-100000"]
+        assert recent[0].label == "NSGA-II on ZDT1"
+        assert recent[0].launched is not None
+        assert (recent[0].launched.month, recent[0].launched.minute) == (10, 30)
+
+    def test_should_keep_only_the_three_newest(self, tmp_path: Path):
+        # Arrange
+        for day in range(1, 6):
+            write_solve_run(tmp_path, f"2026100{day}-100000", "FINISHED", [[0.0, 1.0]])
+
+        # Act
+        recent = activity(tmp_path).recent
+
+        # Assert
+        assert [run.run_id for run in recent] == [
+            "20261005-100000",
+            "20261004-100000",
+            "20261003-100000",
+        ]
+
+
+class TestTrainingLabel:
+    def test_should_name_only_the_first_problems_of_a_training(self):
+        # Arrange
+        training = FinishedTraining(
+            "20261001-100000", "PAES", "Double", tuple(f"RE3{i}" for i in range(1, 8)), ()
+        )
+
+        # Act
+        label = home_panel._training_label(training)
+
+        # Assert
+        assert label == "PAES on RE31, RE32 and 5 more"

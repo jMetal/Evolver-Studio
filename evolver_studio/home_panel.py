@@ -5,6 +5,7 @@ the working directory: Solve's in `solve-runs/` and the training runs' in `cli-r
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -16,15 +17,20 @@ from evolver_studio.problem_catalogue import format_problem_spec
 from evolver_studio.runs import (
     RUNS_DIRECTORY_NAME,
     SOLVE_RUNS_DIRECTORY_NAME,
+    RunPhase,
     find_run_in_progress,
+    run_phase,
 )
 from evolver_studio.solve_results import list_solve_runs, read_request, read_run_fronts
-from evolver_studio.training_runs import read_training
+from evolver_studio.training_runs import FinishedTraining, read_training
 
 SOLVE = "Solve"
 TRAINING = "Training"
 MARKER_COLOR = "#14A3B8"
 MAX_OBJECTIVES = 3
+RECENT_RUNS = 3
+MAX_PROBLEMS_SHOWN = 2
+RUN_ID_FORMAT = "%Y%m%d-%H%M%S"
 
 
 @dataclass(slots=True, frozen=True)
@@ -61,6 +67,25 @@ class LatestResult:
 
 
 @dataclass(slots=True, frozen=True)
+class RecentRun:
+    """A run among the newest, of either use.
+
+    Attributes:
+        kind: SOLVE or TRAINING.
+        run_id: The run's identifier.
+        label: What it is, e.g. "NSGA-II on ZDT1".
+        phase: Where it is: running, finished, failed...
+        launched: When it was launched, or None if its identifier is not a timestamp.
+    """
+
+    kind: str
+    run_id: str
+    label: str
+    phase: RunPhase
+    launched: datetime | None
+
+
+@dataclass(slots=True, frozen=True)
 class Activity:
     """What the app has been used for.
 
@@ -69,12 +94,14 @@ class Activity:
         latest: The newest finished run with a front, of either use, or None.
         solve_runs: How many solve runs are stored.
         trainings: How many training runs are stored.
+        recent: The newest runs of either use, the newest first.
     """
 
     running: RunningNow | None
     latest: LatestResult | None
     solve_runs: int
     trainings: int
+    recent: tuple[RecentRun, ...] = ()
 
 
 def activity(working_directory: Path) -> Activity:
@@ -93,7 +120,51 @@ def activity(working_directory: Path) -> Activity:
         latest=_latest_result(solve_directory, training_directory, working_directory),
         solve_runs=_count_runs(solve_directory),
         trainings=_count_runs(training_directory),
+        recent=_recent_runs(solve_directory, training_directory, working_directory),
     )
+
+
+def _newest(runs_directory: Path) -> list[Path]:
+    if not runs_directory.is_dir():
+        return []
+    directories = [path for path in runs_directory.iterdir() if path.is_dir()]
+    return sorted(directories, reverse=True)[:RECENT_RUNS]
+
+
+def _launched(run_id: str) -> datetime | None:
+    try:
+        return datetime.strptime(run_id, RUN_ID_FORMAT)
+    except ValueError:
+        return None
+
+
+def _recent_runs(
+    solve_directory: Path, training_directory: Path, working_directory: Path
+) -> tuple[RecentRun, ...]:
+    recent = []
+    for run_dir in _newest(solve_directory):
+        request = read_request(run_dir) or {}
+        problem = format_problem_spec(request.get("problem", "a problem"))
+        label = f"{request.get('algorithmName', 'An algorithm')} on {problem}"
+        recent.append(_recent(SOLVE, run_dir, label))
+    for run_dir in _newest(training_directory):
+        training = read_training(run_dir, working_directory)
+        label = _training_label(training) if training is not None else "A training"
+        recent.append(_recent(TRAINING, run_dir, label))
+    recent.sort(key=lambda run: run.run_id, reverse=True)
+    return tuple(recent[:RECENT_RUNS])
+
+
+def _training_label(training: FinishedTraining) -> str:
+    """The algorithm and its first problems, e.g. "PAES on RE31, RE32 and 5 more"."""
+    shown = training.problems[:MAX_PROBLEMS_SHOWN]
+    more = len(training.problems) - len(shown)
+    problems = ", ".join(shown) + (f" and {more} more" if more else "")
+    return f"{training.algorithm} on {problems}"
+
+
+def _recent(kind: str, run_dir: Path, label: str) -> RecentRun:
+    return RecentRun(kind, run_dir.name, label, run_phase(run_dir), _launched(run_dir.name))
 
 
 def _count_runs(runs_directory: Path) -> int:

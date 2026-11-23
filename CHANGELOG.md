@@ -28,7 +28,10 @@ Works with Evolver 2.5.
   take the tour) beside the front of the latest result of either use — or the run in progress —,
   a band with what Evolver offers (read from the jar) and the tutorials written, the three steps
   (Explore, Solve, Meta-optimization) as numbered columns with their pages and how many runs there
-  are, and the tutorials by level below. It takes the colors of the logo.
+  are, and the tutorials by level below. It takes the colors of the logo. Under the title it says
+  which Evolver and which Java are in use, it lists the newest runs of either use, and each figure
+  of the band has examples read from the jar (algorithms, meta-optimizers, problem families,
+  indicators).
 
 ### Documentation
 

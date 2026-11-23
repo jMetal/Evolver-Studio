@@ -7,13 +7,11 @@ what it can resolve, and what the text says about Evolver comes from that answer
 written down.
 """
 
-import shutil
-import subprocess
 from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.app_state import _manifest
+from evolver_studio.app_state import _manifest, java_version
 from evolver_studio.evolver_client import EVOLVER_VERSION, is_jar_overridden
 from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, SOLVE_RUNS_DIRECTORY_NAME
@@ -24,15 +22,6 @@ from evolver_studio.validation_runner import VALIDATION_RUNS_DIRECTORY_NAME
 
 E4_TUTORIAL_URL = "https://github.com/jMetal/Evolver/blob/develop/docs/quick_start.rst"
 KEY_PREFIX = "tutorial_tour"
-
-
-def _java_version() -> str | None:
-    """The first line `java -version` prints, or None when Java is not on the PATH."""
-    if shutil.which("java") is None:
-        return None
-    result = subprocess.run(["java", "-version"], capture_output=True, text=True)
-    lines = (result.stderr or result.stdout).strip().splitlines()
-    return lines[0] if lines else None
 
 
 def _render_introduction(jar: Path) -> None:
@@ -59,7 +48,7 @@ def _render_introduction(jar: Path) -> None:
 
 
 def _render_connection(jar: Path) -> None:
-    java = _java_version()
+    java = java_version()
     version = jar_evolver_version(jar)
     st.markdown(
         "Evolver-Studio needs two things on your computer, and the app "
