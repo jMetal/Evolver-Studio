@@ -23,7 +23,9 @@ def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> AppTest:
     if not jar_path().is_file():
         pytest.skip(f"Evolver jar not found at {jar_path()}")
     monkeypatch.setattr(evolver_client, "WORKING_DIRECTORY", tmp_path)
-    return AppTest.from_file(str(PAGE_SCRIPT), default_timeout=60).run()
+    app = AppTest.from_file(str(PAGE_SCRIPT), default_timeout=60)
+    app.session_state["train_experiment_name"] = "test"
+    return app.run()
 
 
 def _launch_button(app: AppTest):
@@ -34,6 +36,32 @@ def _needs_problem_catalogue() -> None:
     result = describe(WORKING_DIRECTORY, jar_path())
     if parse_problem_catalogue(getattr(result, "value", {})) is None:
         pytest.skip("The Evolver jar in use does not describe the problems")
+
+
+class TestExperiment:
+    def test_should_ask_for_a_name_before_launching(self, app: AppTest):
+        # Act
+        app.text_input(key="train_experiment_name").set_value("").run()
+
+        # Assert
+        assert _launch_button(app).disabled
+        assert any("Give the experiment a name" in info.value for info in app.info)
+        assert any("results/NSGA-II/EXPERIMENT_NAME.<date-time>" in c.value for c in app.caption)
+
+    def test_should_not_take_a_name_that_is_not_one_of_a_directory(self, app: AppTest):
+        # Act
+        app.text_input(key="train_experiment_name").set_value("../other results").run()
+
+        # Assert
+        assert _launch_button(app).disabled
+        assert any("can only have letters" in error.value for error in app.error)
+
+    def test_should_suggest_a_folder_for_the_algorithm(self, app: AppTest):
+        # Act
+        app.selectbox(key="train_base_algorithm").select("PAES").run()
+
+        # Assert
+        assert any("results/PAES/test.<date-time>" in caption.value for caption in app.caption)
 
 
 class TestTrainingSetProblems:
@@ -634,6 +662,8 @@ class TestProblemsWithConstraints:
         assert "ConstrainedMultiobjectiveIndicator" in base_level
         training = read_training(run_dir, tmp_path)
         assert training is not None
+        assert training.output_directory == tmp_path / f"results/NSGA-II/test.{run_dir.name}"
+        assert training.experiment == "test" and " · test · " in training.label
         assert "--constraintHandling" in training.configurations[0].configuration
 
         # Act: its analysis

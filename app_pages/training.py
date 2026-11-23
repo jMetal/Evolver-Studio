@@ -60,7 +60,7 @@ from evolver_studio.parameter_space import parse_parameter_space, serialize_para
 from evolver_studio.problem_browser import render_group, render_problem_selector
 from evolver_studio.problem_catalogue import WITHOUT_CONSTRAINTS, problems_with_encoding
 from evolver_studio.problem_form import render_problem_rows
-from evolver_studio.problems import reference_front_dimension
+from evolver_studio.problems import normalized_hypervolume_warning, reference_front_dimension
 from evolver_studio.request import (
     DEFAULT_META_POPULATION_SIZE,
     META_SEARCH_SCALAR_KEYS,
@@ -86,13 +86,15 @@ from evolver_studio.training_choices import (
     DEFAULT_POPULATION_SIZE,
     META_OBJECTIVES,
     BaseLevelChoices,
+    experiment_directory,
+    experiment_name_error,
     indicator_errors,
     population_errors,
     training_indicators,
 )
 from evolver_studio.training_handoff import validation_form_state
 from evolver_studio.training_monitor import tail_text
-from evolver_studio.training_presets import CONSTRAINTS_KEY, indicators_key
+from evolver_studio.training_presets import CONSTRAINTS_KEY, EXPERIMENT_KEY, indicators_key
 from evolver_studio.training_results import TrainedConfiguration
 from evolver_studio.training_runs import read_training
 from evolver_studio.training_set import (
@@ -196,7 +198,7 @@ def _launch_run(
     encoding: str,
     meta_algorithm_name: str,
     meta_encoding: str,
-    output_directory_base: str,
+    output_directory: str,
     parameter_space_text_: str,
     extra_config: dict[str, str] | None,
     training_set: TrainingSet,
@@ -226,9 +228,8 @@ def _launch_run(
         meta_algorithm_name: The selected meta-optimizer's name
             (catalogue.MetaAlgorithm.name), e.g. "SPEA2".
         meta_encoding: The meta-optimizer's encoding, "flat" or "tree".
-        output_directory_base: Output directory, nested under run_id so
-            INDICATORS.csv (append-only in Evolver) never mixes checkpoints
-            across runs that share the same base output directory.
+        output_directory: Where its results are written, its own directory (see
+            `training_choices.experiment_directory`).
         parameter_space_text_: The (possibly user-edited) base-level parameter
             space YAML, written to this run's own file — Evolver accepts an
             absolute path here regardless of its working directory.
@@ -286,7 +287,7 @@ def _launch_run(
         request_to_yaml(
             str(base_level_file),
             str(meta_search_file),
-            f"{output_directory_base}/{run_id}",
+            output_directory,
             write_frequency=update_every_evaluations,
             status_frequency=update_every_evaluations,
             write_population=write_population,
@@ -731,6 +732,47 @@ def _render_training_set_editor(jar: Path, encoding: str) -> tuple[pd.DataFrame,
     return edited, constrained
 
 
+def _render_experiment(algorithm: BaseAlgorithm) -> tuple[str, str, bool]:
+    """Ask for the name of the experiment, which names the directory of its results.
+
+    Args:
+        algorithm: The base algorithm, which gives the folder of the results.
+
+    Returns:
+        The results folder, the name and whether they are right to launch.
+    """
+    columns = st.columns(2)
+    name = (
+        columns[0]
+        .text_input(
+            "Experiment name",
+            placeholder="Give it a name, e.g. ZDT4-first-try",
+            key=EXPERIMENT_KEY,
+            help="Required. Letters, digits, dots, hyphens and underscores.",
+        )
+        .strip()
+    )
+    folder = (
+        columns[1]
+        .text_input(
+            "Results folder",
+            f"results/{algorithm.registry_name}",
+            key=f"train_results_folder_{algorithm.name}",
+        )
+        .strip()
+    )
+    error = experiment_name_error(name)
+    if not name:
+        st.info("Give the experiment a name to launch it.", icon=":material/edit:")
+    elif error is not None:
+        st.error(error)
+    elif not folder:
+        st.error("The results need a folder.")
+    shown = experiment_directory(folder, name or "EXPERIMENT_NAME", "<date-time>")
+    st.caption(f"Results in `{shown}`.")
+    return folder, name, bool(name) and error is None and bool(folder)
+
+
 def _render_base_level_choices(
     algorithm: BaseAlgorithm,
     extra_config: dict[str, str] | None,
@@ -904,7 +946,6 @@ else:
         m for m in wired_meta_algorithms if m.name == selected_meta_algorithm_name
     )
 
-    output_directory_base = st.text_input("Output directory", "results/nsgaii/ZDT4")
     meta_max_evaluations, meta_max_minutes = _render_meta_limit()
     meta_population_size = _render_meta_population(meta_algorithm)
     number_of_cores = st.number_input("Number of cores", value=8, min_value=1)
@@ -991,6 +1032,15 @@ else:
         for error in problem_errors:
             st.error(error)
 
+    results_folder, experiment, experiment_valid = _render_experiment(algorithm)
+    slow = normalized_hypervolume_warning(
+        choices.indicators,
+        training_set.reference_front_file_names if training_set is not None else (),
+        WORKING_DIRECTORY,
+    )
+    if slow is not None:
+        st.warning(slow)
+
     can_launch = (
         frequency_error is None
         and parameter_space_text_value is not None
@@ -998,6 +1048,7 @@ else:
         and training_set is not None
         and not problem_errors
         and not choice_errors
+        and experiment_valid
     )
     if can_launch:
         base_level = _base_level_config(
@@ -1036,7 +1087,7 @@ else:
             encoding,
             meta_algorithm.name,
             meta_encoding,
-            output_directory_base,
+            experiment_directory(results_folder, experiment, run_id),
             parameter_space_text_value,
             extra_config,
             training_set,

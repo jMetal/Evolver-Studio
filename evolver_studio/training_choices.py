@@ -9,6 +9,7 @@ size and the objectives of every training problem.
 Nothing here depends on Streamlit.
 """
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,6 +48,36 @@ class BaseLevelChoices:
     population_size: int = DEFAULT_POPULATION_SIZE
     independent_runs: int = DEFAULT_INDEPENDENT_RUNS
     indicators: tuple[str, ...] = DEFAULT_INDICATORS
+
+
+def experiment_name_error(name: str) -> str | None:
+    """What is wrong with the name of an experiment, which names a directory; None if nothing is.
+
+    Args:
+        name: The name; an empty one is not an error here, but something still to give.
+    """
+    if not name or re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", name):
+        return None
+    return (
+        "The experiment name can only have letters, digits, dots, hyphens and underscores, and "
+        "must start with a letter, a digit or an underscore."
+    )
+
+
+def experiment_directory(results_folder: str, name: str, run_id: str) -> str:
+    """The directory of the results of an experiment.
+
+    It is the experiment's own, because Evolver refuses to write over the results of another one.
+
+    Args:
+        results_folder: The folder of the results, e.g. "results/NSGA-II".
+        name: The experiment's name.
+        run_id: The run's timestamp-based identifier.
+
+    Returns:
+        The path, e.g. "results/NSGA-II/ZDT4.20261123-120000".
+    """
+    return f"{results_folder.rstrip('/')}/{name}.{run_id}"
 
 
 def training_indicators(constrained: bool = False) -> tuple[QualityIndicator, ...]:

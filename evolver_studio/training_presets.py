@@ -20,6 +20,7 @@ from evolver_studio.training_choices import (
 TRAINING_SET_ROWS_KEY = "training_set_rows"
 # Which problems the page offers: without constraints, with them or both.
 CONSTRAINTS_KEY = "train_constraints"
+EXPERIMENT_KEY = "train_experiment_name"
 STOP_BY_EVALUATIONS = "Evaluations"
 STOP_BY_TIME = "Computing time"
 
@@ -44,6 +45,7 @@ def training_state(
     independent_runs: int = DEFAULT_INDEPENDENT_RUNS,
     population_size: int = DEFAULT_POPULATION_SIZE,
     group: str = WITHOUT_CONSTRAINTS,
+    experiment: str | None = None,
 ) -> dict[str, object]:
     """The values of the Training form for a training, by widget key.
 
@@ -64,6 +66,7 @@ def training_state(
         independent_runs: The runs that measure each configuration.
         population_size: The base algorithm's population.
         group: The problems offered: without constraints, with them or both.
+        experiment: The name of the experiment; None for "tutorial-" and its first problem.
 
     Returns:
         The session state to set.
@@ -73,6 +76,7 @@ def training_state(
         indicators = DEFAULT_CONSTRAINED_INDICATORS if constrained else DEFAULT_INDICATORS
     state: dict[str, object] = {
         CONSTRAINTS_KEY: group,
+        EXPERIMENT_KEY: experiment or f"tutorial-{problems[0] if problems else algorithm}",
         "train_base_algorithm": algorithm,
         f"train_encoding_{algorithm}": encoding,
         f"train_problems_{encoding}": list(problems),

@@ -51,6 +51,10 @@ Works with Evolver 2.7.
 
 ### Training and Training analysis
 
+- A training asks for an **experiment name**, and keeps its results in
+  `results/<algorithm>/<name>.<date-time>` (the folder can be changed). Until now the suggested
+  folder was that of ZDT4, whatever was trained. The name identifies the training in Training
+  analysis and in Validation.
 - **Problems with constraints**: the training set is chosen among the problems without constraints,
   with them or both, before the parameter space, which is then the one that handles constraints.
   The meta-objectives are restricted to those that make sense: ICMOP, EP, NHV and IGD+ with constraints
