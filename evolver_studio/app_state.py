@@ -37,7 +37,10 @@ def render_jar_status() -> Path | None:
     jar = jar_path()
     if jar.is_file():
         if shutil.which("java") is None:
-            st.warning("Java was not found on the PATH; Evolver needs Java 21 or newer.")
+            st.warning(
+                "Java was not found; Evolver needs Java 21 or newer. `make env` installs it in "
+                "the app's Conda environment: start the app with `make run`."
+            )
         return jar
     if is_jar_overridden():
         st.error(f"{JAR_OVERRIDE_VARIABLE} points at a missing file: `{jar}`")

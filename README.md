@@ -115,8 +115,11 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 
 ## Requirements
 
-- Python 3.11 or newer and [Conda](https://docs.conda.io/)
-- Java 21 or newer, on the `PATH`
+- `git` and `make` (Debian/Ubuntu: `sudo apt install git make`; macOS: `xcode-select --install`)
+- [Conda](https://docs.conda.io/) ([Miniforge](https://github.com/conda-forge/miniforge) is
+  recommended; Anaconda and Miniconda also work). `make env` installs Python 3.11 and **Java 21**
+  in an environment of its own, so you do not have to install them beforehand, and the Python and
+  Java already on the computer are not touched
 - Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF
 
 No Evolver checkout and no Maven: the app downloads the jar of **Evolver 2.5** from Maven Central
@@ -132,7 +135,15 @@ time:
 ```bash
 git clone https://github.com/jMetal/Evolver-Studio.git
 cd Evolver-Studio
-make env   # creates (or updates) the 'evolver-studio' Conda environment
+make env   # creates (or updates) the 'evolver-studio' Conda environment, with Python and Java
+```
+
+The `make` targets (`make run`, `make test`, ...) run inside that environment, so you do not need
+to activate it. To use its tools directly (`streamlit run app.py`, `pytest`, `ruff`), activate it
+first:
+
+```bash
+conda activate evolver-studio
 ```
 
 ## Quick start
@@ -181,8 +192,9 @@ with any tool:
 
 ## Troubleshooting
 
-- **"Java was not found on the PATH"**: install Java 21 or newer (for example
-  [Temurin](https://adoptium.net/)) and restart the app.
+- **"Java was not found"**: run `make env` (it installs Java 21 in the Conda environment) and start
+  the app with `make run`, or with the environment activated. If you run the app another way,
+  install Java 21 or newer (for example [Temurin](https://adoptium.net/)) and restart it.
 - **The jar does not download**: check the connection to Maven Central, or download
   `Evolver-2.5-jar-with-dependencies.jar` by hand into `lib/`.
 - **No PNG/PDF buttons under the charts**: they need Chrome or Chromium; the camera icon of each

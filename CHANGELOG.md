@@ -8,7 +8,15 @@ version works with.
 
 Works with Evolver 2.5.
 
+### Installation
+
+- `make env` installs **Java 21** (`openjdk` from conda-forge) in the Conda environment, so Java
+  need not be installed beforehand. The README lists what to have first (git, make and Conda), says
+  that the `make` targets run inside the environment and how to activate it to use its tools
+  directly, and the "Java was not found" messages point to `make env`.
+
 ### Design
+
 
 - The **menu is at the top** of the page (Home, and a dropdown each for Explore, Solve,
   Meta-optimization and Learn) instead of on the left.

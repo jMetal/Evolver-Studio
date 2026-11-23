@@ -64,7 +64,8 @@ def _render_connection(jar: Path) -> None:
     st.markdown(
         "Evolver-Studio needs two things on your computer, and the app "
         "checks both:\n\n"
-        "1. **Java 21 or newer**, which runs Evolver.\n"
+        "1. **Java 21 or newer**, which runs Evolver (`make env` installs it in the app's "
+        "Conda environment).\n"
         "2. **Evolver's jar**, one file with the framework and its configurations. The app "
         f"follows the release **Evolver {EVOLVER_VERSION}**; if the jar is missing, the app "
         "offers to download it from Maven Central into the app's `lib/` folder. Nothing else of "
@@ -75,7 +76,10 @@ def _render_connection(jar: Path) -> None:
     columns[0].metric("Java", java or "not found", help="The first line of `java -version`.")
     columns[1].metric("Evolver jar", version or "unknown version", help=f"`{jar.name}`")
     if java is None:
-        st.warning("Java was not found on the PATH: install Java 21 or newer to run Evolver.")
+        st.warning(
+            "Java was not found: run `make env` and start the app with `make run`, or install "
+            "Java 21 or newer."
+        )
     if is_jar_overridden():
         st.info(
             "The jar in use is the one named by the `EVOLVER_JAR` environment variable, "
