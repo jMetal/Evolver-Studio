@@ -88,12 +88,17 @@ below; revisit and reorder as real usage surfaces new ones.
   Training set takes arguments per problem and checks the encodings. With a 2.3 jar, which has no
   catalogue, the pages fall back to the plain list of names.
 
-- **A running label instead of a live view**: Run algorithm no longer offers the
-  progress bar and live front modes, which a benchmark run, over in a second or two, rarely gave
-  time to see. A run in progress shows a blinking label with the evaluation it is at (its status is
-  updated every 1000 evaluations, `app_pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
-  `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
-  `frontDelayMillis`, unused by the page.
+- **The front of a run while it runs (November 2026)**: Run algorithm draws the front Evolver writes
+  to `CURRENT_FRONT.csv` (`evolver_studio/solve_live.py`) below the Run button, twenty times a run
+  with a pause after each so that a run of a second or two can be seen. It replaces the blinking
+  label alone, which had replaced an earlier live view.
+- **Problems with constraints (November 2026)**: in Explore, Run algorithm, Training, Validation and
+  its analysis, always with the parameter space that handles them; a feasibility tab in the monitor
+  and the analyses (`evolver_studio/feasibility.py`, `validation.feasibility`) and tutorial S9.
+- **Home page and design (November 2026)**: the menu at the top, a theme of its own, no sidebar, and a
+  home page with the latest result, the recent runs and the steps (`evolver_studio/home_panel.py`).
+  The pages live in `app_pages/`: Streamlit serves a folder called `pages/` by itself, without the
+  menu.
 
 - **Moved to Evolver 2.7 (November 2026)**: the resources come from tag `v2.7`, and the catalogue
   has, for each algorithm, its parameter space and default configuration for problems with
@@ -149,9 +154,8 @@ below; revisit and reorder as real usage surfaces new ones.
   `app_pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
   `app_pages/tutorials.py`).
 - **Home page**: the app opens on `app_pages/home.py`, which presents Evolver-Studio's two uses and
-  shows a card for each page (its section, what it does, whether it is available or coming soon,
-  and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
-  cards are built from the same list of pages (`evolver_studio/sections.py`).
+  leads to every page, plus a getting-started note while Evolver's jar is missing. The menu and the
+  home page are built from the same list of pages (`evolver_studio/sections.py`).
 - **Tutorials page with the first interactive tutorial**: the page lists Evolver-Studio's tutorials
   by level (`evolver_studio/tutorials.py`, each paired with tutorials of Evolver's documentation) and
   guides the selected one step by step. **S2, "Exploring a parameter space"**
@@ -187,9 +191,9 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
   documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time. Every
-  section of the app has one for 1.0 (S1 to S8: tour, parameter spaces, solving with the
+  section of the app has one for 1.0 (S1 to S9: tour, parameter spaces, solving with the
   problems, first training, customizing a training, training analysis, validation, validation
-  analysis); the five planned ones (comparing configurations, using a tuned configuration, your
+  analysis, problems with constraints); the five planned ones (comparing configurations, using a tuned configuration, your
   own problem, meta-optimizers and encodings, long-running jobs) come after 1.0. As in Evolver, only
   the written ones are numbered, consecutively by level: writing a new one renumbers those after
   it.

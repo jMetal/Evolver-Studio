@@ -35,7 +35,10 @@ analyze the results with the statistics a paper needs — without writing Java o
   critical difference plots, a Bayesian signed-rank test, attainment surfaces and EAF differences;
   tables in LaTeX, every chart in PNG or PDF, and the files [SAES](https://github.com/jMetal/SAES)
   reads.
-- **Learn by doing.** Eight interactive tutorials, each paired with a tutorial of Evolver's
+- **Problems with constraints.** 127 of them, from benchmarks and real-world suites: every
+  algorithm runs with its parameter space for them, a training chooses how they are handled, and
+  the results tell whether a run found feasible solutions, besides how good they are.
+- **Learn by doing.** Nine interactive tutorials, each paired with a tutorial of Evolver's
   documentation, run real examples inside the app.
 - **In step with Evolver.** Parameter spaces, problems and indicators are read from Evolver's own
   release jar, and tests check the app against every new release.
@@ -52,12 +55,13 @@ analyze the results with the statistics a paper needs — without writing Java o
 ## The workflow
 
 **Solving a problem**: pick a problem in *Explore › Problems*, then configure and run an algorithm
-on it in *Run algorithm*, and inspect its fronts, solutions and quality indicators.
+on it in *Run algorithm*, follow its front while it runs, and inspect its fronts, solutions and
+quality indicators.
 
 **Meta-optimization** has four steps, a page each:
 
 1. **Training** — choose the algorithm to configure, the problems to tune it for, the
-   meta-objectives (quality indicators) and the meta-optimizer, and launch it.
+   meta-objectives (quality indicators) and the meta-optimizer, name the experiment, and launch it.
 2. **Training analysis** — read what it found: convergence, the front of configurations, what
    they have in common and how they differ from the default configuration.
 3. **Validation** — run a configuration it found many times, next to the default configurations
@@ -72,15 +76,15 @@ algorithm*, to be used on a new problem.
 
 | Section | Page | What it does |
 |---|---|---|
-| Explore | Base algorithms | Browse the parameter space of every configurable algorithm, per encoding |
+| Explore | Base algorithms | Browse the parameter space of every configurable algorithm, per encoding, and how each one handles constraints |
 | Explore | Meta-optimizers | The meta-optimizers, their encodings (flat, tree) and their operators |
 | Explore | Quality indicators | The indicators, what each one measures, and which way is better |
-| Explore | Problems | Every problem: encoding, objectives, variables, arguments, reference fronts |
-| Solve | Run algorithm | Run an algorithm from its default configuration, adjusted as you like; fronts, indicators, `VAR`/`FUN` |
+| Explore | Problems | Every problem: encoding, objectives, variables, constraints, arguments, reference fronts |
+| Solve | Run algorithm | Run an algorithm from its default configuration, adjusted as you like; its front as it evolves, fronts, indicators, `VAR`/`FUN` |
 | Meta-optimization | Training | Configure, launch, monitor and cancel a training run |
-| Meta-optimization | Training analysis | Convergence, fronts, population and configurations of a finished training |
+| Meta-optimization | Training analysis | Convergence, fronts, population, feasibility and configurations of a finished training |
 | Meta-optimization | Validation | Design a validation study, run it in the background and follow it |
-| Meta-optimization | Validation analysis | Verdicts, Wilcoxon table, effect sizes, rankings, Bayesian test, fronts, attainment, cost |
+| Meta-optimization | Validation analysis | Verdicts, feasibility, Wilcoxon table, effect sizes, rankings, Bayesian test, fronts, attainment, cost |
 | Learn | Tutorials | Interactive tutorials, paired with Evolver's documentation |
 
 ## Tutorials
@@ -187,7 +191,7 @@ with any tool:
 | Folder | Contents |
 |---|---|
 | `cli-runner-runs/` | One folder per training: its request, status and log |
-| `results/` | What Evolver wrote for each training (`INDICATORS.csv`, `VAR_CONF.txt`, `METADATA.txt`…) |
+| `results/` | What Evolver wrote for each training, in `<algorithm>/<experiment>.<date-time>/` (`INDICATORS.csv`, `VAR_CONF.txt`, `METADATA.txt`…) |
 | `solve-runs/` | The runs of *Run algorithm* |
 | `validation-runs/` | The validation studies, with every run's front and indicators |
 

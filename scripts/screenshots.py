@@ -50,6 +50,7 @@ CHROME_CANDIDATES = (
 TAB_PANEL = """(() => {
   const panel = [...document.querySelectorAll('[role=tabpanel]')]
     .find(p => p.offsetParent !== null);
+  panel.scrollIntoView();  // what is out of the window is not drawn
   const r = panel.getBoundingClientRect();
   return [r.x, r.y + window.scrollY, r.width, r.height];
 })()"""
@@ -134,6 +135,40 @@ class Browser:
         await asyncio.sleep(wait)
         return bool(found)
 
+    async def tick(self, label: str, wait: float = 4) -> None:
+        """Tick the page's checkbox called `label`, with the mouse: a click event does not."""
+        x, y = await self.evaluate(
+            f"""(() => {{
+              const e = [...document.querySelectorAll('[data-testid=stCheckbox] label')]
+                .find(e => e.innerText.trim().endsWith({json.dumps(label)}));
+              e.scrollIntoView({{block: 'center'}});
+              const r = e.getBoundingClientRect();
+              return [r.x + 10, r.y + r.height / 2];
+            }})()"""
+        )
+        for kind in ("mousePressed", "mouseReleased"):
+            await self.call(
+                "Input.dispatchMouseEvent", type=kind, x=x, y=y, button="left", clickCount=1
+            )
+        await asyncio.sleep(wait)
+
+    async def write(self, label: str, text: str, wait: float = 4) -> None:
+        """Write `text` in the page's text input called `label`, and press Enter."""
+        await self.evaluate(
+            f"document.querySelector('input[aria-label=' + {json.dumps(json.dumps(label))} + ']')"
+            ".focus()"
+        )
+        await self.call("Input.insertText", text=text)
+        for kind in ("keyDown", "keyUp"):
+            await self.call(
+                "Input.dispatchKeyEvent",
+                type=kind,
+                key="Enter",
+                code="Enter",
+                windowsVirtualKeyCode=13,
+            )
+        await asyncio.sleep(wait)
+
     async def tab(self, name: str, wait: float = 6) -> bool:
         return await self.click(name, "[role=tab]", wait)
 
@@ -214,9 +249,11 @@ async def _take(url: str, with_training: bool, study: str | None, only: str | No
         await browser.capture(TAB_PANEL, "validation-fronts")
 
         if with_training:
-            await browser.open(f"{url}/training")
-            await browser.click("Show the meta-optimizer's population while it runs", "label")
-            await browser.click("Launch training", wait=90)
+            # Long enough for Evolver to describe its problems, which the page waits for.
+            await browser.open(f"{url}/training", wait=15)
+            await browser.tick("Show the meta-optimizer's population while it runs")
+            await browser.write("Experiment name", "screenshot")
+            await browser.click("Launch training", wait=50)
             await browser.tab("Population", wait=8)
             await browser.capture(TAB_PANEL, "training-monitor")
             await browser.click("Cancel")
