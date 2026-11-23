@@ -10,14 +10,14 @@ Works with Evolver 2.5.
 
 ### Run algorithm
 
-- **The front while it runs**: a run in progress draws the non-dominated solutions it has found so
-  far (Evolver's `CURRENT_FRONT.csv`), over the problem's reference front, with the run and the
-  evaluation they belong to. The option is on by default, every 2500 evaluations (the more often,
-  the slower the run), can be turned off or changed in the budget, is restored when a past run is
-  reopened, and needs Evolver 2.3 or later. A fast run can end before the page has drawn more than
-  a few fronts, so the budget also offers a **pause after each front**, in milliseconds (off by
-  default; Evolver 2.4 or later), which slows the run by that much for each front so that every
-  one can be seen.
+- **The front while it runs**, right below the Run button: a run in progress draws the
+  non-dominated solutions it has found so far (Evolver's `CURRENT_FRONT.csv`), over the problem's
+  reference front, with the run and the evaluation they belong to. It shows 20 fronts spread over
+  the run, can be turned off in the budget, is restored when a past run is reopened, and needs
+  Evolver 2.3 or later. A fast run can end before the page has drawn more than a few of them, so
+  the run **pauses 300 ms after each front** (the budget asks only for that pause, in milliseconds;
+  0 does not pause; Evolver 2.4 or later): every front adds that pause, a few seconds in all, and
+  every one can be seen.
 
 ### Installation
 

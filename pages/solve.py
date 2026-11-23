@@ -76,7 +76,6 @@ from evolver_studio.solve_form import (
     EVALUATIONS_KEY,
     FIX_SEED_KEY,
     LIVE_FRONT_DELAY_KEY,
-    LIVE_FRONT_EVERY_KEY,
     LIVE_FRONT_KEY,
     LOADED_CONFIGURATION_KEY,
     NO_REFERENCE_FRONT,
@@ -115,16 +114,20 @@ RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
 DEFAULT_POPULATION_SIZE = 100
-POLL_EVERY_SECONDS = 1
+# How often the page looks at the run in progress. With the pause after each front shorter than
+# this, some fronts go by unseen.
+POLL_EVERY_SECONDS = 0.5
 LOG_LINES_SHOWN = 15
 # Every how many evaluations a run updates its status, for the page to show the evaluation it is
 # at: often enough to follow it, and seldom enough to cost little (a few percent at most).
 STATUS_FREQUENCY = 1000
 # The Evolver release from which a run reports its progress, and writes its front, while it runs.
 PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
-# Every how many evaluations the front of a run in progress is shown, unless the user chooses: a
-# new front every few seconds in a typical run, at a cost of a few percent.
-LIVE_FRONT_EVERY = 2500
+# How many fronts of a run in progress Evolver writes (one every 1/20 of the evaluations), and how
+# long the run pauses after each unless the user chooses: a fast run (a few seconds) then lasts long
+# enough to see the front take shape, and a long one is slowed by the same few seconds.
+LIVE_FRONT_COUNT = 20
+LIVE_FRONT_DELAY = 300
 # The Evolver release from which a run can pause after writing each front.
 FRONT_DELAY_SINCE = "2.4"
 LIVE_FRONT_DELAY_STEP = 50
@@ -449,7 +452,7 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
         "the seed + i - 1.",
         key=indicators_key(has_reference_front),
     )
-    live_front_every, live_front_delay_millis = _render_live_front()
+    live_front_every, live_front_delay_millis = _render_live_front(int(max_evaluations))
     return Budget(
         population_size=int(population_size),
         max_evaluations=int(max_evaluations),
@@ -461,42 +464,37 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
     )
 
 
-def _render_live_front() -> tuple[int | None, int | None]:
+def _render_live_front(max_evaluations: int) -> tuple[int | None, int | None]:
     """The options to follow the front while a run is in progress.
 
+    Args:
+        max_evaluations: The evaluations of each run, over which the fronts are spread.
+
     Returns:
-        Every how many evaluations to show it, or None not to (the user chose not to, or the jar
-        cannot write it), and how long the run pauses after each front, or None for no pause.
+        Every how many evaluations to show the front, or None not to (the user chose not to, or
+        the jar cannot write it), and how long the run pauses after each front, or None for no
+        pause.
     """
     supported = _live_front_supported()
-    live_column, every_column, delay_column = st.columns(3)
+    live_column, delay_column = st.columns(2)
     live = live_column.checkbox(
         "Show the front while it runs",
         value=True,
         disabled=not supported,
-        help="Evolver writes the non-dominated solutions of the run every so many evaluations "
-        "and this page draws them, so you can see the front take shape. The more often, the "
-        "slower the run.",
+        help="Evolver writes the non-dominated solutions of the run while it runs and this page "
+        "draws them, so you can see the front take shape.",
         key=LIVE_FRONT_KEY,
-    )
-    every = every_column.number_input(
-        "Update it every (evaluations)",
-        100,
-        value=LIVE_FRONT_EVERY,
-        step=500,
-        disabled=not (live and supported),
-        key=LIVE_FRONT_EVERY_KEY,
     )
     can_pause = live and supported and _front_delay_supported()
     delay = delay_column.number_input(
         "Pause after each front (ms)",
         0,
-        value=0,
+        value=LIVE_FRONT_DELAY,
         step=LIVE_FRONT_DELAY_STEP,
         disabled=not can_pause,
-        help="A fast run can end before the page has drawn more than a few fronts. Pausing the "
-        "run after each one lets you see them all, at the price of a slower run: every front "
-        "adds this pause. 0 does not pause.",
+        help="A fast run can end before the page has drawn more than a few of the "
+        f"{LIVE_FRONT_COUNT} fronts it shows. Pausing the run after each one lets you see them "
+        "all, at the price of a slower run: every front adds this pause. 0 does not pause.",
         key=LIVE_FRONT_DELAY_KEY,
     )
     if not supported:
@@ -506,8 +504,8 @@ def _render_live_front() -> tuple[int | None, int | None]:
         )
     elif live and not _front_delay_supported():
         st.caption(f"Pausing after each front needs Evolver {FRONT_DELAY_SINCE} or later.")
-    shown_every = int(every) if live and supported else None
-    return shown_every, int(delay) if can_pause and delay > 0 else None
+    every = max(1, max_evaluations // LIVE_FRONT_COUNT) if live and supported else None
+    return every, int(delay) if can_pause and delay > 0 else None
 
 
 def _front_delay_supported() -> bool:
@@ -888,7 +886,7 @@ jar = require_evolver_jar()
 warn_if_jar_older_than_catalogue(jar)
 
 run_in_progress = find_run_in_progress(RUNS_DIRECTORY)
+_render_form(can_run=run_in_progress is None)
 if run_in_progress is not None:
     _render_run_in_progress(run_in_progress)
-_render_form(can_run=run_in_progress is None)
 _render_history()

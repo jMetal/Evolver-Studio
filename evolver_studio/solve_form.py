@@ -23,7 +23,6 @@ RUNS_KEY = "solve_runs"
 FIX_SEED_KEY = "solve_fix_seed"
 SEED_KEY = "solve_seed"
 LIVE_FRONT_KEY = "solve_live_front"
-LIVE_FRONT_EVERY_KEY = "solve_live_front_every"
 LIVE_FRONT_DELAY_KEY = "solve_live_front_delay"
 # A new version gives the configuration widgets new keys, so they start from their values again.
 CONFIGURATION_VERSION_KEY = "solve_configuration_version"
@@ -114,8 +113,6 @@ def form_state_from_request(
     if weight_vectors:
         state[WEIGHT_VECTORS_KEY] = weight_vectors
     state[LIVE_FRONT_KEY] = request.get("frontFrequency") is not None
-    if request.get("frontFrequency") is not None:
-        state[LIVE_FRONT_EVERY_KEY] = request["frontFrequency"]
     state[LIVE_FRONT_DELAY_KEY] = request.get("frontDelayMillis") or 0
     state[FIX_SEED_KEY] = request.get("seed") is not None
     if request.get("seed") is not None:
