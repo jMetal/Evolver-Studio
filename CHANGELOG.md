@@ -16,6 +16,11 @@ Works with Evolver 2.5.
   headings, light and dark variants, and no developer options in the toolbar.
 - There is **no sidebar**: the jar's status (a missing jar with its download button, a missing
   Java) is shown at the top of the page, and only when there is something to say.
+- The **home page** is a panel of the studio: a first action (run an algorithm, start a training,
+  take the tour) beside the front of the latest result of either use — or the run in progress —,
+  a band with what Evolver offers (read from the jar) and the tutorials written, the three steps
+  (Explore, Solve, Meta-optimization) as numbered columns with their pages and how many runs there
+  are, and the tutorials by level below. It takes the colors of the logo.
 
 ### Documentation
 

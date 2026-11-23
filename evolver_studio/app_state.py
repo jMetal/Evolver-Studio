@@ -106,6 +106,27 @@ def _manifest(jar_str: str) -> dict | None:
     return result.value if isinstance(result, Ok) else None
 
 
+def evolver_facts(jar_str: str) -> dict[str, int] | None:
+    """Count what Evolver offers, from DescribeMain's manifest.
+
+    Args:
+        jar_str: Path to Evolver's jar, as a string.
+
+    Returns:
+        The number of base algorithms, meta-optimizers, problems and quality indicators, by
+        name, or None if DescribeMain could not be run.
+    """
+    manifest = _manifest(jar_str)
+    if manifest is None:
+        return None
+    return {
+        "Base algorithms": len({entry["name"] for entry in manifest["baseAlgorithms"]}),
+        "Meta-optimizers": len(manifest["metaAlgorithms"]),
+        "Problems": len(manifest["problems"]),
+        "Quality indicators": len(manifest["indicators"]),
+    }
+
+
 def registered_problem_names(jar_str: str) -> list[str] | None:
     """List the problems Evolver can resolve by name, from DescribeMain's manifest.
 

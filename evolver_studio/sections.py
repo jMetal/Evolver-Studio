@@ -35,10 +35,14 @@ class Section:
     Attributes:
         name: Its heading in the menu, and the label of its pages' cards on the home page.
         pages: Its pages, in menu order.
+        icon: Its icon, on its heading on the home page.
+        summary: One line on what the section is for, under its heading on the home page.
     """
 
     name: str
     pages: tuple[Page, ...]
+    icon: str = ""
+    summary: str = ""
 
 
 SECTIONS = (
@@ -77,6 +81,8 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="🧭",
+        summary="See what Evolver offers: algorithms, meta-optimizers, indicators and problems.",
     ),
     Section(
         "Solve",
@@ -91,6 +97,8 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="▶️",
+        summary="Run a configurable algorithm on a problem, as an alternative to writing a runner.",
     ),
     Section(
         "Meta-optimization",
@@ -131,6 +139,8 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="🧬",
+        summary="Tune an algorithm automatically, then analyze and validate the result.",
     ),
     Section(
         "Learn",
@@ -143,5 +153,7 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="🎓",
+        summary="Interactive tutorials that walk through every part of the app.",
     ),
 )

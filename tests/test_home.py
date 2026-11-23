@@ -38,22 +38,23 @@ class TestHomePage:
         assert not app.exception
         assert app.title[0].value == "Evolver-Studio"
 
-    def test_should_show_a_card_for_every_page(self, app: AppTest):
+    def test_should_link_to_every_page(self, app: AppTest):
         # Act
-        titles = [markdown.value for markdown in app.markdown if markdown.value.startswith("####")]
+        labels = [link.proto.label for link in app.get("page_link")]
 
         # Assert
-        assert titles == [f"#### {page.icon} {page.title}" for page in PAGES]
+        for section in SECTIONS:
+            if section.name == "Learn":  # its tutorials are listed one by one
+                continue
+            for page in section.pages:
+                assert page.title in labels
 
-    def test_should_mark_the_pages_not_implemented_yet_as_coming_soon(self, app: AppTest):
+    def test_should_group_the_cards_under_a_heading_for_each_section(self, app: AppTest):
         # Act
-        badges = [
-            markdown.value
-            for markdown in app.markdown
-            if "Available" in markdown.value or "Coming soon" in markdown.value
-        ]
+        steps = [h.value for h in app.get("html") if 'class="studio-step"' in h.value]
 
         # Assert
-        assert [("Coming soon" in badge) for badge in badges] == [
-            not page.available for page in PAGES
-        ]
+        for section in SECTIONS:
+            assert any(section.name in step for step in steps) or any(
+                section.name in subheader.value for subheader in app.subheader
+            )
