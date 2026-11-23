@@ -75,6 +75,7 @@ from evolver_studio.solve_form import (
     CONFIGURATION_VERSION_KEY,
     EVALUATIONS_KEY,
     FIX_SEED_KEY,
+    LIVE_FRONT_DELAY_KEY,
     LIVE_FRONT_EVERY_KEY,
     LIVE_FRONT_KEY,
     LOADED_CONFIGURATION_KEY,
@@ -124,6 +125,9 @@ PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
 # Every how many evaluations the front of a run in progress is shown, unless the user chooses: a
 # new front every few seconds in a typical run, at a cost of a few percent.
 LIVE_FRONT_EVERY = 2500
+# The Evolver release from which a run can pause after writing each front.
+FRONT_DELAY_SINCE = "2.4"
+LIVE_FRONT_DELAY_STEP = 50
 LIVE_FRONT_HEIGHT = 380
 
 
@@ -402,6 +406,8 @@ class Budget:
         indicators: The quality indicators to compute.
         live_front_every: Every how many evaluations to show the front while a run is in
             progress, or None not to.
+        live_front_delay_millis: How long the run pauses after writing each front, or None for no
+            pause.
     """
 
     population_size: int
@@ -410,6 +416,7 @@ class Budget:
     seed: int | None
     indicators: list[str]
     live_front_every: int | None = None
+    live_front_delay_millis: int | None = None
 
 
 def _render_budget(has_reference_front: bool, population_sizes: list[int] | None) -> Budget:
@@ -442,7 +449,7 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
         "the seed + i - 1.",
         key=indicators_key(has_reference_front),
     )
-    live_front_every = _render_live_front()
+    live_front_every, live_front_delay_millis = _render_live_front()
     return Budget(
         population_size=int(population_size),
         max_evaluations=int(max_evaluations),
@@ -450,18 +457,19 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
         seed=int(seed) if fix_seed else None,
         indicators=indicators,
         live_front_every=live_front_every,
+        live_front_delay_millis=live_front_delay_millis,
     )
 
 
-def _render_live_front() -> int | None:
-    """The option to follow the front while a run is in progress.
+def _render_live_front() -> tuple[int | None, int | None]:
+    """The options to follow the front while a run is in progress.
 
     Returns:
         Every how many evaluations to show it, or None not to (the user chose not to, or the jar
-        cannot write it).
+        cannot write it), and how long the run pauses after each front, or None for no pause.
     """
     supported = _live_front_supported()
-    live_column, every_column = st.columns(2)
+    live_column, every_column, delay_column = st.columns(3)
     live = live_column.checkbox(
         "Show the front while it runs",
         value=True,
@@ -479,12 +487,33 @@ def _render_live_front() -> int | None:
         disabled=not (live and supported),
         key=LIVE_FRONT_EVERY_KEY,
     )
+    can_pause = live and supported and _front_delay_supported()
+    delay = delay_column.number_input(
+        "Pause after each front (ms)",
+        0,
+        value=0,
+        step=LIVE_FRONT_DELAY_STEP,
+        disabled=not can_pause,
+        help="A fast run can end before the page has drawn more than a few fronts. Pausing the "
+        "run after each one lets you see them all, at the price of a slower run: every front "
+        "adds this pause. 0 does not pause.",
+        key=LIVE_FRONT_DELAY_KEY,
+    )
     if not supported:
         st.caption(
             f"Showing the front while a run is in progress needs Evolver "
             f"{PROGRESS_WITHIN_A_RUN_SINCE} or later."
         )
-    return int(every) if live and supported else None
+    elif live and not _front_delay_supported():
+        st.caption(f"Pausing after each front needs Evolver {FRONT_DELAY_SINCE} or later.")
+    shown_every = int(every) if live and supported else None
+    return shown_every, int(delay) if can_pause and delay > 0 else None
+
+
+def _front_delay_supported() -> bool:
+    """Whether the jar can pause a run after it writes each front."""
+    version = jar_evolver_version(jar)
+    return version is None or is_at_least(version, FRONT_DELAY_SINCE)
 
 
 def _live_front_supported() -> bool:
@@ -572,6 +601,7 @@ def _render_form(can_run: bool) -> None:
             indicator_names=budget.indicators,
             status_frequency=_status_frequency(),
             front_frequency=budget.live_front_every,
+            front_delay_millis=budget.live_front_delay_millis,
             write_population=False,
             output_directory=output_directory,
         )

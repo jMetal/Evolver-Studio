@@ -14,7 +14,10 @@ Works with Evolver 2.5.
   far (Evolver's `CURRENT_FRONT.csv`), over the problem's reference front, with the run and the
   evaluation they belong to. The option is on by default, every 2500 evaluations (the more often,
   the slower the run), can be turned off or changed in the budget, is restored when a past run is
-  reopened, and needs Evolver 2.3 or later.
+  reopened, and needs Evolver 2.3 or later. A fast run can end before the page has drawn more than
+  a few fronts, so the budget also offers a **pause after each front**, in milliseconds (off by
+  default; Evolver 2.4 or later), which slows the run by that much for each front so that every
+  one can be seen.
 
 ### Installation
 

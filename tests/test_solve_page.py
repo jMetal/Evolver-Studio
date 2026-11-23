@@ -363,6 +363,24 @@ class TestLiveFrontOption:
         assert app.checkbox(key="solve_live_front").value is True
         assert app.number_input(key="solve_live_front_every").value == 2500
 
+    def test_should_offer_a_pause_after_each_front_that_starts_at_zero(self, app: AppTest):
+        # Act
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert app.number_input(key="solve_live_front_delay").value == 0
+        assert not app.number_input(key="solve_live_front_delay").disabled
+
+    def test_should_not_ask_for_the_pause_when_the_front_is_off(self, app: AppTest):
+        # Arrange
+        _choose_zdt1_and_nsgaii(app)
+
+        # Act
+        app.checkbox(key="solve_live_front").uncheck().run()
+
+        # Assert
+        assert app.number_input(key="solve_live_front_delay").disabled
+
     def test_should_not_ask_for_the_update_interval_when_it_is_off(self, app: AppTest):
         # Arrange
         _choose_zdt1_and_nsgaii(app)
