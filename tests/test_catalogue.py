@@ -6,6 +6,7 @@ import pytest
 
 from evolver_studio.catalogue import (
     BASE_ALGORITHMS,
+    CONSTRAINT_HANDLING_PARAMETERS,
     KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES,
     META_ALGORITHMS,
     QUALITY_INDICATORS,
@@ -17,7 +18,8 @@ from evolver_studio.catalogue import (
     validation_indicators,
 )
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
-from evolver_studio.resource_files import PARAMETER_SPACES_DIRECTORY
+from evolver_studio.parameter_space import parse_parameter_space
+from evolver_studio.resource_files import PARAMETER_SPACES_DIRECTORY, parameter_space_text
 from evolver_studio.result import Ok
 
 
@@ -146,13 +148,47 @@ class TestDefaultConfigurations:
         missing = [
             filename
             for algorithm in BASE_ALGORITHMS
-            for configurations in algorithm.default_configurations.values()
+            for configurations in (
+                *algorithm.default_configurations.values(),
+                *algorithm.constrained_default_configurations.values(),
+            )
             for _, filename in configurations
             if f"defaultConfigurations/{filename}" not in names
         ]
 
         # Assert
         assert missing == []
+
+
+class TestConstraints:
+    def test_should_have_a_space_and_a_default_for_constraints_in_every_real_valued_algorithm(self):
+        # Act / Assert
+        for algorithm in BASE_ALGORITHMS:
+            assert algorithm.handles_constraints("Double")
+            assert set(algorithm.constrained_encodings) == {"Double"}
+            assert set(algorithm.constrained_default_configurations) == {"Double"}
+
+    def test_should_tell_the_space_for_problems_with_constraints_from_the_other(self):
+        # Arrange
+        nsgaii = next(a for a in BASE_ALGORITHMS if a.name == "NSGA-II")
+
+        # Act / Assert
+        assert nsgaii.parameter_space_file("Double") == "NSGAIIDouble.yaml"
+        assert nsgaii.parameter_space_file("Double", True) == "NSGAIIDoubleConstrained.yaml"
+        with pytest.raises(KeyError):
+            nsgaii.parameter_space_file("Binary", True)
+
+    def test_should_handle_the_constraints_with_a_known_parameter_in_every_space(self):
+        """A space for constraints without one of them would silently ignore the constraints."""
+        jar = jar_path()
+        if not jar.is_file():
+            pytest.skip(f"Evolver jar not found at {jar}")
+
+        # Act / Assert
+        for algorithm in BASE_ALGORITHMS:
+            for filename in algorithm.constrained_encodings.values():
+                names = {p.name for p in parse_parameter_space(parameter_space_text(jar, filename))}
+                assert len(names & set(CONSTRAINT_HANDLING_PARAMETERS)) == 1, filename
 
 
 class TestMetaAlgorithms:
@@ -221,16 +257,16 @@ class TestQualityIndicators:
 
 
 class TestIsOlderThanCatalogue:
-    """The catalogue mirrors the release the app runs, Evolver 2.5 (EVOLVER_VERSION)."""
+    """The catalogue mirrors the release the app runs, Evolver 2.7 (EVOLVER_VERSION)."""
 
-    @pytest.mark.parametrize("version", ["2.4", "2.3", "2.0", "1.0.1"])
+    @pytest.mark.parametrize("version", ["2.6", "2.5", "2.0", "1.0.1"])
     def test_should_flag_an_earlier_release(self, version: str):
         # Act / Assert
         assert is_older_than_catalogue(version)
 
-    @pytest.mark.parametrize("version", ["2.5", "2.5-SNAPSHOT", "2.5.1", "3.0-SNAPSHOT", "3.0"])
+    @pytest.mark.parametrize("version", ["2.7", "2.7-SNAPSHOT", "2.7.1", "3.0-SNAPSHOT", "3.0"])
     def test_should_accept_the_same_or_a_later_release_or_its_snapshot(self, version: str):
-        """A snapshot built from develop on its way to 2.5 already has its catalogue."""
+        """A snapshot built from develop on its way to 2.7 already has its catalogue."""
         # Act / Assert
         assert not is_older_than_catalogue(version)
 
@@ -323,7 +359,10 @@ class TestCatalogueMatchesEvolverJar:
         missing = [
             f"{algorithm.name}/{encoding}: {filename}"
             for algorithm in BASE_ALGORITHMS
-            for encoding, filename in algorithm.encodings.items()
+            for encoding, filename in (
+                *algorithm.encodings.items(),
+                *algorithm.constrained_encodings.items(),
+            )
             if filename not in available
         ]
 
@@ -364,7 +403,12 @@ class TestCatalogueMatchesEvolverJar:
         # Arrange
         actual = _jar_parameter_space_files()
         known = {
-            filename for algorithm in BASE_ALGORITHMS for filename in algorithm.encodings.values()
+            filename
+            for algorithm in BASE_ALGORITHMS
+            for filename in (
+                *algorithm.encodings.values(),
+                *algorithm.constrained_encodings.values(),
+            )
         } | KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES
 
         # Act

@@ -3,7 +3,7 @@
 Tutorial "Your first guided training" runs Evolver's E3 training with the Training page's
 defaults; this one goes through what else that page lets you choose, and why: the training set
 (E6), the meta-objectives and how each configuration is measured (E6), the cost of it all, the
-parameter space (E5), the meta-optimizer, its encoding and its budget (E11, E13, E14), and other
+parameter space (E5), the meta-optimizer, its encoding and its budget (E11, E14, E15), and other
 encodings of the base algorithm (E10). Each step can open Training with an example of what it
 explains, for the reader to launch or adjust; nothing runs in the tutorial itself.
 
@@ -38,7 +38,7 @@ E5_URL = f"{EVOLVER_TUTORIALS}designing_parameter_spaces.rst"
 E6_URL = f"{EVOLVER_TUTORIALS}training_sets_indicators_budgets.rst"
 E10_URL = f"{EVOLVER_TUTORIALS}binary_and_permutation_encodings.rst"
 E11_URL = f"{EVOLVER_TUTORIALS}budgets.rst"
-E14_URL = f"{EVOLVER_TUTORIALS}tree_versus_flat_encoding.rst"
+E15_URL = f"{EVOLVER_TUTORIALS}tree_versus_flat_encoding.rst"
 KEY_PREFIX = "tutorial_customizing"
 ALGORITHM = "NSGA-II"
 # E3's training took about 3 minutes for 24 million base-level evaluations of ZDT4, on 8 cores.
@@ -69,7 +69,7 @@ def _render_introduction(jar: Path) -> None:
         "Each step has a button that opens Training with an example, for you to look at, launch "
         "or adjust. Evolver's tutorials "
         f"[E5]({E5_URL}), [E6]({E6_URL}), [E10]({E10_URL}), [E11]({E11_URL}) and "
-        f"[E14]({E14_URL}) cover the same ground with Java code."
+        f"[E15]({E15_URL}) cover the same ground with Java code."
     )
 
 
@@ -260,7 +260,7 @@ def _render_meta_optimizer(jar: Path) -> None:
         f"**Its encoding.** {', '.join(with_tree)} also search the **tree** encoding: a "
         "derivation tree of the parameter space's grammar, with no inactive parameters, where "
         "the flat one is a vector with a variable for every parameter, active or not. Evolver's "
-        f"[E14]({E14_URL}) compares them.\n\n"
+        f"[E15]({E15_URL}) compares them.\n\n"
         "**Its budget.** By **evaluations**, the run is the same on any machine; by **computing "
         "time**, it takes the time you give it, and the number of configurations it tries "
         f"depends on the machine and the cores ([E11]({E11_URL})).\n\n"

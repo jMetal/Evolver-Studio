@@ -95,6 +95,9 @@ below; revisit and reorder as real usage surfaces new ones.
   `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
   `frontDelayMillis`, unused by the page.
 
+- **Moved to Evolver 2.7 (November 2026)**: the resources come from tag `v2.7`, and the catalogue
+  has, for each algorithm, its parameter space and default configuration for problems with
+  constraints (Evolver 2.6), and the indicators ICMOP and CEP.
 - **Moved to Evolver 2.5 (October 2026)**: the app downloads Evolver 2.5 and its resources come from
   tag `v2.5`. SPEA2 as a meta-optimizer is configured as NSGA-II (its operators from
   `SPEA2MetaDouble.yaml`, plus `knnNeighborhoodSize` and `knnNormalizeObjectives`) and gains the tree
@@ -228,7 +231,7 @@ Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
   `tests/test_explore_*.py`.)*
-- Track Evolver's releases: the app is built against Evolver 2.5 (`evolver_client.EVOLVER_VERSION`)
+- Track Evolver's releases: the app is built against Evolver 2.7 (`evolver_client.EVOLVER_VERSION`)
   and follows stable releases only; moving to a newer release is the `/bump-evolver` command
   (bumping that constant, `make sync-resources`, `/sync-catalogue` and the drift-detection tests).
   Work against a `develop` jar set by `EVOLVER_JAR` goes on an `experiment/*` branch. The rename

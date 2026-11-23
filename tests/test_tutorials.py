@@ -45,12 +45,12 @@ class TestTutorialsCatalogue:
         assert len(slugs) == len(set(slugs))
 
     def test_should_pair_only_with_tutorials_evolver_has(self):
-        """Evolver's documentation has tutorials E1 to E17."""
+        """Evolver's documentation has tutorials E1 to E21."""
         # Act
         paired = {number for tutorial in TUTORIALS for number in tutorial.pairs_with}
 
         # Assert
-        assert paired <= {f"E{index}" for index in range(1, 18)}
+        assert paired <= {f"E{index}" for index in range(1, 22)}
 
     @pytest.mark.parametrize("level", list(TutorialLevel))
     def test_should_group_every_tutorial_under_its_level(self, level: TutorialLevel):

@@ -109,7 +109,7 @@ DEFAULT_ON_ZDT1 = PreparedRun(
     100,
     25000,
     1,
-    {"EP": 0.0103, "NHV": 0.0098},
+    {"EP": 0.0138, "NHV": 0.0107},
 )
 OTHER_ON_ZDT1 = PreparedRun(
     "other",
@@ -133,7 +133,7 @@ DEFAULT_ON_ZDT2_FIVE_RUNS = PreparedRun(
     100,
     25000,
     5,
-    {"EP": 0.0133, "NHV": 0.0197},
+    {"EP": 0.0135, "NHV": 0.0204},
 )
 MOEAD_ON_DTLZ2 = PreparedRun(
     "moead",
@@ -145,7 +145,7 @@ MOEAD_ON_DTLZ2 = PreparedRun(
     91,
     25000,
     1,
-    {"EP": 0.0767, "NHV": 0.1220},
+    {"EP": 0.0766, "NHV": 0.1223},
 )
 RVEA_VARIANTS = {
     "RVEA": PreparedRun(

@@ -6,7 +6,17 @@ version works with.
 
 ## 0.1.0 (unreleased)
 
-Works with Evolver 2.5.
+Works with Evolver 2.7.
+
+### Evolver 2.7
+
+- The app runs **Evolver 2.7** and its resources. The catalogue has each algorithm's parameter space
+  and default configuration for **problems with constraints**, and the indicators for them, ICMOP
+  (`ConstrainedMultiobjectiveIndicator`) and CEP (`ConstrainedEpsilon`). RDE-MOEA has a default
+  configuration only for those problems.
+- The values that *Solving a problem with a configurable algorithm* announces are those of Evolver
+  2.7, which differ from those of 2.5 with the same seed, and the tutorials name those of Evolver
+  with their new numbers.
 
 ### Run algorithm
 

@@ -145,7 +145,7 @@ make run     # streamlit run app.py
 
 At runtime the app needs Java ≥ 21 (`openjdk=21` in `environment.yml`, so `make env` installs it in
 the Conda environment) and Evolver's release jar (`EVOLVER_VERSION` in
-`evolver_studio/evolver_client.py`, currently 2.5), which the app downloads from Maven Central
+`evolver_studio/evolver_client.py`, currently 2.7), which the app downloads from Maven Central
 into `lib/`. No Evolver checkout is needed: parameter spaces and meta-optimizer configurations are
 read from the jar, and the reference fronts/weight vectors training runs need are copied into
 `resources/` (the JVM runs with this repo's root as working directory). Set `EVOLVER_JAR` to run
