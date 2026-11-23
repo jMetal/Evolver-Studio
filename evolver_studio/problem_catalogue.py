@@ -14,6 +14,10 @@ from dataclasses import dataclass
 
 ArgumentValue = int | float | bool
 
+# The two groups the pages tell the problems apart by.
+WITHOUT_CONSTRAINTS = "Without constraints"
+WITH_CONSTRAINTS = "With constraints"
+
 
 @dataclass(slots=True, frozen=True)
 class ProblemArgument:
@@ -41,6 +45,9 @@ class Problem:
         number_of_objectives: Of the problem built with no arguments, or None if unknown.
         number_of_variables: Of the problem built with no arguments, or None if unknown.
         arguments: The arguments of its constructor with arguments, in order; empty for none.
+        number_of_constraints: Of the problem built with no arguments; 0 for a problem without
+            constraints, and when the jar does not say (Evolver 2.5 or older, whose algorithms do
+            not handle them).
     """
 
     name: str
@@ -49,6 +56,12 @@ class Problem:
     number_of_objectives: int | None
     number_of_variables: int | None
     arguments: tuple[ProblemArgument, ...]
+    number_of_constraints: int = 0
+
+    @property
+    def has_constraints(self) -> bool:
+        """Whether a solution of it can be infeasible."""
+        return self.number_of_constraints > 0
 
 
 def parse_problem_catalogue(manifest: dict) -> dict[str, Problem] | None:
@@ -76,6 +89,7 @@ def parse_problem_catalogue(manifest: dict) -> dict[str, Problem] | None:
             number_of_objectives=entry.get("numberOfObjectives"),
             number_of_variables=entry.get("numberOfVariables"),
             arguments=arguments,
+            number_of_constraints=entry.get("numberOfConstraints") or 0,
         )
     return problems
 

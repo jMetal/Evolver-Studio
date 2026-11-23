@@ -9,10 +9,38 @@ for.
 import streamlit as st
 
 from evolver_studio.app_state import require_evolver_jar, warn_if_jar_older_than_catalogue
-from evolver_studio.catalogue import BASE_ALGORITHMS
+from evolver_studio.catalogue import BASE_ALGORITHMS, CONSTRAINT_HANDLING_PARAMETERS
 from evolver_studio.parameter_form import render_parameter_space_table
-from evolver_studio.parameter_space import parse_parameter_space
+from evolver_studio.parameter_space import (
+    CategoricalParameter,
+    ParameterSpec,
+    parse_parameter_space,
+)
+from evolver_studio.problem_catalogue import WITH_CONSTRAINTS, WITHOUT_CONSTRAINTS
 from evolver_studio.resource_files import parameter_space_text
+
+# What each value of the parameter that handles the constraints does, as Evolver's tutorial
+# "Problems with constraints" describes them.
+CONSTRAINT_HANDLING = {
+    "cdp": "Deb's constrained-domination principle. A feasible solution is better than an "
+    "infeasible one, two infeasible ones are compared by their violation, and two feasible ones "
+    "by dominance.",
+    "violatedConstraints": "As `cdp`, but two infeasible solutions are compared by how many "
+    "constraints they violate.",
+    "epsilonConstrained": "As `cdp`, but a violation below a tolerance counts as feasible; the "
+    "tolerance decreases to 0 during the run.",
+    "stochasticRanking": "When one of two solutions is infeasible, they are compared by their "
+    "objectives with a given probability, and by their violation otherwise.",
+    "pushPull": "First the constraints are ignored (push) until the population settles, and then "
+    "it is pulled to the feasible region.",
+    "selfAdaptivePenalty": "The objectives are penalized with the violation, with a penalty that "
+    "adapts to the fraction of feasible solutions.",
+    "feasibilityRules": "Deb's feasibility rules decide whether a new solution replaces the one "
+    "of a subproblem.",
+    "improvedEpsilon": "The improved epsilon method of Fan et al. (2019): a tolerance on the "
+    "violation that adapts to the fraction of feasible solutions.",
+    "violationThreshold": "A violation below an adaptive threshold does not count.",
+}
 
 
 def _render_runnable_badge(runnable_today: bool) -> None:
@@ -25,6 +53,22 @@ def _render_runnable_badge(runnable_today: bool) -> None:
         st.success("✅ Runnable today from this app.")
     else:
         st.info("🔍 Browsable only for now — Evolver does not expose it for launching a run yet.")
+
+
+def _render_constraint_handling(parameters: list[ParameterSpec]) -> None:
+    """Say how the algorithm handles constraints: the parameter that chooses it, and its values.
+
+    Args:
+        parameters: The parameter space for problems with constraints.
+    """
+    parameter = next((p for p in parameters if p.name in CONSTRAINT_HANDLING_PARAMETERS), None)
+    if not isinstance(parameter, CategoricalParameter):
+        return
+    values = "\n".join(
+        f"- `{choice.value}`: {CONSTRAINT_HANDLING.get(choice.value, '(not described yet)')}"
+        for choice in parameter.choices
+    )
+    st.markdown(f"`{parameter.name}` chooses how the constraints are handled:\n\n{values}")
 
 
 st.title("Base algorithms")
@@ -51,8 +95,22 @@ if len(encodings) == 1:
     (encoding,) = encodings
 else:
     encoding = st.selectbox("Encoding", encodings, key=f"explorer_encoding_{algorithm.name}")
-filename = algorithm.encodings[encoding]
+constrained = False
+if algorithm.handles_constraints(encoding):
+    constrained = (
+        st.radio(
+            "Problems",
+            (WITHOUT_CONSTRAINTS, WITH_CONSTRAINTS),
+            horizontal=True,
+            key=f"explorer_constraints_{algorithm.name}_{encoding}",
+            help="The space for problems with constraints is the same one plus how the algorithm "
+            "handles them. This app uses it whenever a problem has constraints.",
+        )
+        == WITH_CONSTRAINTS
+    )
+filename = algorithm.parameter_space_file(encoding, constrained)
+parameters = parse_parameter_space(parameter_space_text(jar, filename))
+if constrained:
+    _render_constraint_handling(parameters)
 st.caption(f"Parameter space of {algorithm.name} ({encoding}) — {filename}")
-render_parameter_space_table(
-    parse_parameter_space(parameter_space_text(jar, filename)), key="explorer_base"
-)
+render_parameter_space_table(parameters, key="explorer_base")

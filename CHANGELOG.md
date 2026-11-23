@@ -18,6 +18,14 @@ Works with Evolver 2.7.
   2.7, which differ from those of 2.5 with the same seed, and the tutorials name those of Evolver
   with their new numbers.
 
+### Explore
+
+- **Problems** shows the number of constraints of each problem and filters those with or without
+  them; Training and Validation, which share the listing, have the filter too.
+- **Base algorithms** shows, for the Double encoding, the parameter space for problems with
+  constraints, and what each constraint-handling technique does.
+- **Quality indicators** explains what happens on problems with constraints.
+
 ### Run algorithm
 
 - **The front while it runs**, right below the Run button: a run in progress draws the

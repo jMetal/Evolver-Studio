@@ -11,6 +11,7 @@ from evolver_studio.result import Ok
 
 PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore_problems.py"
 ENCODING_KEY = "explore_problems_encoding"
+CONSTRAINTS_KEY = "explore_problems_constraints"
 FAMILY_KEY = "explore_problems_family"
 FILTER_KEY = "explore_problems_filter"
 
@@ -78,6 +79,24 @@ class TestFilters:
 
         # Assert
         assert set(app.dataframe[0].value["Family"]) == {"DTLZ"}
+
+    def test_should_keep_only_the_problems_with_constraints_and_say_what_solves_them(
+        self, described: AppTest
+    ):
+        # Act
+        app = described.selectbox(key=CONSTRAINTS_KEY).select("With constraints").run()
+
+        # Assert
+        assert "DASCMOP5" in _shown(app) and "ZDT1" not in _shown(app)
+        assert (app.dataframe[0].value["Constraints"] > 0).all()
+        assert any("Double problems with constraints" in c.value for c in app.caption)
+
+    def test_should_keep_only_the_problems_without_constraints(self, described: AppTest):
+        # Act
+        app = described.selectbox(key=CONSTRAINTS_KEY).select("Without constraints").run()
+
+        # Assert
+        assert "ZDT1" in _shown(app) and "DASCMOP5" not in _shown(app)
 
     def test_should_filter_by_name_ignoring_case(self, described: AppTest):
         # Act

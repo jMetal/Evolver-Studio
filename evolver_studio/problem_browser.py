@@ -10,7 +10,12 @@ from collections.abc import Mapping
 import pandas as pd
 import streamlit as st
 
-from evolver_studio.problem_catalogue import Problem, format_arguments
+from evolver_studio.problem_catalogue import (
+    WITH_CONSTRAINTS,
+    WITHOUT_CONSTRAINTS,
+    Problem,
+    format_arguments,
+)
 from evolver_studio.problems import reference_front_candidates
 
 ALL = "All"
@@ -20,6 +25,7 @@ COLUMNS = (
     "Encoding",
     "Objectives",
     "Variables",
+    "Constraints",
     "Arguments",
     "Reference fronts",
 )
@@ -41,6 +47,7 @@ def problem_frame(problems: list[Problem]) -> pd.DataFrame:
             "Encoding": problem.encoding,
             "Objectives": problem.number_of_objectives,
             "Variables": problem.number_of_variables,
+            "Constraints": problem.number_of_constraints,
             "Arguments": format_arguments(problem),
             "Reference fronts": ", ".join(
                 path.rsplit("/", 1)[-1] for path in reference_front_candidates(problem.name)
@@ -54,11 +61,12 @@ def problem_frame(problems: list[Problem]) -> pd.DataFrame:
 def render_filters(
     catalogue: Mapping[str, Problem], key_prefix: str, fixed_encoding: str | None = None
 ) -> list[Problem]:
-    """Show the filters (encoding, family, name) and apply them.
+    """Show the filters (encoding, constraints, family, name) and apply them.
 
     Args:
         catalogue: The problem catalogue.
-        key_prefix: Prefixes the filters' widget keys: `<prefix>_encoding`, `_family`, `_filter`.
+        key_prefix: Prefixes the filters' widget keys: `<prefix>_encoding`, `_constraints`,
+            `_family`, `_filter`.
         fixed_encoding: The encoding to show the problems of, without offering to choose it; None
             to offer it.
 
@@ -67,11 +75,16 @@ def render_filters(
     """
     candidates = [p for p in catalogue.values() if fixed_encoding in (None, p.encoding)]
     families = sorted({problem.family for problem in candidates})
-    columns = st.columns(2 if fixed_encoding else 3)
+    columns = st.columns(3 if fixed_encoding else 4)
     encoding = fixed_encoding or ALL
     if fixed_encoding is None:
         encodings = sorted({problem.encoding for problem in catalogue.values()})
         encoding = columns[0].selectbox("Encoding", [ALL, *encodings], key=f"{key_prefix}_encoding")
+    constraints = columns[-3].selectbox(
+        "Constraints",
+        [ALL, WITHOUT_CONSTRAINTS, WITH_CONSTRAINTS],
+        key=f"{key_prefix}_constraints",
+    )
     family = columns[-2].selectbox("Family", [ALL, *families], key=f"{key_prefix}_family")
     text = columns[-1].text_input(
         "Filter by name", key=f"{key_prefix}_filter", placeholder="e.g. DTLZ"
@@ -81,6 +94,7 @@ def render_filters(
         for problem in sorted(catalogue.values(), key=lambda p: (p.family, p.name))
         if encoding in (ALL, problem.encoding)
         and family in (ALL, problem.family)
+        and (constraints == ALL or problem.has_constraints == (constraints == WITH_CONSTRAINTS))
         and text.strip().lower() in problem.name.lower()
     ]
 

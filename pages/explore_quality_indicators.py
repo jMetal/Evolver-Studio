@@ -22,7 +22,13 @@ st.markdown(
     "use its points. A validation measures its runs with them too, all but `HypervolumeMinus`, "
     "which only exists so that a training can minimize the hypervolume, and with `Hypervolume`, "
     "which Evolver does not compute: Evolver-Studio computes it from each run's front, the same "
-    "way (*In Validation*)."
+    "way (*In Validation*).\n\n"
+    "On **problems with constraints** a run may end without feasible solutions. A training puts "
+    "feasibility first whatever its indicators: each run without feasible solutions adds 6 to "
+    "the value of a configuration, and the indicators measure only the feasible solutions "
+    "(`ConstrainedMultiobjectiveIndicator` and `Epsilon` are the recommended pair). Elsewhere, "
+    "use the two indicators **for constraints**: the others measure a front without feasible "
+    "solutions as if it were feasible, and so can make it look better than it is."
 )
 # A markdown table, not st.dataframe: the descriptions are the point, and it wraps them instead of
 # truncating them.
