@@ -23,11 +23,14 @@ class CurrentFront:
         run: The number of the independent run (from 1).
         evaluations: The evaluations of that run when the file was written.
         objectives: One row per solution, with columns f1, f2, ... as `read_front` returns them.
+        violations: The violation of each solution (0 if it is feasible), or None for a problem
+            without constraints.
     """
 
     run: int
     evaluations: int
     objectives: pd.DataFrame
+    violations: pd.Series | None = None
 
 
 def read_current_front(output_directory: Path) -> CurrentFront | None:
@@ -50,6 +53,7 @@ def read_current_front(output_directory: Path) -> CurrentFront | None:
             run=int(table["Run"].iloc[0]),
             evaluations=int(table["Evaluations"].iloc[0]),
             objectives=objectives.reset_index(drop=True),
+            violations=table["Violation"] if "Violation" in table.columns else None,
         )
     except (OSError, ValueError, KeyError, pd.errors.EmptyDataError):
         return None

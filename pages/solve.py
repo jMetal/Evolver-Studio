@@ -25,8 +25,8 @@ from evolver_studio.app_state import (
 from evolver_studio.catalogue import (
     BASE_ALGORITHMS,
     BaseAlgorithm,
-    evolver_indicators,
     is_at_least,
+    quality_indicator,
 )
 from evolver_studio.configuration import (
     complete_values,
@@ -48,7 +48,13 @@ from evolver_studio.evolver_client import (
 from evolver_studio.figure_export import render_chart
 from evolver_studio.parameter_form import render_configuration_form
 from evolver_studio.parameter_space import parse_parameter_space
-from evolver_studio.problem_catalogue import ArgumentValue, Problem, number_of_objectives
+from evolver_studio.problem_catalogue import (
+    WITH_CONSTRAINTS,
+    WITHOUT_CONSTRAINTS,
+    ArgumentValue,
+    Problem,
+    number_of_objectives,
+)
 from evolver_studio.problem_form import defaults_help, render_argument_inputs
 from evolver_studio.problems import (
     default_reference_front,
@@ -73,6 +79,7 @@ from evolver_studio.solve_figures import build_front_figure
 from evolver_studio.solve_form import (
     ALGORITHM_KEY,
     CONFIGURATION_VERSION_KEY,
+    CONSTRAINTS_KEY,
     EVALUATIONS_KEY,
     FIX_SEED_KEY,
     LIVE_FRONT_DELAY_KEY,
@@ -88,6 +95,7 @@ from evolver_studio.solve_form import (
     encoding_key,
     form_state_from_request,
     indicators_key,
+    offered_indicators,
     problem_argument_key,
     problem_arguments_key,
     reference_front_key,
@@ -96,6 +104,7 @@ from evolver_studio.solve_live import read_current_front
 from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
 from evolver_studio.solve_results import (
     SolveRunInfo,
+    feasible_runs,
     filter_by_objectives,
     indicator_summary,
     is_permutation,
@@ -105,6 +114,7 @@ from evolver_studio.solve_results import (
     read_indicators,
     read_request,
     read_run_fronts,
+    read_run_violations,
     read_solutions,
     zip_fronts,
 )
@@ -112,6 +122,7 @@ from evolver_studio.weight_vectors import available_population_sizes
 
 RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
+DEFAULT_CONSTRAINED_INDICATORS = ("ConstrainedMultiobjectiveIndicator", "ConstrainedEpsilon")
 DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
 DEFAULT_POPULATION_SIZE = 100
 # How often the page looks at the run in progress. With the pause after each front shorter than
@@ -143,12 +154,15 @@ class ProblemChoice:
         arguments: Its constructor's arguments, all of them in order, or empty for none.
         encoding: Its encoding, or None when the jar does not describe the problems.
         reference_front: Its reference front file, or None for no indicators.
+        constrained: Whether it has constraints: the algorithm then runs with its parameter space
+            for them.
     """
 
     name: str
     arguments: tuple[ArgumentValue, ...]
     encoding: str | None
     reference_front: str | None
+    constrained: bool
 
 
 def _render_problem() -> ProblemChoice | None:
@@ -164,6 +178,8 @@ def _render_problem() -> ProblemChoice | None:
         st.warning("Could not list the problems (is Java installed?).")
         return None
     problems = registered_problems(str(jar)) or {}
+    if any(described.has_constraints for described in problems.values()):
+        names = _render_constraints_filter(names, problems)
     problem = st.selectbox(
         "Problem",
         names,
@@ -180,10 +196,17 @@ def _render_problem() -> ProblemChoice | None:
         return None
     objectives = number_of_objectives(described, arguments) if described is not None else None
     encoding = described.encoding if described is not None else None
+    constrained = described is not None and described.has_constraints
+    if constrained:
+        count = described.number_of_constraints
+        st.caption(
+            f"With {count} constraint{'' if count == 1 else 's'}: the algorithms handle them with "
+            "the technique chosen in the configuration."
+        )
     candidates = reference_front_candidates(problem)
     if not candidates:
         st.info("This problem has no reference front among the resources: no indicators.")
-        return ProblemChoice(problem, arguments, encoding, None)
+        return ProblemChoice(problem, arguments, encoding, None, constrained)
     choice = st.selectbox(
         "Reference front",
         [*candidates, NO_REFERENCE_FRONT],
@@ -203,8 +226,38 @@ def _render_problem() -> ProblemChoice | None:
                 "indicators would fail."
             )
     return ProblemChoice(
-        problem, arguments, encoding, None if choice == NO_REFERENCE_FRONT else choice
+        problem,
+        arguments,
+        encoding,
+        None if choice == NO_REFERENCE_FRONT else choice,
+        constrained,
     )
+
+
+def _render_constraints_filter(names: list[str], problems: dict[str, Problem]) -> list[str]:
+    """Choose between the problems without constraints and those with them.
+
+    Args:
+        names: The problems the jar resolves.
+        problems: Their descriptions.
+
+    Returns:
+        The problems of the chosen group.
+    """
+    groups = {
+        label: [n for n in names if (n in problems and problems[n].has_constraints) == constrained]
+        for label, constrained in ((WITHOUT_CONSTRAINTS, False), (WITH_CONSTRAINTS, True))
+    }
+    group = st.radio(
+        "Problems",
+        list(groups),
+        format_func=lambda label: f"{label} ({len(groups[label])})",
+        horizontal=True,
+        key=CONSTRAINTS_KEY,
+        # The problem chosen is not in the other group.
+        on_change=lambda: st.session_state.pop(PROBLEM_KEY, None),
+    )
+    return groups[group]
 
 
 def _problem_label(problem: Problem | None, name: str) -> str:
@@ -251,13 +304,14 @@ def _default_front_index(candidates: list[str], objectives: int | None) -> int |
 
 
 def _render_algorithm(
-    problem_encoding: str | None,
+    problem_encoding: str | None, constrained: bool
 ) -> tuple[BaseAlgorithm, str, dict[str, str] | None] | None:
     """Section 2: the algorithm, its encoding and what it needs besides.
 
     Args:
         problem_encoding: The problem's encoding, which the algorithm must support; None when it
             is not known (the encoding is then chosen).
+        constrained: Whether the problem has constraints, which the algorithm must handle.
 
     Returns:
         The algorithm, the encoding and the extra configuration (None if it needs none), or None
@@ -269,6 +323,7 @@ def _render_algorithm(
         for algorithm in BASE_ALGORITHMS
         if algorithm.runnable_today
         and (problem_encoding is None or problem_encoding in algorithm.runnable_encodings)
+        and (not constrained or algorithm.handles_constraints(problem_encoding))
     ]
     if not runnable:
         st.warning(f"No algorithm of this app solves {problem_encoding} problems.")
@@ -306,19 +361,22 @@ def _render_algorithm(
     return algorithm, encoding, extra_config
 
 
-def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
+def _render_configuration(algorithm: BaseAlgorithm, encoding: str, constrained: bool) -> str:
     """Section 3: the default configuration, adjustable within the parameter space.
 
     Args:
         algorithm: The chosen algorithm.
         encoding: The chosen encoding.
+        constrained: Whether the problem has constraints.
 
     Returns:
         The configuration string, "--parameter value ...".
     """
     st.subheader("3. Configuration")
-    parameters = parse_parameter_space(parameter_space_text(jar, algorithm.encodings[encoding]))
-    defaults = algorithm.default_configurations.get(encoding, ())
+    variant = "_constrained" if constrained else ""
+    space_file = algorithm.parameter_space_file(encoding, constrained)
+    parameters = parse_parameter_space(parameter_space_text(jar, space_file))
+    defaults = algorithm.defaults(encoding, constrained)
     if defaults:
         labels = [label for label, _ in defaults]
         label = (
@@ -326,7 +384,7 @@ def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
                 "Default configuration",
                 labels,
                 horizontal=True,
-                key=f"solve_default_{algorithm.name}_{encoding}",
+                key=f"solve_default_{algorithm.name}_{encoding}{variant}",
             )
             if len(labels) > 1
             else labels[0]
@@ -351,7 +409,7 @@ def _render_configuration(algorithm: BaseAlgorithm, encoding: str) -> str:
     else:
         values = complete_values(parameters, reference)
     version = st.session_state.setdefault(CONFIGURATION_VERSION_KEY, 0)
-    key_prefix = f"solve_configuration_{algorithm.name}_{encoding}_{label}_{version}"
+    key_prefix = f"solve_configuration_{algorithm.name}_{encoding}{variant}_{label}_{version}"
     with st.expander("Adjust the parameters"):
         if st.button("Reset to the default configuration"):
             st.session_state[CONFIGURATION_VERSION_KEY] = version + 1
@@ -422,13 +480,16 @@ class Budget:
     live_front_delay_millis: int | None = None
 
 
-def _render_budget(has_reference_front: bool, population_sizes: list[int] | None) -> Budget:
+def _render_budget(
+    has_reference_front: bool, population_sizes: list[int] | None, constrained: bool
+) -> Budget:
     """Section 4: the population, the budget, the runs, the seed and the indicators.
 
     Args:
         has_reference_front: Whether the problem has a reference front (indicators need one).
         population_sizes: The population sizes the weight vector files allow, if the algorithm
             reads them (see `_render_population_size`).
+        constrained: Whether the problem has constraints.
 
     Returns:
         What was chosen.
@@ -443,15 +504,22 @@ def _render_budget(has_reference_front: bool, population_sizes: list[int] | None
     with columns[3]:
         fix_seed = st.checkbox("Fix the seed", key=FIX_SEED_KEY)
         seed = st.number_input("Seed", 0, value=1, disabled=not fix_seed, key=SEED_KEY)
+    defaults = DEFAULT_CONSTRAINED_INDICATORS if constrained else DEFAULT_INDICATORS
     indicators = st.multiselect(
         "Quality indicators",
-        [indicator.registry_name for indicator in evolver_indicators()],
-        default=list(DEFAULT_INDICATORS) if has_reference_front else [],
+        offered_indicators(constrained),
+        default=list(defaults) if has_reference_front else [],
         disabled=not has_reference_front,
         help="Computed on each run's front, normalized with the reference front. Run `i` uses "
         "the seed + i - 1.",
-        key=indicators_key(has_reference_front),
+        key=indicators_key(has_reference_front, constrained),
     )
+    unaware = [name for name in indicators if not quality_indicator(name).for_constraints]
+    if constrained and unaware:
+        st.info(
+            f"{', '.join(unaware)}: if a run finds no feasible solution, measured as if its "
+            "solutions were feasible. The indicators for constraints tell the difference."
+        )
     live_front_every, live_front_delay_millis = _render_live_front(int(max_evaluations))
     return Budget(
         population_size=int(population_size),
@@ -573,13 +641,16 @@ def _render_form(can_run: bool) -> None:
     if problem is None:
         return
     reference_front = problem.reference_front
-    algorithm_choice = _render_algorithm(problem.encoding)
+    constrained = problem.constrained
+    algorithm_choice = _render_algorithm(problem.encoding, constrained)
     if algorithm_choice is None:
         return
     algorithm, encoding, extra_config = algorithm_choice
-    configuration = _render_configuration(algorithm, encoding)
+    configuration = _render_configuration(algorithm, encoding, constrained)
     budget = _render_budget(
-        reference_front is not None, _weight_vector_population_sizes(extra_config, reference_front)
+        reference_front is not None,
+        _weight_vector_population_sizes(extra_config, reference_front),
+        constrained,
     )
 
     def request_for(output_directory: str) -> SolveRequest:
@@ -587,7 +658,7 @@ def _render_form(can_run: bool) -> None:
             algorithm_name=algorithm.registry_name,
             encoding=encoding,
             population_size=budget.population_size,
-            yaml_parameter_space_file=algorithm.encodings[encoding],
+            yaml_parameter_space_file=algorithm.parameter_space_file(encoding, constrained),
             extra_config=extra_config,
             configuration=configuration,
             problem=problem.name,
@@ -600,7 +671,8 @@ def _render_form(can_run: bool) -> None:
             status_frequency=_status_frequency(),
             front_frequency=budget.live_front_every,
             front_delay_millis=budget.live_front_delay_millis,
-            write_population=False,
+            # The non-dominated solutions alone would hide how feasible the population is.
+            write_population=constrained and budget.live_front_every is not None,
             output_directory=output_directory,
         )
 
@@ -655,11 +727,18 @@ def _render_live_front_of(output_directory: Path, reference: pd.DataFrame | None
     front = read_current_front(output_directory)
     if front is None:
         return
-    figure = build_front_figure({front.run: front.objectives}, reference)
+    violations = {front.run: front.violations} if front.violations is not None else None
+    figure = build_front_figure({front.run: front.objectives}, reference, violations)
     figure.update_layout(height=LIVE_FRONT_HEIGHT, margin={"l": 0, "r": 0, "t": 10, "b": 0})
     st.plotly_chart(figure, config={"displayModeBar": False}, width="stretch")
+    feasibility = (
+        f", {int((front.violations <= 0).sum())} of them feasible"
+        if front.violations is not None
+        else ""
+    )
     st.caption(
-        f"Run {front.run}, {front.evaluations:,} evaluations: {len(front.objectives)} solutions."
+        f"Run {front.run}, {front.evaluations:,} evaluations: {len(front.objectives)} solutions"
+        f"{feasibility}."
     )
 
 
@@ -700,17 +779,28 @@ def _render_runner_log(log_file: Path) -> None:
 
 def _render_front(run: SolveRunInfo) -> None:
     fronts = read_run_fronts(run.output_directory)
+    violations = read_run_violations(run.output_directory, fronts)
+    _render_feasibility(violations)
     chosen = st.multiselect(
         "Runs", list(fronts), default=list(fronts), format_func=lambda number: f"Run {number}"
     )
     reference_file = run.request.get("referenceFrontFileName")
     reference = read_front(WORKING_DIRECTORY / reference_file) if reference_file else None
     render_chart(
-        build_front_figure({number: fronts[number] for number in chosen}, reference),
+        build_front_figure({n: fronts[n] for n in chosen}, reference, violations),
         f"solve_front_{run.run_id}",
         f"front_{run.run_id}",
         width="stretch",
     )
+
+
+def _render_feasibility(violations: dict[int, pd.Series]) -> None:
+    """Say in how many runs a problem with constraints was solved, if it has them."""
+    if not violations:
+        return
+    feasible, runs = feasible_runs(violations), len(violations)
+    message = f"Feasible solutions found in {feasible} of {runs} run{'' if runs == 1 else 's'}."
+    (st.success if feasible == runs else st.warning)(message)
 
 
 def _render_solutions(run: SolveRunInfo) -> None:
@@ -728,6 +818,10 @@ def _render_solutions(run: SolveRunInfo) -> None:
     )
     solutions = read_solutions(run.output_directory, number)
     shown = filter_by_objectives(solutions, _objective_ranges(run, number, solutions))
+    if "violation" in solutions and st.checkbox(
+        "Only the feasible solutions", key=f"solve_feasible_{run.run_id}_{number}"
+    ):
+        shown = shown[shown["violation"] <= 0]
     st.caption(f"{len(shown)} of {len(solutions)} solutions.")
     selection = st.dataframe(
         shown,
@@ -775,7 +869,7 @@ def _render_solution(solution: pd.Series, identifier: int) -> None:
     """Show one solution: its objectives, and its decision variables."""
     st.markdown(f"**Solution {identifier}**")
     st.caption(
-        ", ".join(f"{name} = {solution[name]:.6g}" for name in solution.index if name[0] == "f")
+        ", ".join(f"{name} = {solution[name]:.6g}" for name in solution.index if name[0] in "fv")
     )
     variables = solution[[name for name in solution.index if name[0] == "x"]]
     if variables.empty:
@@ -797,6 +891,7 @@ def _render_indicators(run: SolveRunInfo) -> None:
         st.info("This run computed no indicators.")
         return
     indicators = read_indicators(run.output_directory)
+    _render_feasibility(read_run_violations(run.output_directory, indicators["Run"]))
     st.dataframe(indicators, hide_index=True, width="stretch")
     if len(indicators) > 1:
         st.markdown("**Over the runs**")

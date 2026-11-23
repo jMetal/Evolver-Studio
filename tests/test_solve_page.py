@@ -381,6 +381,107 @@ class TestLiveFrontOption:
         assert app.number_input(key="solve_live_front_delay").disabled
 
 
+class TestProblemsWithConstraints:
+    @pytest.fixture
+    def constrained(self, app: AppTest) -> AppTest:
+        app.radio(key="solve_constraints").set_value("With constraints").run()
+        return app.selectbox(key="solve_problem").select("DASCMOP5").run()
+
+    @pytest.mark.parametrize(
+        ("algorithm", "parameter"),
+        [
+            *((name, "--constraintHandling cdp") for name in ("NSGA-II", "RVEA", "PAES")),
+            ("MOEA/D", "--subproblemUpdateCriterion feasibilityRules"),
+        ],
+    )
+    def test_should_start_from_the_default_configuration_that_handles_constraints(
+        self, constrained: AppTest, algorithm: str, parameter: str
+    ):
+        # Act
+        app = constrained.selectbox(key="solve_algorithm").select(algorithm).run()
+
+        # Assert
+        assert not app.exception
+        assert any(parameter in code.value for code in app.code)
+
+    def test_should_list_apart_the_problems_with_and_without_constraints(self, app: AppTest):
+        # Act
+        without = set(app.selectbox(key="solve_problem").options)
+        app.radio(key="solve_constraints").set_value("With constraints").run()
+        constrained = set(app.selectbox(key="solve_problem").options)
+
+        # Assert
+        assert "ZDT1" in without and "DASCMOP5" in constrained
+        assert not without & constrained
+
+    def test_should_forget_the_problem_when_the_group_changes(self, constrained: AppTest):
+        # Act
+        app = constrained.radio(key="solve_constraints").set_value("Without constraints").run()
+
+        # Assert
+        assert not app.exception
+        assert app.selectbox(key="solve_problem").value is None
+
+    def test_should_offer_the_indicators_for_constraints_only_with_them(self, constrained: AppTest):
+        # Act
+        app = constrained.selectbox(key="solve_algorithm").select("NSGA-II").run()
+        indicators = app.multiselect(key="solve_indicators_True_constrained")
+        chosen = list(indicators.value)
+        app.radio(key="solve_constraints").set_value("Without constraints").run()
+        _choose_zdt1_and_nsgaii(app)
+
+        # Assert
+        assert chosen == ["ConstrainedMultiobjectiveIndicator", "ConstrainedEpsilon"]
+        offered = app.multiselect(key="solve_indicators_True").options
+        assert "ConstrainedEpsilon" not in offered
+
+    @pytest.mark.parametrize(
+        "algorithm",
+        [
+            *("NSGA-II", "MOEA/D", "SMS-EMOA", "RDE-MOEA", "AGE-MOEA", "RVEA", "NSGA-III"),
+            *("PAES", "SSMOEA"),
+        ],
+    )
+    def test_should_run_every_algorithm_and_tell_the_feasible_solutions(
+        self, app: AppTest, tmp_path: Path, algorithm: str
+    ):
+        # Arrange
+        app.radio(key="solve_constraints").set_value("With constraints").run()
+        app.selectbox(key="solve_problem").select("Srinivas").run()
+        app.selectbox(key="solve_algorithm").select(algorithm).run()
+        app.number_input(key="solve_evaluations").set_value(1000).run()
+        app.number_input(key="solve_live_front_delay").set_value(0).run()
+
+        # Act
+        next(button for button in app.button if button.label == "Run").click().run()
+        run_dir = next((tmp_path / "solve-runs").iterdir())
+        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
+        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the run did not finish"
+            time.sleep(0.2)
+        app.run()
+        app.selectbox(key="solve_history").select(run_dir.name).run()
+
+        # Assert
+        assert not app.exception
+        assert run_phase(run_dir) == RunPhase.FINISHED
+        request = (run_dir / "request.yaml").read_text()
+        assert "Constrained.yaml" in request and "writePopulation: true" in request
+        table = next(frame for frame in app.dataframe if "x1" in frame.value.columns)
+        assert "violation" in table.value.columns
+        assert any("Feasible solutions found in 1 of 1 run." in s.value for s in app.success)
+
+        # Act: load it back from the other group of problems
+        app.radio(key="solve_constraints").set_value("Without constraints").run()
+        app.button(key=f"solve_load_{run_dir.name}").click().run()
+
+        # Assert
+        assert not app.exception
+        assert app.radio(key="solve_constraints").value == "With constraints"
+        assert app.selectbox(key="solve_problem").value == "Srinivas"
+        assert app.selectbox(key="solve_algorithm").value == algorithm
+
+
 class TestSolutions:
     def test_should_list_the_solutions_of_a_run_and_filter_them(self, app: AppTest, tmp_path: Path):
         # Arrange: a finished run with a front in a known place

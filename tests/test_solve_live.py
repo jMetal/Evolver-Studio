@@ -35,6 +35,7 @@ class TestReadCurrentFront:
         # Assert
         assert front is not None
         assert list(front.objectives.columns) == ["f1", "f2", "f3"]
+        assert front.violations is not None and front.violations.tolist() == [0]
 
     def test_should_be_none_without_a_file(self, tmp_path: Path):
         # Act / Assert

@@ -116,6 +116,21 @@ class TestFormStateFromRequest:
         assert hidden[LIVE_FRONT_KEY] is False
         assert hidden[LIVE_FRONT_DELAY_KEY] == 0
 
+    @pytest.mark.parametrize("constraints", [0, 2])
+    def test_should_restore_only_the_indicators_offered_for_the_problem(self, constraints: int):
+        # Arrange
+        problem = Problem("ZDT1", "ZDT", "Double", 2, 30, (), constraints)
+        request = _request(indicatorNames=["Epsilon", "ConstrainedEpsilon"])
+
+        # Act
+        state = form_state_from_request(request, BASE_ALGORITHMS, PROBLEMS, 0, {"ZDT1": problem})
+
+        # Assert
+        expected = ["Epsilon", "ConstrainedEpsilon"] if constraints else ["Epsilon"]
+        assert state[indicators_key(True, constraints > 0)] == expected
+        group = "With constraints" if constraints else "Without constraints"
+        assert state["solve_constraints"] == group
+
     def test_should_fix_the_seed_only_when_the_run_had_one(self):
         # Act
         fixed = form_state_from_request(_request(), BASE_ALGORITHMS, PROBLEMS, 0)

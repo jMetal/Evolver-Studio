@@ -59,3 +59,34 @@ class TestBuildFrontFigure:
     def test_should_return_an_empty_figure_when_there_are_no_fronts(self):
         # Act / Assert
         assert len(build_front_figure({}).data) == 0
+
+
+class TestInfeasibleSolutions:
+    def test_should_draw_the_infeasible_solutions_apart_and_the_reference_as_points(self):
+        # Arrange
+        violations = {1: pd.Series([0.0, 1.0, 0.0])}
+
+        # Act
+        figure = build_front_figure({1: _front(2)}, _front(2, 10), violations)
+
+        # Assert
+        traces = {trace.name: trace for trace in figure.data}
+        assert set(traces) == {"Reference front", "1", "1 · infeasible"}
+        assert len(traces["1"].x) == 2 and len(traces["1 · infeasible"].x) == 1
+        assert traces["Reference front"].mode == "markers"
+
+    def test_should_draw_them_in_three_objectives(self):
+        # Act
+        figure = build_front_figure({1: _front(3)}, None, {1: pd.Series([1.0, 1.0, 1.0])})
+
+        # Assert
+        assert [trace.name for trace in figure.data] == ["1 · infeasible"]
+
+    def test_should_leave_them_out_of_the_parallel_coordinates_unless_there_are_no_others(self):
+        # Act
+        some = build_front_figure({1: _front(5)}, None, {1: pd.Series([0.0, 1.0, 0.0])})
+        none = build_front_figure({1: _front(5)}, None, {1: pd.Series([1.0, 1.0, 1.0])})
+
+        # Assert
+        assert len(some.data[0].dimensions[0]["values"]) == 2
+        assert len(none.data[0].dimensions[0]["values"]) == 3

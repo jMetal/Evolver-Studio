@@ -72,6 +72,31 @@ class TestActivity:
         assert latest.run_id == "20261001-100000"
 
 
+class TestProblemsWithConstraints:
+    def test_should_show_only_the_feasible_solutions(self, tmp_path: Path):
+        # Arrange
+        write_solve_run(tmp_path, "20261001-100000", "FINISHED", [[0.0, 1.0], [0.1, 0.2]])
+        (tmp_path / "out/20261001-100000/run-1/CV.csv").write_text("0.0\n3.0\n")
+
+        # Act
+        latest = activity(tmp_path).latest
+
+        # Assert
+        assert latest is not None and len(latest.front) == 1
+
+    def test_should_skip_a_run_without_feasible_solutions(self, tmp_path: Path):
+        # Arrange
+        write_solve_run(tmp_path, "20261001-100000", "FINISHED", [[0.0, 1.0]])
+        write_solve_run(tmp_path, "20261002-100000", "FINISHED", [[0.0, 1.0]])
+        (tmp_path / "out/20261002-100000/run-1/CV.csv").write_text("3.0\n")
+
+        # Act
+        latest = activity(tmp_path).latest
+
+        # Assert
+        assert latest is not None and latest.run_id == "20261001-100000"
+
+
 class TestFrontFigure:
     @pytest.mark.parametrize("objectives", [2, 3])
     def test_should_plot_two_or_three_objectives(self, objectives: int):

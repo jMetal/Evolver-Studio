@@ -28,6 +28,11 @@ Works with Evolver 2.7.
 
 ### Run algorithm
 
+- **Problems with constraints**, listed apart from the others: the algorithms run with their
+  parameter space and default configuration for them, and are measured with ICMOP and CEP by
+  default. The live front draws the whole population, the infeasible solutions in red, and counts
+  the feasible ones; the results say in how many runs feasible solutions were found and how much
+  each solution violates the constraints. The home page draws only feasible solutions.
 - **The front while it runs**, right below the Run button: a run in progress draws the
   non-dominated solutions it has found so far (Evolver's `CURRENT_FRONT.csv`), over the problem's
   reference front, with the run and the evaluation they belong to. It shows 20 fronts spread over

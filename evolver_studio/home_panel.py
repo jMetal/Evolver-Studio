@@ -21,7 +21,12 @@ from evolver_studio.runs import (
     find_run_in_progress,
     run_phase,
 )
-from evolver_studio.solve_results import list_solve_runs, read_request, read_run_fronts
+from evolver_studio.solve_results import (
+    list_solve_runs,
+    read_request,
+    read_run_fronts,
+    read_run_violations,
+)
 from evolver_studio.training_runs import FinishedTraining, read_training
 
 SOLVE = "Solve"
@@ -206,8 +211,14 @@ def _latest_solve(solve_directory: Path, working_directory: Path) -> LatestResul
         if run.state != RunState.FINISHED or not run.output_directory.is_dir():
             continue
         fronts = read_run_fronts(run.output_directory)
-        if fronts:
-            front = pd.concat(list(fronts.values()), ignore_index=True)
+        violations = read_run_violations(run.output_directory, fronts)
+        # Only the feasible solutions are solutions of a problem with constraints.
+        feasible = [
+            front[violations[number] <= 0] if number in violations else front
+            for number, front in fronts.items()
+        ]
+        front = pd.concat(feasible, ignore_index=True) if feasible else pd.DataFrame()
+        if not front.empty:
             return LatestResult(SOLVE, run.run_id, f"{run.algorithm} on {run.problem}", front)
     return None
 
