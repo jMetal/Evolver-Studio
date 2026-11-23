@@ -165,7 +165,7 @@ below; revisit and reorder as real usage surfaces new ones.
   its results; the text about them is computed from the data. `tests/test_tutorials.py`,
   `tests/test_tutorial_solving.py` and `tests/test_tutorial_validation.py` walk through them with
   Streamlit's `AppTest`.
-- **No Evolver checkout needed to use the app**: the sidebar downloads the Evolver release's jar
+- **No Evolver checkout needed to use the app**: the app downloads the Evolver release's jar
   from Maven Central (checksum-verified) into `lib/`; parameter spaces and meta-optimizer
   configurations are read from the jar (`evolver_studio/resource_files.py`), and the reference
   fronts, weight vectors and TSP instances are copied into `resources/` (MaF's fronts left out) from

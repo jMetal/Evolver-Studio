@@ -14,6 +14,8 @@ Works with Evolver 2.5.
   Meta-optimization and Learn) instead of on the left.
 - A **theme** of its own (`.streamlit/config.toml`): the colors of the logo, Montserrat for
   headings, light and dark variants, and no developer options in the toolbar.
+- There is **no sidebar**: the jar's status (a missing jar with its download button, a missing
+  Java) is shown at the top of the page, and only when there is something to say.
 
 ### Documentation
 

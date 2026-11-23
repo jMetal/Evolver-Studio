@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.app_state import render_sidebar
+from evolver_studio.app_state import render_jar_status
 from evolver_studio.evolver_client import EVOLVER_VERSION
 from evolver_studio.sections import SECTIONS, Page, Section
 
@@ -26,7 +26,7 @@ def _render_card(section: Section, page: Page) -> None:
         st.page_link(page.path, label=f"Open {page.title}", icon=":material/arrow_forward:")
 
 
-jar = render_sidebar()
+jar = render_jar_status()
 
 icon_column, title_column = st.columns([1, 11], vertical_alignment="center")
 icon_column.image(str(ICON), width=72)
@@ -41,7 +41,7 @@ st.markdown(
 if jar is None:
     st.info(
         "**Getting started.** Evolver-Studio runs Evolver, a Java framework (Java 21 or newer is "
-        "needed): download its jar from the sidebar. Meanwhile, the **Tutorials** page and "
+        "needed): download its jar with the button above. Meanwhile, the **Tutorials** page and "
         f"[Evolver's documentation]({EVOLVER_DOCUMENTATION_URL}) are a good place to start.",
         icon=":material/rocket_launch:",
     )

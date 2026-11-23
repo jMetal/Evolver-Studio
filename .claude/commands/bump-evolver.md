@@ -21,7 +21,7 @@ missing. Never bump to a SNAPSHOT: Evolver-Studio follows stable releases only.
 
 ### 2. The jar
 
-Download it into `lib/` (the sidebar's **Download Evolver <version>** button does it, or `curl` the
+Download it into `lib/` (the app's **Download Evolver <version>** button does it, or `curl` the
 `MAVEN_CENTRAL_JAR_URL` and its `.sha1`, and compare). Keep the previous jar until the tests pass,
 to compare parameter spaces in the next step.
 
@@ -53,7 +53,7 @@ make test          # no EVOLVER_JAR: the release jar in lib/
 ```
 
 Every test must pass with the release jar, none skipped. Then `make run` and check the home page
-names the new version, the sidebar says "Evolver <version>", and Explore shows no "older jar"
+banner names the new version, and Explore shows no "older jar"
 warning. Remove the previous jar from `lib/` (it is not tracked).
 
 ### 7. Commit

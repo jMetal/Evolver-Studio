@@ -62,11 +62,11 @@ def _render_connection(jar: Path) -> None:
     java = _java_version()
     version = jar_evolver_version(jar)
     st.markdown(
-        "Evolver-Studio needs two things on your computer, and the **sidebar** reports on "
-        "both:\n\n"
+        "Evolver-Studio needs two things on your computer, and the app "
+        "checks both:\n\n"
         "1. **Java 21 or newer**, which runs Evolver.\n"
         "2. **Evolver's jar**, one file with the framework and its configurations. The app "
-        f"follows the release **Evolver {EVOLVER_VERSION}**; if the jar is missing, the sidebar "
+        f"follows the release **Evolver {EVOLVER_VERSION}**; if the jar is missing, the app "
         "offers to download it from Maven Central into the app's `lib/` folder. Nothing else of "
         "Evolver is needed: the parameter spaces and the meta-optimizers' configurations are "
         "read from the jar.\n\nYours:"

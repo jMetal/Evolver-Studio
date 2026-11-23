@@ -14,7 +14,7 @@ from evolver_studio import (
     tutorial_validation,
     tutorial_validation_analysis,
 )
-from evolver_studio.app_state import render_sidebar, require_evolver_jar
+from evolver_studio.app_state import render_jar_status, require_evolver_jar
 from evolver_studio.tutorial_navigation import (
     SELECTED_KEY,
     STEP_KEY,
@@ -91,7 +91,7 @@ selected_slug = st.session_state.get(SELECTED_KEY)
 selected = next((t for t in TUTORIALS if t.slug == selected_slug and t.available), None)
 if selected is None:
     # The catalogue itself does not need Evolver, only the tutorials' content does.
-    render_sidebar()
+    render_jar_status()
     _render_catalogue()
 else:
     _render_tutorial(selected, require_evolver_jar())

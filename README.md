@@ -141,7 +141,7 @@ make env   # creates (or updates) the 'evolver-studio' Conda environment
 make run   # opens Evolver-Studio in your browser
 ```
 
-1. The first time, click **Download Evolver 2.5** in the sidebar (about 130 MB, checksum verified).
+1. The first time, click **Download Evolver 2.5** at the top of the page (about 130 MB, checksum verified).
 2. Open **Tutorials** and start with **S1. A tour of Evolver-Studio**.
 3. To solve a problem right away, open **Run algorithm**, choose a problem (ZDT1, for instance),
    keep NSGA-II with its default configuration and click **Run**.

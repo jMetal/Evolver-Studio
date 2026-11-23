@@ -6,12 +6,12 @@ against Evolver's DescribeMain manifest, so the page needs no Java run.
 
 import streamlit as st
 
-from evolver_studio.app_state import render_sidebar
+from evolver_studio.app_state import render_jar_status
 from evolver_studio.catalogue import QUALITY_INDICATORS
 
 st.title("Quality indicators")
 
-render_sidebar()
+render_jar_status()
 
 st.markdown(
     "A training run measures every configuration it evaluates with **two** of these indicators, "

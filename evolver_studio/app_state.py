@@ -1,7 +1,7 @@
 """State shared across pages: the Evolver jar the app runs, and its download.
 
 Each st.navigation page runs as its own script, so nothing at Python module
-level survives between pages — only `st.session_state` does. This sidebar is
+level survives between pages — only `st.session_state` does. The jar's status is
 rendered once per page (cheap: a few widgets) rather than centralized, since
 st.navigation has no single "shell" script that wraps every page's body.
 """
@@ -26,44 +26,43 @@ from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.result import Err, Ok
 
 
-def render_sidebar() -> Path | None:
-    """Show which Evolver jar the app runs, offering to download it if missing.
+def render_jar_status() -> Path | None:
+    """Tell what is wrong with Evolver's jar, if anything, offering to download it if missing.
+
+    There is no sidebar: when the jar is in place and Java is found, nothing is shown.
 
     Returns:
         The jar's path, or None if it is not available yet.
     """
     jar = jar_path()
     if jar.is_file():
-        if is_jar_overridden():
-            st.sidebar.caption(f"Evolver: `{jar}` (set by {JAR_OVERRIDE_VARIABLE})")
-        else:
-            st.sidebar.caption(f"Evolver {EVOLVER_VERSION}")
         if shutil.which("java") is None:
-            st.sidebar.warning("Java was not found on the PATH; Evolver needs Java 21 or newer.")
+            st.warning("Java was not found on the PATH; Evolver needs Java 21 or newer.")
         return jar
     if is_jar_overridden():
-        st.sidebar.error(f"{JAR_OVERRIDE_VARIABLE} points at a missing file: `{jar}`")
+        st.error(f"{JAR_OVERRIDE_VARIABLE} points at a missing file: `{jar}`")
         return None
-    st.sidebar.warning(f"Evolver {EVOLVER_VERSION} has not been downloaded yet.")
-    if st.sidebar.button(f"Download Evolver {EVOLVER_VERSION} (about 130 MB)"):
-        progress = st.sidebar.progress(0.0, text="Downloading from Maven Central…")
-        result = download_jar(jar, lambda fraction: progress.progress(fraction))
-        if isinstance(result, Err):
-            st.sidebar.error(result.message)
-        else:
-            st.rerun()
+    with st.container(border=True):
+        st.warning(f"Evolver {EVOLVER_VERSION} has not been downloaded yet.")
+        if st.button(f"Download Evolver {EVOLVER_VERSION} (about 130 MB)", type="primary"):
+            progress = st.progress(0.0, text="Downloading from Maven Central…")
+            result = download_jar(jar, lambda fraction: progress.progress(fraction))
+            if isinstance(result, Err):
+                st.error(result.message)
+            else:
+                st.rerun()
     return None
 
 
 def require_evolver_jar() -> Path:
-    """Render the sidebar, stopping the page if Evolver's jar is not available.
+    """Show the jar's status, stopping the page if Evolver's jar is not available.
 
     Returns:
         The jar's path.
     """
-    jar = render_sidebar()
+    jar = render_jar_status()
     if jar is None:
-        st.info("This page needs Evolver: download it from the sidebar.")
+        st.info("This page needs Evolver: download it with the button above.")
         st.stop()
     return jar
 
