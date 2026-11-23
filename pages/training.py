@@ -46,6 +46,7 @@ from evolver_studio.monitor_view import (
     MonitorState,
     render_best_configurations,
     render_convergence,
+    render_feasibility,
     render_front_with_slider,
     render_indicator_front,
     render_log,
@@ -56,8 +57,8 @@ from evolver_studio.monitor_view import (
 )
 from evolver_studio.parameter_form import render_parameter_form
 from evolver_studio.parameter_space import parse_parameter_space, serialize_parameter_space
-from evolver_studio.problem_browser import render_problem_selector
-from evolver_studio.problem_catalogue import problems_with_encoding
+from evolver_studio.problem_browser import render_group, render_problem_selector
+from evolver_studio.problem_catalogue import WITHOUT_CONSTRAINTS, problems_with_encoding
 from evolver_studio.problem_form import render_problem_rows
 from evolver_studio.problems import reference_front_dimension
 from evolver_studio.request import (
@@ -79,6 +80,7 @@ from evolver_studio.results import (
 )
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, ActiveRun, find_active_run, mark_cancelled
 from evolver_studio.training_choices import (
+    DEFAULT_CONSTRAINED_INDICATORS,
     DEFAULT_INDEPENDENT_RUNS,
     DEFAULT_INDICATORS,
     DEFAULT_POPULATION_SIZE,
@@ -90,6 +92,7 @@ from evolver_studio.training_choices import (
 )
 from evolver_studio.training_handoff import validation_form_state
 from evolver_studio.training_monitor import tail_text
+from evolver_studio.training_presets import CONSTRAINTS_KEY, indicators_key
 from evolver_studio.training_results import TrainedConfiguration
 from evolver_studio.training_runs import read_training
 from evolver_studio.training_set import (
@@ -410,6 +413,8 @@ def _render_last_finished_run_if_any() -> None:
     names = ["Front", "Convergence"]
     if state.population is not None:
         names.append("Population")
+    if state.has_feasibility:
+        names.append("Feasibility")
     names += ["Best configurations", "Files"]
     tabs = iter(st.tabs(names))
     with next(tabs):
@@ -419,6 +424,9 @@ def _render_last_finished_run_if_any() -> None:
     if state.population is not None:
         with next(tabs):
             render_population(state, f"{key}_population")
+    if state.has_feasibility:
+        with next(tabs):
+            render_feasibility(state, f"{key}_feasibility")
     with next(tabs):
         render_best_configurations(state, f"{key}_best", _validator(run_dir))
     with next(tabs):
@@ -646,11 +654,19 @@ def _render_parameter_space_editor(title: str, default_text: str, key_prefix: st
         return _render_guided_editor(default_text, f"{key_prefix}_form")
 
 
+CONSTRAINED_INDICATORS_HELP = (
+    "On problems with constraints each run without feasible solutions adds 6 to both "
+    "meta-objectives, so the search first reaches the configurations that find them; then each "
+    "one measures the quality of the feasible fronts. ConstrainedMultiobjectiveIndicator (ICMOP) "
+    "and Epsilon are the recommended pair, NormalizedHypervolume and Epsilon the other one. The "
+    "other indicators are not offered: ConstrainedEpsilon has the values of Epsilon in a training, "
+    "HypervolumeMinus measures what ICMOP does, and the rest measure only the spread."
+)
 DEFAULT_TRAINING_PROBLEMS = {"Double": ["ZDT4"]}
 TRAINING_SET_ROWS_KEY = "training_set_rows"
 
 
-def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
+def _render_training_set_editor(jar: Path, encoding: str) -> tuple[pd.DataFrame, bool]:
     """Let the user choose the training problems, and edit what each one needs.
 
     The problems are chosen from a list (those of the base algorithm's encoding when the jar
@@ -666,18 +682,21 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
             jar describes them.
 
     Returns:
-        The training set table (without rows while no problem is chosen).
+        The training set table (without rows while no problem is chosen), and whether its problems
+        may have constraints.
     """
     catalogue = registered_problems(str(jar))
+    problems_key = f"train_problems_{encoding}"
+    group = render_group(catalogue, encoding, CONSTRAINTS_KEY, problems_key)
+    constrained = group != WITHOUT_CONSTRAINTS
     options = (
-        problems_with_encoding(catalogue, encoding)
+        problems_with_encoding(catalogue, encoding, group)
         if catalogue is not None
         else registered_problem_names(str(jar))
     )
     if options is None:
         st.warning("Could not list registered problems (is Java installed?).")
         options = []
-    problems_key = f"train_problems_{encoding}"
     names = render_problem_selector(
         catalogue,
         options,
@@ -691,9 +710,10 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
         "multiobjective.multiobjectivetsp.instance.KroAB100TSP): Evolver resolves it by "
         "reflection.",
         accept_class_names=True,
+        group=group,
     )
     if not names:
-        return pd.DataFrame(columns=list(TRAINING_SET_COLUMNS))
+        return pd.DataFrame(columns=list(TRAINING_SET_COLUMNS)), constrained
     table = training_set_table(
         names,
         catalogue or {},
@@ -707,11 +727,14 @@ def _render_training_set_editor(jar: Path, encoding: str) -> pd.DataFrame:
         f"train_problem_{encoding}",
         WORKING_DIRECTORY,
     )
-    return edited
+    return edited, constrained
 
 
 def _render_base_level_choices(
-    algorithm: BaseAlgorithm, extra_config: dict[str, str] | None, objectives: list[int | None]
+    algorithm: BaseAlgorithm,
+    extra_config: dict[str, str] | None,
+    objectives: list[int | None],
+    constrained: bool,
 ) -> tuple[BaseLevelChoices, list[str]]:
     """Choose the meta-objectives, the independent runs and the base population size.
 
@@ -719,19 +742,23 @@ def _render_base_level_choices(
         algorithm: The base algorithm.
         extra_config: Its extra settings, with the weight vector directory when it reads one.
         objectives: The number of objectives of each training problem.
+        constrained: Whether the training problems may have constraints.
 
     Returns:
         The choices, and what is wrong with them.
     """
     with st.expander("Meta-objectives and the measure of each configuration", expanded=True):
-        names = [indicator.registry_name for indicator in training_indicators()]
+        names = [indicator.registry_name for indicator in training_indicators(constrained)]
+        defaults = DEFAULT_CONSTRAINED_INDICATORS if constrained else DEFAULT_INDICATORS
         indicators = st.multiselect(
             "Meta-objectives (quality indicators, minimized)",
             names,
-            default=[name for name in DEFAULT_INDICATORS if name in names],
+            default=[name for name in defaults if name in names],
             max_selections=META_OBJECTIVES,
-            key="train_indicators",
-            help="The quality indicators of the front a configuration finds, which the "
+            key=indicators_key(constrained),
+            help=CONSTRAINED_INDICATORS_HELP
+            if constrained
+            else "The quality indicators of the front a configuration finds, which the "
             "meta-optimizer minimizes. NormalizedHypervolume and Epsilon are the usual pair: NHV "
             "measures convergence and spread together, EP tells apart the configurations NHV "
             "gives 1. IGD+ and EP, EP and Spread, or HypervolumeMinus and EP (it needs only a "
@@ -814,7 +841,8 @@ def _render_active_run(active_run: ActiveRun) -> None:
             monitor.record(status)
         monitor.poll()
         pid = read_pid(active_run.pid_file)
-        tabs = st.tabs(tab_names(monitor.population is not None))
+        with_feasibility = monitor.has_feasibility
+        tabs = st.tabs(tab_names(monitor.population is not None, with_feasibility))
         names = iter(tabs)
         with next(names):
             render_overview(monitor, status, pid is not None and is_alive(pid))
@@ -827,6 +855,9 @@ def _render_active_run(active_run: ActiveRun) -> None:
                 render_population(monitor, f"{key}_population")
         with next(names):
             render_convergence(monitor, f"{key}_convergence")
+        if with_feasibility:
+            with next(names):
+                render_feasibility(monitor, f"{key}_feasibility")
         with next(names):
             render_best_configurations(monitor, f"{key}_best", _validator(active_run.run_dir))
         with next(names):
@@ -898,11 +929,24 @@ else:
         "that shows how it evolves. The files are larger; leave it off if you do not need it.",
     )
 
-    default_base_text = parameter_space_text(jar, algorithm.encodings[encoding])
+    with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
+        training_set_table_value, constrained = _render_training_set_editor(jar, encoding)
+    if constrained and not write_population:
+        st.caption(
+            "With constraints, tick *Show the meta-optimizer's population while it runs* to follow "
+            "the configurations whose runs find no feasible solutions: the front hides them as "
+            "soon as one configuration finds some."
+        )
+
+    default_base_text = parameter_space_text(
+        jar, algorithm.parameter_space_file(encoding, constrained)
+    )
+    variant = "_constrained" if constrained else ""
     parameter_space_text_value = _render_parameter_space_editor(
-        f"Base algorithm parameter space ({algorithm.name}, {encoding})",
+        f"Base algorithm parameter space ({algorithm.name}, {encoding}"
+        f"{', with constraints' if constrained else ''})",
         default_base_text,
-        f"base_{algorithm.name}_{encoding}",
+        f"base_{algorithm.name}_{encoding}{variant}",
     )
 
     meta_encoding = _render_meta_encoding(meta_algorithm)
@@ -919,8 +963,6 @@ else:
             f"meta_operator_flags_{meta_algorithm.name}_{meta_encoding}",
         )
 
-    with st.expander("Training set (problems, reference fronts, evaluations)", expanded=True):
-        training_set_table_value = _render_training_set_editor(jar, encoding)
     training_set = parse_training_set(training_set_table_value)
     objectives = (
         [
@@ -930,7 +972,9 @@ else:
         if training_set is not None
         else []
     )
-    choices, choice_errors = _render_base_level_choices(algorithm, extra_config, objectives)
+    choices, choice_errors = _render_base_level_choices(
+        algorithm, extra_config, objectives, constrained
+    )
     for error in choice_errors:
         st.error(error)
     problem_specs: list[str | dict] = []

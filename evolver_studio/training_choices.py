@@ -16,6 +16,15 @@ from evolver_studio.catalogue import QualityIndicator, evolver_indicators
 from evolver_studio.weight_vectors import available_population_sizes
 
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
+# With constraints Evolver turns every meta-objective into its version with them (each run without
+# feasible solutions adds 6), so few pairs make sense: the two it recommends, ICMOP with EP and NHV
+# with EP. ConstrainedEpsilon has there the values of Epsilon, and is not offered.
+CONSTRAINED_INDICATORS = (
+    "ConstrainedMultiobjectiveIndicator",
+    "Epsilon",
+    "NormalizedHypervolume",
+)
+DEFAULT_CONSTRAINED_INDICATORS = ("ConstrainedMultiobjectiveIndicator", "Epsilon")
 DEFAULT_POPULATION_SIZE = 100
 DEFAULT_INDEPENDENT_RUNS = 1
 META_OBJECTIVES = 2
@@ -38,9 +47,16 @@ class BaseLevelChoices:
     indicators: tuple[str, ...] = DEFAULT_INDICATORS
 
 
-def training_indicators() -> tuple[QualityIndicator, ...]:
-    """The indicators a training can minimize: those Evolver computes (all are minimized)."""
-    return tuple(i for i in evolver_indicators() if not i.maximized)
+def training_indicators(constrained: bool = False) -> tuple[QualityIndicator, ...]:
+    """The indicators a training can minimize: those Evolver computes (all are minimized).
+
+    Args:
+        constrained: Whether the training set may have problems with constraints: only the
+            indicators that make sense with them are then offered.
+    """
+    if constrained:
+        return tuple(i for i in evolver_indicators() if i.registry_name in CONSTRAINED_INDICATORS)
+    return tuple(i for i in evolver_indicators() if not i.maximized and not i.for_constraints)
 
 
 def indicator_errors(indicators: tuple[str, ...], objectives: list[int | None]) -> list[str]:
@@ -62,6 +78,11 @@ def indicator_errors(indicators: tuple[str, ...], objectives: list[int | None]) 
                 f"{name} is defined only for problems with two objectives: use "
                 "GeneralizedSpread instead."
             )
+    if {"ConstrainedMultiobjectiveIndicator", "NormalizedHypervolume"} <= set(indicators):
+        errors.append(
+            "ConstrainedMultiobjectiveIndicator and NormalizedHypervolume both measure the "
+            "hypervolume: combine one of them with Epsilon."
+        )
     return errors
 
 

@@ -18,6 +18,28 @@ class TestIndicators:
         assert "Hypervolume" not in names
         assert {"Epsilon", "NormalizedHypervolume", "HypervolumeMinus"} <= set(names)
 
+    def test_should_offer_those_for_constraints_only_with_them(self):
+        # Act
+        without = {indicator.registry_name for indicator in training_indicators()}
+        constrained = {i.registry_name for i in training_indicators(constrained=True)}
+
+        # Assert
+        assert not any(name.startswith("Constrained") for name in without)
+        assert constrained == {
+            "ConstrainedMultiobjectiveIndicator",
+            "Epsilon",
+            "NormalizedHypervolume",
+        }
+
+    def test_should_not_take_two_that_measure_the_hypervolume(self):
+        # Act
+        errors = indicator_errors(
+            ("ConstrainedMultiobjectiveIndicator", "NormalizedHypervolume"), [2]
+        )
+
+        # Assert
+        assert len(errors) == 1 and "both measure the hypervolume" in errors[0]
+
     def test_should_ask_for_two_meta_objectives(self):
         # Act / Assert
         assert indicator_errors(("Epsilon", "NormalizedHypervolume"), [2]) == []

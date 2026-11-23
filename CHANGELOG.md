@@ -42,6 +42,15 @@ Works with Evolver 2.7.
   0 does not pause; Evolver 2.4 or later): every front adds that pause, a few seconds in all, and
   every one can be seen.
 
+### Training and Training analysis
+
+- **Problems with constraints**: the training set is chosen among the problems without constraints,
+  with them or both, before the parameter space, which is then the one that handles constraints.
+  The meta-objectives are restricted to those that make sense: ICMOP, EP and NHV with constraints
+  (ICMOP and EP by default), all but ICMOP and CEP without them. A **Feasibility** tab, in the
+  monitor and in the analysis, tells how many configurations find feasible solutions in all their
+  runs, and on which problems they fail; the population draws those that fail in red.
+
 ### Validation and Validation analysis
 
 - **Problems with constraints**: a study chooses its problems among those without constraints, with

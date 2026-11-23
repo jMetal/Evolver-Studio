@@ -14,6 +14,13 @@ import pandas as pd
 import streamlit as st
 
 from evolver_studio.evolver_client import RunStatus
+from evolver_studio.feasibility import (
+    FEASIBILITY_FILE,
+    failed_configurations,
+    failures_by_problem,
+    feasible_by_checkpoint,
+    read_feasibility,
+)
 from evolver_studio.figure_export import render_chart
 from evolver_studio.live_front import build_front_figure
 from evolver_studio.progress import training_progress
@@ -28,6 +35,7 @@ from evolver_studio.training_monitor import (
     CheckpointReader,
     VarConfFollower,
     build_convergence_figure,
+    build_feasibility_figure,
     build_population_figure,
     format_duration,
     summarize_run,
@@ -72,7 +80,13 @@ class MonitorState:
         )
         self.var_conf = VarConfFollower(var_conf_file)
         self.log_file = log_file
+        self.output_directory = indicators_csv.parent
         self.samples: deque[tuple[float, int]] = deque(maxlen=SAMPLES_KEPT)
+
+    @property
+    def has_feasibility(self) -> bool:
+        """Whether the training problems have constraints: Evolver then tells the feasibility."""
+        return (self.output_directory / FEASIBILITY_FILE).is_file()
 
     def poll(self) -> None:
         """Read what Evolver appended to the files since the last poll."""
@@ -152,13 +166,14 @@ def run_started_at(run_id: str) -> datetime | None:
         return None
 
 
-def tab_names(with_population: bool) -> list[str]:
+def tab_names(with_population: bool, with_feasibility: bool = False) -> list[str]:
     """The tabs of the monitor of a run in progress."""
     return [
         "Overview",
         "Front",
         *(["Population"] if with_population else []),
         "Convergence",
+        *(["Feasibility"] if with_feasibility else []),
         "Best so far",
         "Log",
     ]
@@ -252,7 +267,9 @@ def render_population(state: MonitorState, key: str) -> None:
         evaluation = st.select_slider(
             "Checkpoint (meta-evaluations)", options=kept, value=kept[-1], key=f"{key}_checkpoint"
         )
-    log_scale = st.checkbox(
+    # ICMOP can be negative, which a logarithmic scale cannot show.
+    positive = all(value > 0 for s in summaries for value in s.minimum.values())
+    log_scale = positive and st.checkbox(
         "Logarithmic axes",
         key=f"{key}_log",
         help="The first checkpoints are far from the later ones: a logarithmic scale shows both.",
@@ -261,12 +278,15 @@ def render_population(state: MonitorState, key: str) -> None:
     if len(indicators) < 2:
         st.info("The population viewer needs two meta-objectives.")
         return
+    population = state.population.checkpoint(evaluation)
+    feasibility = read_feasibility(state.output_directory, population=True)
     figure = build_population_figure(
-        state.population.checkpoint(evaluation),
+        population,
         state.front.checkpoint(evaluation),
         state.front.first,
         (indicators[0], indicators[1]),
         log_scale=log_scale,
+        failed=failed_configurations(feasibility, evaluation) if feasibility is not None else None,
     )
     render_chart(figure, f"{key}_chart", f"population_{evaluation}", width="stretch")
     st.caption(
@@ -295,10 +315,51 @@ def render_convergence(state: MonitorState, key: str) -> None:
     by_time = columns[0].radio(
         "x axis", ["Meta-evaluations", "Computing time"], horizontal=True, key=f"{key}_x"
     )
-    log_scale = columns[1].checkbox("Logarithmic values", key=f"{key}_log")
+    positive = all(value > 0 for s in summaries for value in s.minimum.values())
+    log_scale = (
+        columns[1].checkbox("Logarithmic values", key=f"{key}_log", disabled=not positive)
+        and positive
+    )
     minutes = state.var_conf.minutes if by_time == "Computing time" else None
     figure = build_convergence_figure(summaries, minutes=minutes, log_scale=log_scale)
     render_chart(figure, f"{key}_chart", "convergence", width="stretch")
+
+
+def render_feasibility(state: MonitorState, key: str) -> None:
+    """Show how the configurations come to find feasible solutions, and where they do not.
+
+    Args:
+        state: The monitor's state.
+        key: Prefixes the widgets' keys.
+    """
+    table = read_feasibility(state.output_directory, population=True)
+    what = "population"
+    if table is None:
+        table = read_feasibility(state.output_directory)
+        what = "front"
+    if table is None:
+        st.caption("No checkpoint yet.")
+        return
+    counts = feasible_by_checkpoint(table)
+    last = counts.iloc[-1]
+    st.markdown(
+        f"The configurations of the {what} whose runs **all** found feasible solutions: "
+        f"**{last['without_failures']} of {last['configurations']}** at evaluation "
+        f"{last['Evaluation']:,}. The others have at least a failed run, which adds 6 to both "
+        "meta-objectives."
+    )
+    render_chart(build_feasibility_figure(counts), f"{key}_chart", "feasibility", width="stretch")
+    by_problem = read_feasibility(
+        state.output_directory, population=what == "population", by_problem=True
+    )
+    if by_problem is not None:
+        st.markdown("By training problem, at the last checkpoint:")
+        st.dataframe(failures_by_problem(by_problem), hide_index=True, width="stretch")
+    if what == "front":
+        st.caption(
+            "Only the front: as soon as one configuration finds feasible solutions, it hides those "
+            "that do not. A training that writes its population shows them all."
+        )
 
 
 def render_best_configurations(

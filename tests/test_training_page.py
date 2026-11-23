@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,8 @@ from streamlit.testing.v1 import AppTest
 from evolver_studio import evolver_client
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path, write_pid_file
 from evolver_studio.problem_catalogue import parse_problem_catalogue
+from evolver_studio.runs import RunPhase, run_phase
+from evolver_studio.training_runs import read_training
 
 PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "training.py"
 
@@ -560,3 +563,81 @@ class TestMetaOptimizersWithFixedOperators:
     ):
         # Assert: NSGA-II, the default one
         assert not any("hardcodes" in i.value for i in app.info)
+
+
+class TestProblemsWithConstraints:
+    @pytest.fixture
+    def constrained(self, app: AppTest, tmp_path: Path) -> AppTest:
+        (tmp_path / "resources").symlink_to(PAGE_SCRIPT.parent.parent / "resources")
+        app.radio(key="train_constraints").set_value("With constraints").run()
+        return app.multiselect(key="train_problems_Double").select("DASCMOP5").run()
+
+    def test_should_offer_the_problems_of_the_group_and_drop_the_others(self, app: AppTest):
+        # Act
+        app.radio(key="train_constraints").set_value("With constraints").run()
+
+        # Assert: ZDT4, chosen at first, has no constraints
+        problems = app.multiselect(key="train_problems_Double")
+        assert not app.exception and not app.warning
+        assert problems.value == []
+        assert "DASCMOP5" in problems.options and "ZDT4" not in problems.options
+
+    def test_should_offer_only_the_indicators_that_make_sense_with_constraints(
+        self, constrained: AppTest
+    ):
+        # Act
+        indicators = constrained.multiselect(key="train_indicators_constrained")
+
+        # Assert
+        assert indicators.value == ["ConstrainedMultiobjectiveIndicator", "Epsilon"]
+        assert set(indicators.options) == {*indicators.value, "NormalizedHypervolume"}
+
+    def test_should_search_the_space_that_handles_constraints(self, constrained: AppTest):
+        # Assert
+        assert not constrained.exception and not constrained.error
+        assert any("with constraints" in expander.label for expander in constrained.expander)
+        assert not _launch_button(constrained).disabled
+
+    def test_should_not_offer_the_indicators_for_constraints_without_them(self, app: AppTest):
+        # Act
+        options = app.multiselect(key="train_indicators").options
+
+        # Assert
+        assert not any(option.startswith("Constrained") for option in options)
+
+    def test_should_train_and_tell_the_feasibility_of_the_configurations(
+        self, constrained: AppTest, tmp_path: Path
+    ):
+        # Arrange
+        app = constrained
+        app.number_input(key="train_meta_evals").set_value(100)
+        app.number_input(key="train_meta_population_NSGA-II").set_value(20).run()
+        app.number_input(key="train_update_every_20").set_value(20)
+        app.checkbox(key="train_write_population").check().run()
+        assert not app.error
+
+        # Act
+        _launch_button(app).click().run()
+        run_dir = next((tmp_path / "cli-runner-runs").iterdir())
+        deadline = time.monotonic() + 120
+        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the training did not finish"
+            time.sleep(0.3)
+
+        # Assert
+        assert run_phase(run_dir) == RunPhase.FINISHED, (run_dir / "runner.log").read_text()[-800:]
+        base_level = (run_dir / "base_level.yaml").read_text()
+        assert "ConstrainedMultiobjectiveIndicator" in base_level
+        training = read_training(run_dir, tmp_path)
+        assert training is not None
+        assert "--constraintHandling" in training.configurations[0].configuration
+
+        # Act: its analysis
+        analysis = AppTest.from_file(
+            str(PAGE_SCRIPT.parent / "training_analysis.py"), default_timeout=60
+        ).run()
+
+        # Assert
+        assert not analysis.exception
+        assert "Feasibility" in [tab.label for tab in analysis.tabs]
+        assert any("found feasible solutions" in m.value for m in analysis.markdown)

@@ -19,6 +19,7 @@ from evolver_studio.app_state import require_evolver_jar
 from evolver_studio.evolver_client import WORKING_DIRECTORY
 from evolver_studio.monitor_view import (
     render_convergence,
+    render_feasibility,
     render_indicator_front,
     render_population,
 )
@@ -43,6 +44,8 @@ training = st.selectbox("Training run", trainings, format_func=lambda t: t.label
 render_summary(training)
 state = monitor_state(training)
 names = ["Convergence", "Front", *(["Population"] if training.has_population else [])]
+if state.has_feasibility:
+    names.append("Feasibility")
 names += ["Configurations", "Parameters"]
 tabs = iter(st.tabs(names))
 key = f"analysis_{training.run_id}"
@@ -53,6 +56,9 @@ with next(tabs):
 if training.has_population:
     with next(tabs):
         render_population(state, f"{key}_population")
+if state.has_feasibility:
+    with next(tabs):
+        render_feasibility(state, f"{key}_feasibility")
 with next(tabs):
     render_configurations(training, jar)
 with next(tabs):

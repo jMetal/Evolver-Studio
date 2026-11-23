@@ -18,7 +18,7 @@ Nothing here depends on Streamlit.
 import io
 import statistics
 from collections import deque
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +39,7 @@ MAX_PLOTTED_CHECKPOINTS = 2000
 STUCK_AFTER_GAPS = 10
 STUCK_AFTER_MINIMUM_SECONDS = 180.0
 POPULATION_COLOR = "#b0b7c3"
+FAILED_COLOR = "#D94A57"
 FRONT_COLOR = "#1f77b4"
 FIRST_FRONT_COLOR = "#e8b04a"
 
@@ -405,6 +406,7 @@ def build_population_figure(
     first_front: pd.DataFrame | None,
     indicators: tuple[str, str],
     log_scale: bool = False,
+    failed: Collection[int] | None = None,
 ) -> go.Figure:
     """Plot a checkpoint's population in the space of two meta-objectives.
 
@@ -418,15 +420,23 @@ def build_population_figure(
         first_front: The rows of the front at the first checkpoint, or None.
         indicators: The meta-objectives of the axes.
         log_scale: Whether to draw the axes in a logarithmic scale.
+        failed: The `SolutionId` of the configurations of the population with runs without feasible
+            solutions, drawn in red; None for a training without constraints.
 
     Returns:
         The figure, titled with the checkpoint's evaluations.
     """
     x, y = indicators
     figure = go.Figure()
+    failing = (
+        population[population[SOLUTION_COLUMN].isin(failed)]
+        if population is not None and failed
+        else None
+    )
     layers = (
         (first_front, "First checkpoint", FIRST_FRONT_COLOR, 6, 0.35),
         (population, "Population", POPULATION_COLOR, 7, 0.9),
+        (failing, "With failed runs", FAILED_COLOR, 7, 0.9),
         (front, "Non-dominated front", FRONT_COLOR, 9, 1.0),
     )
     for rows, name, color, size, opacity in layers:
@@ -452,6 +462,37 @@ def build_population_figure(
     if log_scale:
         figure.update_xaxes(type="log")
         figure.update_yaxes(type="log")
+    return figure
+
+
+def build_feasibility_figure(counts: pd.DataFrame) -> go.Figure:
+    """Plot how many configurations of each checkpoint have no failed runs.
+
+    Args:
+        counts: What `feasibility.feasible_by_checkpoint` returns.
+
+    Returns:
+        The figure: the configurations without failed runs, under the total.
+    """
+    figure = go.Figure()
+    for column, name, color, dash in (
+        ("configurations", "All the configurations", POPULATION_COLOR, "dash"),
+        ("without_failures", "Without failed runs", FRONT_COLOR, "solid"),
+    ):
+        figure.add_trace(
+            go.Scatter(
+                x=counts[EVALUATION_COLUMN],
+                y=counts[column],
+                mode="lines+markers",
+                name=name,
+                line={"color": color, "dash": dash},
+            )
+        )
+    figure.update_layout(
+        xaxis_title="Meta-evaluations",
+        yaxis={"title": "Configurations", "rangemode": "tozero"},
+        legend={"orientation": "h", "y": -0.2},
+    )
     return figure
 
 
