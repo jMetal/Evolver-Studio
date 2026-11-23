@@ -27,6 +27,12 @@ st.logo(
     size="large",
 )
 
+# The menu runs along the top, so the page needs less room above its content than Streamlit's
+# default (which leaves space for a taller header).
+st.html(
+    '<style>[data-testid="stMainBlockContainer"] { padding-top: 4.5rem; }</style>',
+)
+
 pg = st.navigation(
     {
         "": [st.Page(HOME_PAGE, title="Home", icon="🏠", default=True)],
@@ -36,6 +42,7 @@ pg = st.navigation(
             ]
             for section in SECTIONS
         },
-    }
+    },
+    position="top",
 )
 pg.run()

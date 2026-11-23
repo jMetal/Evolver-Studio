@@ -8,6 +8,13 @@ version works with.
 
 Works with Evolver 2.5.
 
+### Design
+
+- The **menu is at the top** of the page (Home, and a dropdown each for Explore, Solve,
+  Meta-optimization and Learn) instead of on the left.
+- A **theme** of its own (`.streamlit/config.toml`): the colors of the logo, Montserrat for
+  headings, light and dark variants, and no developer options in the toolbar.
+
 ### Documentation
 
 - The **README** is rewritten for new users: why Evolver-Studio, a gallery of screenshots of the
