@@ -46,7 +46,7 @@ Works with Evolver 2.7.
 
 - **Problems with constraints**: the training set is chosen among the problems without constraints,
   with them or both, before the parameter space, which is then the one that handles constraints.
-  The meta-objectives are restricted to those that make sense: ICMOP, EP and NHV with constraints
+  The meta-objectives are restricted to those that make sense: ICMOP, EP, NHV and IGD+ with constraints
   (ICMOP and EP by default), all but ICMOP and CEP without them. A **Feasibility** tab, in the
   monitor and in the analysis, tells how many configurations find feasible solutions in all their
   runs, and on which problems they fail; the population draws those that fail in red.

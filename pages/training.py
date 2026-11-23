@@ -658,9 +658,10 @@ CONSTRAINED_INDICATORS_HELP = (
     "On problems with constraints each run without feasible solutions adds 6 to both "
     "meta-objectives, so the search first reaches the configurations that find them; then each "
     "one measures the quality of the feasible fronts. ConstrainedMultiobjectiveIndicator (ICMOP) "
-    "and Epsilon are the recommended pair, NormalizedHypervolume and Epsilon the other one. The "
-    "other indicators are not offered: ConstrainedEpsilon has the values of Epsilon in a training, "
-    "HypervolumeMinus measures what ICMOP does, and the rest measure only the spread."
+    "and Epsilon are the recommended pair; NormalizedHypervolume or IGD+ can take the place of "
+    "either, but not NormalizedHypervolume together with ICMOP. The other indicators are not "
+    "offered: ConstrainedEpsilon has the values of Epsilon in a training, HypervolumeMinus "
+    "measures what ICMOP does, and the two of spread do not measure convergence."
 )
 DEFAULT_TRAINING_PROBLEMS = {"Double": ["ZDT4"]}
 TRAINING_SET_ROWS_KEY = "training_set_rows"

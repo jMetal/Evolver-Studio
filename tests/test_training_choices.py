@@ -29,6 +29,7 @@ class TestIndicators:
             "ConstrainedMultiobjectiveIndicator",
             "Epsilon",
             "NormalizedHypervolume",
+            "InvertedGenerationalDistancePlus",
         }
 
     def test_should_not_take_two_that_measure_the_hypervolume(self):

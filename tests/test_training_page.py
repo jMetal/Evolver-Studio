@@ -590,7 +590,11 @@ class TestProblemsWithConstraints:
 
         # Assert
         assert indicators.value == ["ConstrainedMultiobjectiveIndicator", "Epsilon"]
-        assert set(indicators.options) == {*indicators.value, "NormalizedHypervolume"}
+        assert set(indicators.options) == {
+            *indicators.value,
+            "NormalizedHypervolume",
+            "InvertedGenerationalDistancePlus",
+        }
 
     def test_should_search_the_space_that_handles_constraints(self, constrained: AppTest):
         # Assert

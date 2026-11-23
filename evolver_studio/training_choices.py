@@ -17,12 +17,14 @@ from evolver_studio.weight_vectors import available_population_sizes
 
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
 # With constraints Evolver turns every meta-objective into its version with them (each run without
-# feasible solutions adds 6), so few pairs make sense: the two it recommends, ICMOP with EP and NHV
-# with EP. ConstrainedEpsilon has there the values of Epsilon, and is not offered.
+# feasible solutions adds 6): ICMOP with EP is the pair it recommends. ConstrainedEpsilon has there
+# the values of Epsilon, HypervolumeMinus measures what ICMOP does, and the two of spread do not
+# measure convergence: they are not offered.
 CONSTRAINED_INDICATORS = (
     "ConstrainedMultiobjectiveIndicator",
     "Epsilon",
     "NormalizedHypervolume",
+    "InvertedGenerationalDistancePlus",
 )
 DEFAULT_CONSTRAINED_INDICATORS = ("ConstrainedMultiobjectiveIndicator", "Epsilon")
 DEFAULT_POPULATION_SIZE = 100
