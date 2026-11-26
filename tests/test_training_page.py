@@ -13,6 +13,7 @@ from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path,
 from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.runs import RunPhase, run_phase
 from evolver_studio.training_runs import read_training
+from evolver_studio.validation_form import PASTED_CONFIGURATION_KEY
 
 PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "training.py"
 
@@ -483,20 +484,23 @@ class TestResultsOfAFinishedRun:
         assert not any("--crossover SBX" in code.value for code in app.code)
 
     def test_should_offer_to_validate_the_configuration_chosen(self, app: AppTest, tmp_path: Path):
-        # Arrange
+        # Arrange: the page inside the app, whose navigation the switch to Validation needs
         self._finished(tmp_path, population=False)
+        app = AppTest.from_file(
+            str(PAGE_SCRIPT.parent.parent / "app.py"), default_timeout=60
+        ).switch_page("app_pages/training.py")
+        app.session_state["train_experiment_name"] = "test"
         app.session_state["last_finished_run"] = self.state
         app.run()
         button = next(b for b in app.button if b.label == "Validate this configuration")
 
-        # Act: the page switch itself is not available outside the app
+        # Act
         button.click()
         app.run()
 
-        # Assert: Validation's form is ready with the configuration chosen as the tuned one (the
-        # exception is the missing navigation of a lone page)
-        assert "Could not find page" in app.exception[0].message
-        assert any("--crossover" in str(v) for v in app.session_state.filtered_state.values())
+        # Assert: Validation's form is ready with the configuration chosen as the tuned one
+        assert not app.exception
+        assert "--crossover" in app.session_state[PASTED_CONFIGURATION_KEY]
 
     def test_should_add_the_population_when_the_run_wrote_it(self, app: AppTest, tmp_path: Path):
         # Arrange
