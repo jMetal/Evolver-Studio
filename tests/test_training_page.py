@@ -675,3 +675,30 @@ class TestProblemsWithConstraints:
         assert not analysis.exception
         assert "Feasibility" in [tab.label for tab in analysis.tabs]
         assert any("found feasible solutions" in m.value for m in analysis.markdown)
+
+
+class TestClusterExport:
+    def _write_button(self, app: AppTest):
+        return next(button for button in app.button if button.label == "Write the package")
+
+    def test_should_write_a_package_instead_of_launching(self, app: AppTest, tmp_path: Path):
+        # Arrange: the reference fronts the training reads
+        (tmp_path / "resources").symlink_to(PAGE_SCRIPT.parent.parent / "resources")
+
+        # Act
+        self._write_button(app).click().run()
+
+        # Assert
+        assert not app.exception
+        (zip_file,) = (tmp_path / "cluster-exports").iterdir()
+        assert zip_file.name.startswith("test.") and zip_file.suffix == ".zip"
+        assert any("Written" in success.value for success in app.success)
+        assert not (tmp_path / "cli-runner-runs").exists()
+
+    def test_should_not_write_it_with_a_time_limit_slurm_does_not_read(self, app: AppTest):
+        # Act
+        app.text_input(key="cluster_time_limit").set_value("two days").run()
+
+        # Assert
+        assert self._write_button(app).disabled
+        assert any("time limit" in error.value for error in app.error)

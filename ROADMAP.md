@@ -95,6 +95,11 @@ below; revisit and reorder as real usage surfaces new ones.
 - **Problems with constraints (November 2026)**: in Explore, Run algorithm, Training, Validation and
   its analysis, always with the parameter space that handles them; a feasibility tab in the monitor
   and the analyses (`evolver_studio/feasibility.py`, `validation.feasibility`) and tutorial S9.
+- **Trainings on a cluster (November 2026)**: Training writes a training as a package for a Slurm
+  cluster (jar, training with relative paths, resources, job array of replications, README), and
+  Training analysis imports the finished replications as trainings of the app
+  (`evolver_studio/cluster_package.py`). Next: an analysis of the replications of a training
+  together (as Evolver's `scripts/training_replicas.py`), and validation studies on a cluster.
 - **Home page and design (November 2026)**: the menu at the top, a theme of its own, no sidebar, and a
   home page with the latest result, the recent runs and the steps (`evolver_studio/home_panel.py`).
   The pages live in `app_pages/`: Streamlit serves a folder called `pages/` by itself, without the

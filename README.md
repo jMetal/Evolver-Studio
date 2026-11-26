@@ -62,6 +62,8 @@ quality indicators.
 
 1. **Training** — choose the algorithm to configure, the problems to tune it for, the
    meta-objectives (quality indicators) and the meta-optimizer, name the experiment, and launch it.
+   A training too long for your computer can instead be written as a package to run on a cluster
+   managed by Slurm (see below).
 2. **Training analysis** — read what it found: convergence, the front of configurations, what
    they have in common and how they differ from the default configuration.
 3. **Validation** — run a configuration it found many times, next to the default configurations
@@ -72,6 +74,14 @@ quality indicators.
 A configuration goes from one step to the next with a button, and from a training to *Run
 algorithm*, to be used on a new problem.
 
+**Trainings on a cluster.** On expensive problems a training can take days. In *Training*, *Run it
+on a cluster (Slurm)* writes the training as a zip, in `cluster-exports/`, with everything a
+cluster needs: Evolver's jar, the training, the reference fronts it reads, a batch script that runs
+independent replications as a Slurm job array, and a README with the steps. The cluster only needs
+Java 21 or later. When the replications end, copy the folder back and import it in *Training
+analysis* (*Import a training run on a cluster*): each finished replication becomes a training of
+the app, to analyze and validate like the others.
+
 ## Pages
 
 | Section | Page | What it does |
@@ -81,8 +91,8 @@ algorithm*, to be used on a new problem.
 | Explore | Quality indicators | The indicators, what each one measures, and which way is better |
 | Explore | Problems | Every problem: encoding, objectives, variables, constraints, arguments, reference fronts |
 | Solve | Run algorithm | Run an algorithm from its default configuration, adjusted as you like; its front as it evolves, fronts, indicators, `VAR`/`FUN` |
-| Meta-optimization | Training | Configure, launch, monitor and cancel a training run |
-| Meta-optimization | Training analysis | Convergence, fronts, population, feasibility and configurations of a finished training |
+| Meta-optimization | Training | Configure, launch, monitor and cancel a training run, or write it as a package for a Slurm cluster |
+| Meta-optimization | Training analysis | Convergence, fronts, population, feasibility and configurations of a finished training; import the trainings run on a cluster |
 | Meta-optimization | Validation | Design a validation study, run it in the background and follow it |
 | Meta-optimization | Validation analysis | Verdicts, feasibility, Wilcoxon table, effect sizes, rankings, Bayesian test, fronts, attainment, cost |
 | Learn | Tutorials | Interactive tutorials, paired with Evolver's documentation |
@@ -194,6 +204,7 @@ with any tool:
 | `results/` | What Evolver wrote for each training, in `<algorithm>/<experiment>.<date-time>/` (`INDICATORS.csv`, `VAR_CONF.txt`, `METADATA.txt`…) |
 | `solve-runs/` | The runs of *Run algorithm* |
 | `validation-runs/` | The validation studies, with every run's front and indicators |
+| `cluster-exports/` | The packages of the trainings to run on a cluster |
 
 ## Troubleshooting
 

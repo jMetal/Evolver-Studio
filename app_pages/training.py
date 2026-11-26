@@ -31,6 +31,16 @@ from evolver_studio.catalogue import (
     BaseAlgorithm,
     MetaAlgorithm,
 )
+from evolver_studio.cluster_package import (
+    DEFAULT_JAVA_SETUP,
+    DEFAULT_MEMORY,
+    DEFAULT_TIME_LIMIT,
+    EXPORTS_DIRECTORY_NAME,
+    SlurmSettings,
+    TrainingPackage,
+    slurm_settings_errors,
+    write_cluster_package,
+)
 from evolver_studio.evolver_client import (
     WORKING_DIRECTORY,
     RunState,
@@ -299,6 +309,88 @@ def _launch_run(
     write_pid_file(run_dir / "pid.txt", process.pid)
     st.session_state[f"update_every_evaluations_{run_id}"] = update_every_evaluations
     st.session_state.pop("last_finished_run", None)
+
+
+def _render_slurm_settings(number_of_cores: int) -> SlurmSettings:
+    """Ask what the batch script of a package asks Slurm for."""
+    left, right = st.columns(2)
+    replications = left.number_input(
+        "Independent replications",
+        value=1,
+        min_value=1,
+        key="cluster_replications",
+        help="Trainings with the same settings, each one a task of a Slurm job array, to see how "
+        "much their results vary (tutorial E20 of Evolver).",
+    )
+    time_limit = right.text_input(
+        "Time limit of each replication",
+        DEFAULT_TIME_LIMIT,
+        key="cluster_time_limit",
+        help="Slurm's --time: hours:minutes:seconds, or days-hours:minutes:seconds.",
+    )
+    memory = left.text_input("Memory of each replication", DEFAULT_MEMORY, key="cluster_memory")
+    java_setup = right.text_input(
+        "How to load Java 21 or later",
+        DEFAULT_JAVA_SETUP,
+        key="cluster_java_setup",
+        help="The command that puts Java on the path of a node, as your cluster does it; empty if "
+        "it already is.",
+    )
+    extra_options = st.text_area(
+        "More sbatch options, one per line",
+        key="cluster_extra_options",
+        placeholder="--partition=long\n--constraint=cal",
+        height=80,
+    )
+    st.caption(
+        f"Each replication asks for {number_of_cores} cores, the *Number of cores* above: the "
+        "meta-optimizer uses that many whatever Slurm gives it."
+    )
+    return SlurmSettings(
+        replications=int(replications),
+        time_limit=time_limit,
+        memory=memory,
+        java_setup=java_setup,
+        extra_options=extra_options,
+    )
+
+
+def _render_cluster_export(
+    jar: Path,
+    can_export: bool,
+    number_of_cores: int,
+    make_package: Callable[[str], TrainingPackage],
+) -> None:
+    """Offer the training as a package to run on a cluster, instead of launching it here."""
+    with st.expander("Run it on a cluster (Slurm)", key="cluster_export"):
+        st.markdown(
+            "A training on expensive problems can take days. Instead of launching it here, write "
+            "it as a **package** to run on a cluster managed by Slurm: a zip with Evolver's jar, "
+            "the training, the files it reads and the scripts to submit it, with a README.txt "
+            "that explains the steps. When it is done, bring the folder back and import it in "
+            "**Training analysis**."
+        )
+        settings = _render_slurm_settings(number_of_cores)
+        errors = slurm_settings_errors(settings)
+        for error in errors:
+            st.error(error)
+        if not can_export:
+            st.caption(
+                "The package holds the training defined above: it can be written once the training "
+                "could be launched (see what the page asks for above *Launch training*)."
+            )
+        if st.button("Write the package", disabled=not can_export or bool(errors)):
+            run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+            destination = WORKING_DIRECTORY / EXPORTS_DIRECTORY_NAME
+            try:
+                path = write_cluster_package(
+                    make_package(run_id), settings, jar, WORKING_DIRECTORY, destination
+                )
+            except (OSError, ValueError) as error:
+                st.error(f"The package could not be written: {error}")
+            else:
+                size = path.stat().st_size / 1e6
+                st.success(f"Written: `{path}` ({size:.0f} MB). Its README.txt has the steps.")
 
 
 def _cancel(active_run: ActiveRun) -> None:
@@ -1102,5 +1194,35 @@ else:
             choices,
         )
         st.rerun()
+
+    def _package(run_id: str) -> TrainingPackage:
+        return TrainingPackage(
+            experiment=experiment,
+            run_id=run_id,
+            results_folder=results_folder,
+            base_level=_base_level_config(
+                algorithm.registry_name,
+                encoding,
+                PARAMETER_SPACE_FILE_NAME,
+                extra_config,
+                training_set,
+                problem_specs,
+                choices,
+            ),
+            meta_search=_meta_search_config(
+                meta_algorithm.name,
+                meta_encoding,
+                meta_max_evaluations,
+                meta_max_minutes,
+                meta_population_size,
+                int(number_of_cores),
+                operator_flags or {},
+            ),
+            parameter_space_text=parameter_space_text_value or "",
+            write_frequency=int(update_every_evaluations),
+            write_population=write_population,
+        )
+
+    _render_cluster_export(jar, can_launch, int(number_of_cores), _package)
 
     _render_last_finished_run_if_any()

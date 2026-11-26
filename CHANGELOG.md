@@ -53,6 +53,16 @@ Works with Evolver 2.7.
 
 ### Training and Training analysis
 
+- **Trainings on a cluster managed by Slurm.** *Run it on a cluster (Slurm)*, in Training, writes
+  the training as a zip, in `cluster-exports/`, instead of launching it: Evolver's jar, the training
+  with paths relative to the package, the reference fronts, weight vectors and instances it reads,
+  a batch script and a script that submits the independent replications as a job array (adapted
+  from Evolver's `scripts/slurm/`), and a README with the steps. The form asks for the
+  replications, the time limit, the memory, how to load Java and other sbatch options; the cores are
+  those of the meta-optimizer. The scripts check the version of Java, run on the local disk of the
+  node if it has one, bring the results back even if the training fails, and submit again only the
+  replications that are not done. *Import a training run on a cluster*, in Training analysis, turns
+  each finished replication of the folder brought back into a training of the app, once.
 - A training asks for an **experiment name**, and keeps its results in
   `results/<algorithm>/<name>.<date-time>` (the folder can be changed). Until now the suggested
   folder was that of ZDT4, whatever was trained. The name identifies the training in Training

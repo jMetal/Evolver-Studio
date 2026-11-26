@@ -15,4 +15,5 @@ dist/
 .idea/
 /solve-runs/
 /validation-runs/
+/cluster-exports/
 .DS_Store
