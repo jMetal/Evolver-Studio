@@ -21,7 +21,7 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
-          auto-activate-base: false
+          auto-activate: false
           conda-remove-defaults: "true"
 
       # The same steps as in the README.
@@ -42,5 +42,8 @@ jobs:
           "
 
       # make test stops at the first failure; here every failure is reported, with its output.
+      # A runner has fewer cores than a laptop, and is shared: the runs of the tests get more time.
       - name: Test
+        env:
+          EVOLVER_STUDIO_TEST_TIME_FACTOR: "4"
         run: conda run --no-capture-output -n evolver-studio pytest tests/ -ra
