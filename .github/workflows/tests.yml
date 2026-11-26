@@ -6,18 +6,26 @@ on:
   pull_request:
   workflow_dispatch:
 
+defaults:
+  run:
+    # A login shell, so that the conda set up below is on the path of every step.
+    shell: bash -el {0}
+
 jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # The same steps as in the README, with the Conda that the runner comes with.
+      # The runners do not come with conda: Miniforge, whose channel is the environment's.
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          auto-activate-base: false
+
+      # The same steps as in the README.
       - name: Create the environment
-        run: |
-          echo "$CONDA/bin" >> "$GITHUB_PATH"
-          export PATH="$CONDA/bin:$PATH"
-          make env
+        run: make env
 
       - name: Lint
         run: make lint
