@@ -7,6 +7,8 @@ configuration goes from here to Validation, to be compared with other algorithms
 algorithm, to be run on a problem.
 """
 
+from pathlib import Path
+
 import streamlit as st
 
 from evolver_studio.analysis_view import (
@@ -16,6 +18,7 @@ from evolver_studio.analysis_view import (
     render_summary,
 )
 from evolver_studio.app_state import require_evolver_jar
+from evolver_studio.cluster_package import import_cluster_results
 from evolver_studio.evolver_client import WORKING_DIRECTORY
 from evolver_studio.monitor_view import (
     render_convergence,
@@ -23,13 +26,42 @@ from evolver_studio.monitor_view import (
     render_indicator_front,
     render_population,
 )
+from evolver_studio.result import Err
 from evolver_studio.training_runs import list_finished_trainings
 
 SELECTION_KEY = "analysis_training"
 
+
+def _render_import() -> None:
+    """Import the replications of a training run on a cluster, from the folder of its package."""
+    with st.expander("Import a training run on a cluster", key="analysis_import"):
+        st.markdown(
+            "A training written as a package in **Training** (*Run it on a cluster*) runs "
+            "elsewhere. Copy its folder back, with its `results/` and `logs/`, and give it here: "
+            "each finished replication becomes a training run of the app, to analyze and validate "
+            "like any other. Importing the folder again adds only the replications that are new."
+        )
+        folder = st.text_input("Folder of the package", key="analysis_import_folder")
+        if st.button("Import", disabled=not folder.strip()):
+            result = import_cluster_results(Path(folder.strip()).expanduser(), WORKING_DIRECTORY)
+            if isinstance(result, Err):
+                st.error(result.message)
+                return
+            report = result.value
+            if report.imported:
+                st.success(
+                    f"Imported {len(report.imported)} replication(s): "
+                    + ", ".join(report.imported)
+                    + ". Choose them below."
+                )
+            for line in report.skipped:
+                st.info(line)
+
+
 st.title("Training analysis")
 
 jar = require_evolver_jar()
+_render_import()
 
 trainings = list_finished_trainings(WORKING_DIRECTORY)
 if not trainings:

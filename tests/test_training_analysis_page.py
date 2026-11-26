@@ -105,3 +105,17 @@ class TestAnalysisPage:
         app.run()
 
         assert not app.exception
+
+
+class TestImport:
+    def test_should_say_when_a_folder_is_not_a_package(self, working_directory: Path):
+        # Arrange
+        app = _open().run()
+
+        # Act
+        app.text_input(key="analysis_import_folder").set_value(str(working_directory)).run()
+        next(button for button in app.button if button.label == "Import").click().run()
+
+        # Assert
+        assert not app.exception
+        assert any("is not the folder of a package" in error.value for error in app.error)
