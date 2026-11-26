@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same steps as in the README, with the Conda that the runner comes with.
+      - name: Create the environment
+        run: |
+          echo "$CONDA/bin" >> "$GITHUB_PATH"
+          export PATH="$CONDA/bin:$PATH"
+          make env
+
+      - name: Lint
+        run: make lint
+
+      # Without the jar, the tests that need it are skipped, so it is downloaded first.
+      - name: Download Evolver's jar
+        run: |
+          conda run -n evolver-studio python -c "
+          import sys
+          from evolver_studio.evolver_client import Err, download_jar, jar_path
+          result = download_jar(jar_path())
+          sys.exit(result.message if isinstance(result, Err) else 0)
+          "
+
+      - name: Test
+        run: make test
