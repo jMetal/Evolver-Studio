@@ -97,6 +97,18 @@ class TestValidationFormState:
         # Assert
         assert state is not None and defaults_key("Double") not in state
 
+    def test_should_take_a_configuration_that_handles_constraints_to_problems_with_them(self):
+        # Arrange
+        configuration = TrainedConfiguration({}, "--constraintHandling cdp")
+
+        # Act
+        state = validation_form_state(_training(algorithm="RVEA"), configuration)
+
+        # Assert: RVEA has a single default for them
+        assert state is not None
+        assert state["validation_constraints"] == "With constraints"
+        assert state[defaults_key("Double", constrained=True)] == ["RVEA"]
+
     def test_should_leave_the_problems_for_the_user_to_choose(self):
         # Act
         state = validation_form_state(_training(), CONFIGURATION)

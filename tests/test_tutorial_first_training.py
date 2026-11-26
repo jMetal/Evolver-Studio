@@ -30,7 +30,7 @@ def working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _open() -> AppTest:
     app = AppTest.from_file(str(APP_SCRIPT), default_timeout=120).run()
-    app.switch_page("pages/tutorials.py").run()
+    app.switch_page("app_pages/tutorials.py").run()
     app.button(key=OPEN_KEY).click().run()
     return app
 
@@ -43,7 +43,7 @@ class TestTrainingForm:
             app.session_state[key] = value
 
         # Act
-        app.switch_page("pages/training.py").run()
+        app.switch_page("app_pages/training.py").run()
 
         # Assert: the form shows it, with the population written
         assert not app.exception

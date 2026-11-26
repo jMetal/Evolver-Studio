@@ -10,14 +10,14 @@ from collections.abc import Mapping
 
 import pandas as pd
 
-from evolver_studio.problem_catalogue import (
-    Problem,
-)
+from evolver_studio.catalogue import configuration_handles_constraints
+from evolver_studio.problem_catalogue import WITH_CONSTRAINTS, WITHOUT_CONSTRAINTS, Problem
 from evolver_studio.solve_form import form_state_from_request
 from evolver_studio.training_results import TrainedConfiguration
 from evolver_studio.training_runs import FinishedTraining
 from evolver_studio.validation import base_algorithm
 from evolver_studio.validation_form import (
+    CONSTRAINTS_KEY,
     ENCODING_KEY,
     PASTED_ALGORITHM_KEY,
     PASTED_CONFIGURATION_KEY,
@@ -58,15 +58,17 @@ def validation_form_state(
     algorithm = base_algorithm(training.algorithm)
     if algorithm is None:
         return None
+    constrained = configuration_handles_constraints(configuration.configuration)
     state: dict[str, object] = {
         ENCODING_KEY: training.encoding,
+        CONSTRAINTS_KEY: WITH_CONSTRAINTS if constrained else WITHOUT_CONSTRAINTS,
         TUNED_SOURCE_KEY: TUNED_PASTED,
         PASTED_ALGORITHM_KEY: algorithm.name,
         PASTED_CONFIGURATION_KEY: configuration.configuration,
         tuned_name_key(training.algorithm): f"{algorithm.name} (tuned)",
     }
-    if len(algorithm.default_configurations.get(training.encoding, ())) == 1:
-        state[defaults_key(training.encoding)] = [algorithm.name]
+    if len(algorithm.defaults(training.encoding, constrained)) == 1:
+        state[defaults_key(training.encoding, constrained)] = [algorithm.name]
     if training.population_size:
         state[POPULATION_KEY] = training.population_size
     state[problems_key(training.encoding)] = []

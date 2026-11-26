@@ -35,6 +35,7 @@ class TestTutorialsCatalogue:
             "analyzing_training_results",
             "validating_a_configuration",
             "analyzing_a_validation",
+            "problems_with_constraints",
         ]
 
     def test_should_identify_every_tutorial_by_a_distinct_topic(self):
@@ -45,12 +46,12 @@ class TestTutorialsCatalogue:
         assert len(slugs) == len(set(slugs))
 
     def test_should_pair_only_with_tutorials_evolver_has(self):
-        """Evolver's documentation has tutorials E1 to E17."""
+        """Evolver's documentation has tutorials E1 to E21."""
         # Act
         paired = {number for tutorial in TUTORIALS for number in tutorial.pairs_with}
 
         # Assert
-        assert paired <= {f"E{index}" for index in range(1, 18)}
+        assert paired <= {f"E{index}" for index in range(1, 22)}
 
     @pytest.mark.parametrize("level", list(TutorialLevel))
     def test_should_group_every_tutorial_under_its_level(self, level: TutorialLevel):
@@ -79,7 +80,7 @@ class TestTutorialS2WalkThrough:
         if not jar_path().is_file():
             pytest.skip(f"Evolver jar not found at {jar_path()}")
         app = AppTest.from_file(str(APP_SCRIPT), default_timeout=60).run()
-        app.switch_page("pages/tutorials.py").run()
+        app.switch_page("app_pages/tutorials.py").run()
         next(
             button for button in app.button if button.key == "tutorial_open_parameter_spaces"
         ).click().run()

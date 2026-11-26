@@ -9,6 +9,7 @@ size and the objectives of every training problem.
 Nothing here depends on Streamlit.
 """
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,17 @@ from evolver_studio.catalogue import QualityIndicator, evolver_indicators
 from evolver_studio.weight_vectors import available_population_sizes
 
 DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
+# With constraints Evolver turns every meta-objective into its version with them (each run without
+# feasible solutions adds 6): ICMOP with EP is the pair it recommends. ConstrainedEpsilon has there
+# the values of Epsilon, HypervolumeMinus measures what ICMOP does, and the two of spread do not
+# measure convergence: they are not offered.
+CONSTRAINED_INDICATORS = (
+    "ConstrainedMultiobjectiveIndicator",
+    "Epsilon",
+    "NormalizedHypervolume",
+    "InvertedGenerationalDistancePlus",
+)
+DEFAULT_CONSTRAINED_INDICATORS = ("ConstrainedMultiobjectiveIndicator", "Epsilon")
 DEFAULT_POPULATION_SIZE = 100
 DEFAULT_INDEPENDENT_RUNS = 1
 META_OBJECTIVES = 2
@@ -38,9 +50,46 @@ class BaseLevelChoices:
     indicators: tuple[str, ...] = DEFAULT_INDICATORS
 
 
-def training_indicators() -> tuple[QualityIndicator, ...]:
-    """The indicators a training can minimize: those Evolver computes (all are minimized)."""
-    return tuple(i for i in evolver_indicators() if not i.maximized)
+def experiment_name_error(name: str) -> str | None:
+    """What is wrong with the name of an experiment, which names a directory; None if nothing is.
+
+    Args:
+        name: The name; an empty one is not an error here, but something still to give.
+    """
+    if not name or re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._-]*", name):
+        return None
+    return (
+        "The experiment name can only have letters, digits, dots, hyphens and underscores, and "
+        "must start with a letter, a digit or an underscore."
+    )
+
+
+def experiment_directory(results_folder: str, name: str, run_id: str) -> str:
+    """The directory of the results of an experiment.
+
+    It is the experiment's own, because Evolver refuses to write over the results of another one.
+
+    Args:
+        results_folder: The folder of the results, e.g. "results/NSGA-II".
+        name: The experiment's name.
+        run_id: The run's timestamp-based identifier.
+
+    Returns:
+        The path, e.g. "results/NSGA-II/ZDT4.20261123-120000".
+    """
+    return f"{results_folder.rstrip('/')}/{name}.{run_id}"
+
+
+def training_indicators(constrained: bool = False) -> tuple[QualityIndicator, ...]:
+    """The indicators a training can minimize: those Evolver computes (all are minimized).
+
+    Args:
+        constrained: Whether the training set may have problems with constraints: only the
+            indicators that make sense with them are then offered.
+    """
+    if constrained:
+        return tuple(i for i in evolver_indicators() if i.registry_name in CONSTRAINED_INDICATORS)
+    return tuple(i for i in evolver_indicators() if not i.maximized and not i.for_constraints)
 
 
 def indicator_errors(indicators: tuple[str, ...], objectives: list[int | None]) -> list[str]:
@@ -62,6 +111,11 @@ def indicator_errors(indicators: tuple[str, ...], objectives: list[int | None]) 
                 f"{name} is defined only for problems with two objectives: use "
                 "GeneralizedSpread instead."
             )
+    if {"ConstrainedMultiobjectiveIndicator", "NormalizedHypervolume"} <= set(indicators):
+        errors.append(
+            "ConstrainedMultiobjectiveIndicator and NormalizedHypervolume both measure the "
+            "hypervolume: combine one of them with Epsilon."
+        )
     return errors
 
 

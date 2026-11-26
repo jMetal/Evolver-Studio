@@ -7,10 +7,13 @@ their own directory. Paths are returned relative to the JVM's working directory,
 """
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 from evolver_studio.bundled_resources import RESOURCES_DIRECTORY
 
+# From how many points the hypervolume of a reference front of 4 or 5 objectives is slow.
+SLOW_FRONT_POINTS = 1500
 REFERENCE_FRONT_DIRECTORIES = ("referenceFronts", "referenceFrontsTSP")
 
 
@@ -62,6 +65,46 @@ def reference_front_dimension(front_file: Path) -> int | None:
     except OSError:
         return None
     return len(first_line.split(",")) if first_line else None
+
+
+def normalized_hypervolume_warning(
+    indicators: Iterable[str], fronts: Iterable[str], working_directory: Path
+) -> str | None:
+    """Warn when computing NHV is known to be slow: it needs the hypervolume of the reference front.
+
+    The limits come from measuring Evolver 2.7: up to 5 objectives it takes seconds with 1,000
+    points (12 s at most) and from half a minute to more than three with some fronts of 2,000; with
+    6 objectives or more, from half a minute to more than it was waited for, even with 400 points.
+
+    Args:
+        indicators: The registry names of the indicators chosen.
+        fronts: The reference fronts, relative to the working directory.
+        working_directory: The directory the fronts are relative to.
+
+    Returns:
+        The warning; None when there is nothing to warn about.
+    """
+    if "NormalizedHypervolume" not in indicators:
+        return None
+    slow = []
+    for front in dict.fromkeys(fronts):
+        objectives = reference_front_dimension(working_directory / front)
+        if objectives is None or objectives < 4:
+            continue
+        if objectives >= 6 or _count_lines(working_directory / front) >= SLOW_FRONT_POINTS:
+            slow.append(Path(front).name)
+    if not slow:
+        return None
+    return (
+        f"NormalizedHypervolume may take minutes, or not finish, with {', '.join(slow)}: it needs "
+        "the hypervolume of the reference front, which has many objectives or points. Epsilon, "
+        "IGD+ and the indicators for constraints do not."
+    )
+
+
+def _count_lines(path: Path) -> int:
+    with path.open() as lines:
+        return sum(1 for _ in lines)
 
 
 def default_reference_front(candidates: list[str]) -> str | None:

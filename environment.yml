@@ -1,8 +1,10 @@
 name: evolver-studio
 channels:
-  - defaults
+  - conda-forge
 dependencies:
   - python=3.11
+  # Evolver runs on the JVM: Java comes with the environment, so it need not be installed apart.
+  - openjdk=21
   - pip
   - pip:
       - -e .[dev]

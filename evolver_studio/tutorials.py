@@ -119,7 +119,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
         _MID,
         "Solving",
         "Several configurations, several runs each, and their comparison.",
-        ("E8", "E12"),
+        ("E8", "E13"),
     ),
     Tutorial(
         "using_a_tuned_configuration",
@@ -173,13 +173,23 @@ TUTORIALS: tuple[Tutorial, ...] = (
         ("E8",),
     ),
     Tutorial(
+        "problems_with_constraints",
+        "S9",
+        "Problems with constraints",
+        _MID,
+        "Both",
+        "What a constraint-handling technique does, how a run is measured when it may find no "
+        "feasible solution, and a training that chooses the technique.",
+        ("E12",),
+    ),
+    Tutorial(
         "your_own_problem",
         None,
         "Solving your own problem",
         _ADVANCED,
         "Solving",
         "Run an algorithm on a user-defined jMetal problem.",
-        ("E2", "E17"),
+        ("E2", "E19"),
     ),
     Tutorial(
         "meta_optimizers_and_encodings",
@@ -188,7 +198,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
         _ADVANCED,
         "Meta-optimization",
         "Training runs with different meta-optimizers or encodings, and their comparison.",
-        ("E13", "E14"),
+        ("E14", "E15"),
     ),
     Tutorial(
         "long_running_jobs",
@@ -197,7 +207,7 @@ TUTORIALS: tuple[Tutorial, ...] = (
         _ADVANCED,
         "Both",
         "Background runs: cancelling, reconnecting and resuming the analysis.",
-        ("E16",),
+        ("E18",),
     ),
 )
 

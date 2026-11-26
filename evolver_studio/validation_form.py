@@ -10,6 +10,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from evolver_studio.catalogue import (
+    CONSTRAINT_HANDLING_PARAMETERS,
+    configuration_handles_constraints,
+)
 from evolver_studio.configuration import (
     complete_values,
     parse_configuration,
@@ -17,6 +21,8 @@ from evolver_studio.configuration import (
 )
 from evolver_studio.parameter_space import parse_parameter_space
 from evolver_studio.problem_catalogue import (
+    BOTH_CONSTRAINTS,
+    WITHOUT_CONSTRAINTS,
     Problem,
     arguments_text,
     number_of_objectives,
@@ -39,6 +45,8 @@ EVALUATIONS_KEY = "validation_evaluations"
 RUNS_KEY = "validation_runs"
 SEED_KEY = "validation_seed"
 INDICATORS_KEY = "validation_indicators"
+# Which problems are offered: without constraints, with them or both.
+CONSTRAINTS_KEY = "validation_constraints"
 ADJUSTED_SUFFIX = " (adjusted)"
 TUNED_FROM_TRAINING = "A training run"
 TUNED_PASTED = "A configuration I paste"
@@ -49,15 +57,24 @@ def problems_key(encoding: str) -> str:
     return f"validation_problems_{encoding}"
 
 
-def defaults_key(encoding: str) -> str:
+def indicators_key(constrained: bool = False) -> str:
+    """The key of the indicators selector, which offers others for problems with constraints."""
+    return INDICATORS_KEY + _variant(constrained)
+
+
+def defaults_key(encoding: str, constrained: bool = False) -> str:
     """The key of the selector of the algorithms compared with their default configuration."""
-    return f"validation_defaults_{encoding}"
+    return f"validation_defaults_{encoding}{_variant(constrained)}"
 
 
-def adjusted_key(encoding: str, name: str) -> str:
+def adjusted_key(encoding: str, name: str, constrained: bool = False) -> str:
     """The key of the values an algorithm compared with starts from, when they are not its
     default configuration's (a study run again with that algorithm adjusted)."""
-    return f"validation_adjusted_{encoding}_{name}"
+    return f"validation_adjusted_{encoding}{_variant(constrained)}_{name}"
+
+
+def _variant(constrained: bool) -> str:
+    return "_constrained" if constrained else ""
 
 
 def adjusted_name(name: str) -> str:
@@ -90,6 +107,7 @@ def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
     algorithm = base_algorithm(pivot.algorithm) if pivot is not None else None
     if pivot is None or algorithm is None:
         raise ValueError("the study's pivot is not one of its contenders")
+    constrained = configuration_handles_constraints(pivot.configuration)
     others = []
     adjusted = {}
     for contender in study.contenders:
@@ -98,7 +116,7 @@ def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
         name = contender.name.removesuffix(ADJUSTED_SUFFIX)
         others.append(name)
         # None leaves an algorithm adjusted in the form before at its default configuration.
-        adjusted[adjusted_key(study.encoding, name)] = (
+        adjusted[adjusted_key(study.encoding, name, constrained)] = (
             parse_configuration(contender.configuration) if name != contender.name else None
         )
     rows = [
@@ -111,18 +129,20 @@ def form_state_from_study(study: ValidationStudy) -> dict[str, object]:
     ]
     return {
         ENCODING_KEY: study.encoding,
+        # Both, since the study does not say which of its problems have constraints.
+        CONSTRAINTS_KEY: BOTH_CONSTRAINTS if constrained else WITHOUT_CONSTRAINTS,
         problems_key(study.encoding): [problem.name for problem in study.problems],
         PROBLEM_ROWS_KEY: pd.DataFrame(rows, columns=list(PROBLEM_COLUMNS)),
         TUNED_SOURCE_KEY: TUNED_PASTED,
         PASTED_ALGORITHM_KEY: algorithm.name,
         PASTED_CONFIGURATION_KEY: pivot.configuration,
         tuned_name_key(pivot.algorithm): pivot.name,
-        defaults_key(study.encoding): others,
+        defaults_key(study.encoding, constrained): others,
         POPULATION_KEY: study.population_size,
         EVALUATIONS_KEY: study.max_evaluations,
         RUNS_KEY: study.runs,
         SEED_KEY: study.seed,
-        INDICATORS_KEY: list(study.indicators),
+        indicators_key(constrained): list(study.indicators),
         **adjusted,
     }
 
@@ -214,13 +234,17 @@ def parse_problem_table(
     return tuple(problems), errors
 
 
-def configuration_errors(configuration: str, parameter_space_text_: str, label: str) -> list[str]:
+def configuration_errors(
+    configuration: str, parameter_space_text_: str, label: str, constrained: bool = False
+) -> list[str]:
     """Check a configuration against a parameter space.
 
     Args:
         configuration: The configuration, "--parameter value ...".
         parameter_space_text_: The parameter space the contender is run with (a YAML text).
         label: What to call the contender in the messages.
+        constrained: Whether the study has problems with constraints, which the configuration must
+            say how to handle: without it the algorithm would ignore them.
 
     Returns:
         The messages of what is wrong; empty when the configuration fits the space. Parameters
@@ -233,6 +257,12 @@ def configuration_errors(configuration: str, parameter_space_text_: str, label: 
         return [f"{label}: {error}"]
     if not values:
         return [f"{label}: the configuration is empty."]
+    if constrained and not configuration_handles_constraints(configuration):
+        return [
+            f"{label}: the configuration does not say how it handles constraints "
+            f"({' or '.join(f'--{name}' for name in CONSTRAINT_HANDLING_PARAMETERS)}), so it would "
+            "ignore them."
+        ]
     parameters = parse_parameter_space(parameter_space_text_)
     outside = values_outside_the_space(parameters, complete_values(parameters, values))
     if outside:

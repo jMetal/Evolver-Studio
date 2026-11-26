@@ -84,11 +84,21 @@ class FinishedTraining:
     has_population: bool = False
 
     @property
+    def experiment(self) -> str | None:
+        """The name its experiment was given; None for a training launched without one."""
+        suffix = f".{self.run_id}"
+        directory = self.output_directory.name if self.output_directory is not None else ""
+        return directory.removesuffix(suffix) if directory.endswith(suffix) else None
+
+    @property
     def label(self) -> str:
-        """The run in one line, e.g. "20261007-120000 · NSGA-II (Double) · ZDT4 · 14 configs"."""
+        """The run in one line, e.g. "20261007-120000 · NSGA-II (Double) · ZDT4 · 14 configs", with
+        the name of its experiment when it has one."""
         problems = ", ".join(self.problems)
         count = len(self.configurations)
-        return f"{self.run_id} · {self.algorithm} ({self.encoding}) · {problems} · {count} configs"
+        name = f"{self.experiment} · " if self.experiment else ""
+        what = f"{name}{self.algorithm} ({self.encoding})"
+        return f"{self.run_id} · {what} · {problems} · {count} configs"
 
 
 def list_finished_trainings(working_directory: Path) -> list[FinishedTraining]:

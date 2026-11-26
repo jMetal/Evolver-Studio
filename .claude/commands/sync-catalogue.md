@@ -58,7 +58,7 @@ algorithm's space or a meta-level one).
 - `evolver_studio/catalogue.py`: the entries above, with the one-line comment naming the Java
   class(es) each entry mirrors, as the existing ones do; the module docstring's list of runnable
   algorithms.
-- `pages/training.py`: if a newly runnable algorithm needs extra configuration
+- `app_pages/training.py`: if a newly runnable algorithm needs extra configuration
   (`required_extra_config_keys`), check that the page asks for it (it does for
   `weightVectorFilesDirectory`; anything else needs a new input).
 - `tests/test_catalogue.py`: the tests that pin exact sets (runnable base algorithms, wired
@@ -83,7 +83,9 @@ Then look at the pages: `EVOLVER_JAR=$JAR make run`, open Explore's pages throug
 choose each changed algorithm and check its table (its parameters, the *Active if* column) and, for
 meta-optimizers, the Flat/Tree tabs; check Quality indicators if they changed. Without a browser at hand, a headless Chrome screenshot through the DevTools
 protocol works (load `/`, then click the link whose `href` ends in `/explore_base_algorithms` or
-`/explore_meta_optimizers`; opening those URLs directly bypasses `st.navigation`).
+`/explore_meta_optimizers`, in a wide
+window, e.g. 1400 px: in a narrow one, such as headless Chrome's default, Streamlit moves the menu to
+the sidebar).
 
 ### 6. Commit
 

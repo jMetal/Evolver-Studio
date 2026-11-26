@@ -9,6 +9,7 @@ import pytest
 
 from evolver_studio.evolver_client import RunState
 from evolver_studio.solve_results import (
+    feasible_runs,
     filter_by_objectives,
     indicator_summary,
     is_permutation,
@@ -18,7 +19,9 @@ from evolver_studio.solve_results import (
     read_indicators,
     read_request,
     read_run_fronts,
+    read_run_violations,
     read_solutions,
+    read_violations,
     variable_columns,
     zip_fronts,
 )
@@ -256,3 +259,41 @@ class TestListSolveRuns:
     def test_should_list_nothing_when_there_is_no_runs_directory(self, tmp_path: Path):
         # Act / Assert
         assert list_solve_runs(tmp_path / "missing", tmp_path) == []
+
+
+class TestViolations:
+    def _run(self, output: Path, number: int, violations: str | None) -> None:
+        directory = output / f"run-{number}"
+        directory.mkdir(parents=True)
+        (directory / "FUN.csv").write_text("0.1,0.9\n0.5,0.4\n")
+        (directory / "VAR.csv").write_text("1.0\n2.0\n")
+        if violations is not None:
+            (directory / "CV.csv").write_text(violations)
+
+    def test_should_put_the_violation_of_each_solution_next_to_its_objectives(self, tmp_path: Path):
+        # Arrange
+        self._run(tmp_path, 1, "0.0\n2.5\n")
+
+        # Act
+        solutions = read_solutions(tmp_path, 1)
+
+        # Assert
+        assert list(solutions.columns) == ["f1", "f2", "violation", "x1"]
+        assert solutions["violation"].tolist() == [0.0, 2.5]
+
+    def test_should_have_no_violations_for_a_problem_without_constraints(self, tmp_path: Path):
+        # Arrange
+        self._run(tmp_path, 1, None)
+
+        # Act / Assert
+        assert read_violations(tmp_path, 1) is None
+        assert read_run_violations(tmp_path, [1]) == {}
+        assert "violation" not in read_solutions(tmp_path, 1)
+
+    def test_should_count_the_runs_with_at_least_a_feasible_solution(self, tmp_path: Path):
+        # Arrange
+        self._run(tmp_path, 1, "0.0\n2.5\n")
+        self._run(tmp_path, 2, "1.0\n2.5\n")
+
+        # Act / Assert
+        assert feasible_runs(read_run_violations(tmp_path, [1, 2])) == 1

@@ -2,7 +2,7 @@
 
 Run the app first (`make run`), then:
 
-    python scripts/screenshots.py [--url http://localhost:8501] [--with-training]
+    python scripts/screenshots.py [--url http://localhost:8501] [--with-training] [--only home]
 
 The images go to docs/images/. They show what is in the app's folders, so take them where:
 
@@ -10,6 +10,8 @@ The images go to docs/images/. They show what is in the app's folders, so take t
   is a good one);
 - Validation analysis lists a study with several problems and algorithms (`--study` chooses it by
   part of its name; the first one listed otherwise).
+
+`--only home` takes just the home page's image, leaving the others as they are.
 
 `--with-training` also launches the Training page's default training, waits for its monitor to
 fill and captures it, then cancels the training: its folder stays in cli-runner-runs/, marked as
@@ -48,20 +50,20 @@ CHROME_CANDIDATES = (
 TAB_PANEL = """(() => {
   const panel = [...document.querySelectorAll('[role=tabpanel]')]
     .find(p => p.offsetParent !== null);
+  panel.scrollIntoView();  // what is out of the window is not drawn
   const r = panel.getBoundingClientRect();
   return [r.x, r.y + window.scrollY, r.width, r.height];
 })()"""
-# The page down to the end of the second row of cards of the home page.
+# The home page, from the menu down to the first rows of the three steps (below the band of facts).
 HOME_TOP = """(() => {
-  const cards = [...document.querySelectorAll('[data-testid=stVerticalBlockBorderWrapper]')];
-  const bottom = cards.length > 4 ? cards[4].getBoundingClientRect().bottom : 900;
+  const band = document.querySelector('.st-key-home_facts').getBoundingClientRect();
   const main = document.querySelector('[data-testid=stMainBlockContainer]');
-  return [0, 0, main.getBoundingClientRect().right + 24, bottom + window.scrollY];
+  return [0, 0, main.getBoundingClientRect().right + 24, band.bottom + window.scrollY + 190];
 })()"""
-# Hide what is not the app's: Streamlit's toolbar (Deploy, the menu).
+# Hide what is not the app's: Streamlit's menu at the top right (the app's own menu stays).
 HIDE_TOOLBAR = """(() => {
   const style = document.createElement('style');
-  style.textContent = '[data-testid=stToolbar], [data-testid=stDecoration] {display: none;}';
+  style.textContent = '[data-testid=stMainMenu], [data-testid=stDecoration] {display: none;}';
   document.head.appendChild(style);
 })()"""
 
@@ -133,6 +135,40 @@ class Browser:
         await asyncio.sleep(wait)
         return bool(found)
 
+    async def tick(self, label: str, wait: float = 4) -> None:
+        """Tick the page's checkbox called `label`, with the mouse: a click event does not."""
+        x, y = await self.evaluate(
+            f"""(() => {{
+              const e = [...document.querySelectorAll('[data-testid=stCheckbox] label')]
+                .find(e => e.innerText.trim().endsWith({json.dumps(label)}));
+              e.scrollIntoView({{block: 'center'}});
+              const r = e.getBoundingClientRect();
+              return [r.x + 10, r.y + r.height / 2];
+            }})()"""
+        )
+        for kind in ("mousePressed", "mouseReleased"):
+            await self.call(
+                "Input.dispatchMouseEvent", type=kind, x=x, y=y, button="left", clickCount=1
+            )
+        await asyncio.sleep(wait)
+
+    async def write(self, label: str, text: str, wait: float = 4) -> None:
+        """Write `text` in the page's text input called `label`, and press Enter."""
+        await self.evaluate(
+            f"document.querySelector('input[aria-label=' + {json.dumps(json.dumps(label))} + ']')"
+            ".focus()"
+        )
+        await self.call("Input.insertText", text=text)
+        for kind in ("keyDown", "keyUp"):
+            await self.call(
+                "Input.dispatchKeyEvent",
+                type=kind,
+                key="Enter",
+                code="Enter",
+                windowsVirtualKeyCode=13,
+            )
+        await asyncio.sleep(wait)
+
     async def tab(self, name: str, wait: float = 6) -> bool:
         return await self.click(name, "[role=tab]", wait)
 
@@ -172,7 +208,7 @@ def _chrome() -> str:
     raise SystemExit("Chrome or Chromium was not found")
 
 
-async def _take(url: str, with_training: bool, study: str | None) -> None:
+async def _take(url: str, with_training: bool, study: str | None, only: str | None) -> None:
     targets = None
     for _ in range(50):
         try:
@@ -197,6 +233,8 @@ async def _take(url: str, with_training: bool, study: str | None) -> None:
 
         await browser.open(url, wait=9)
         await browser.capture(HOME_TOP, "home", margin=0)
+        if only == "home":
+            return
 
         await browser.open(f"{url}/training_analysis")
         await browser.tab("Convergence")
@@ -211,9 +249,11 @@ async def _take(url: str, with_training: bool, study: str | None) -> None:
         await browser.capture(TAB_PANEL, "validation-fronts")
 
         if with_training:
-            await browser.open(f"{url}/training")
-            await browser.click("Show the meta-optimizer's population while it runs", "label")
-            await browser.click("Launch training", wait=90)
+            # Long enough for Evolver to describe its problems, which the page waits for.
+            await browser.open(f"{url}/training", wait=15)
+            await browser.tick("Show the meta-optimizer's population while it runs")
+            await browser.write("Experiment name", "screenshot")
+            await browser.click("Launch training", wait=50)
             await browser.tab("Population", wait=8)
             await browser.capture(TAB_PANEL, "training-monitor")
             await browser.click("Cancel")
@@ -223,6 +263,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--url", default="http://localhost:8501")
     parser.add_argument("--with-training", action="store_true")
+    parser.add_argument(
+        "--only", choices=["home"], help="Take only this image (the others are left as they are)"
+    )
     parser.add_argument(
         "--study", help="Part of the name of the validation study to show (default: the first)"
     )
@@ -242,7 +285,7 @@ def main() -> None:
             stderr=subprocess.DEVNULL,
         )
         try:
-            asyncio.run(_take(args.url.rstrip("/"), args.with_training, args.study))
+            asyncio.run(_take(args.url.rstrip("/"), args.with_training, args.study, args.only))
         finally:
             chrome.terminate()
             chrome.wait(timeout=10)

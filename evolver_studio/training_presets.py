@@ -7,7 +7,9 @@ sets them and goes to the page.
 
 import streamlit as st
 
+from evolver_studio.problem_catalogue import WITHOUT_CONSTRAINTS
 from evolver_studio.training_choices import (
+    DEFAULT_CONSTRAINED_INDICATORS,
     DEFAULT_INDEPENDENT_RUNS,
     DEFAULT_INDICATORS,
     DEFAULT_POPULATION_SIZE,
@@ -16,8 +18,16 @@ from evolver_studio.training_choices import (
 # The Training page keeps the rows of its training set table under this key; dropping them makes
 # the table start from the problems chosen, with their default budgets and fronts.
 TRAINING_SET_ROWS_KEY = "training_set_rows"
+# Which problems the page offers: without constraints, with them or both.
+CONSTRAINTS_KEY = "train_constraints"
+EXPERIMENT_KEY = "train_experiment_name"
 STOP_BY_EVALUATIONS = "Evaluations"
 STOP_BY_TIME = "Computing time"
+
+
+def indicators_key(constrained: bool) -> str:
+    """The key of the meta-objectives selector, which differs for problems with constraints."""
+    return "train_indicators" + ("_constrained" if constrained else "")
 
 
 def training_state(
@@ -31,9 +41,11 @@ def training_state(
     meta_population: int = 50,
     update_every: int = 100,
     write_population: bool = True,
-    indicators: tuple[str, ...] = DEFAULT_INDICATORS,
+    indicators: tuple[str, ...] | None = None,
     independent_runs: int = DEFAULT_INDEPENDENT_RUNS,
     population_size: int = DEFAULT_POPULATION_SIZE,
+    group: str = WITHOUT_CONSTRAINTS,
+    experiment: str | None = None,
 ) -> dict[str, object]:
     """The values of the Training form for a training, by widget key.
 
@@ -50,14 +62,21 @@ def training_state(
         meta_population: The meta-optimizer's population.
         update_every: How often the training writes a checkpoint, a multiple of the population.
         write_population: Whether it also writes the meta-optimizer's population.
-        indicators: The meta-objectives.
+        indicators: The meta-objectives; None for the default ones of the group.
         independent_runs: The runs that measure each configuration.
         population_size: The base algorithm's population.
+        group: The problems offered: without constraints, with them or both.
+        experiment: The name of the experiment; None for "tutorial-" and its first problem.
 
     Returns:
         The session state to set.
     """
+    constrained = group != WITHOUT_CONSTRAINTS
+    if indicators is None:
+        indicators = DEFAULT_CONSTRAINED_INDICATORS if constrained else DEFAULT_INDICATORS
     state: dict[str, object] = {
+        CONSTRAINTS_KEY: group,
+        EXPERIMENT_KEY: experiment or f"tutorial-{problems[0] if problems else algorithm}",
         "train_base_algorithm": algorithm,
         f"train_encoding_{algorithm}": encoding,
         f"train_problems_{encoding}": list(problems),
@@ -68,7 +87,7 @@ def training_state(
         f"train_meta_population_{meta_algorithm}": meta_population,
         f"train_update_every_{meta_population}": update_every,
         "train_write_population": write_population,
-        "train_indicators": list(indicators),
+        indicators_key(constrained): list(indicators),
         "train_independent_runs": independent_runs,
         f"train_population_{algorithm}": population_size,
     }
@@ -85,4 +104,4 @@ def open_training(state: dict[str, object]) -> None:
     """
     st.session_state.pop(TRAINING_SET_ROWS_KEY, None)
     st.session_state.update(state)
-    st.switch_page("pages/training.py")
+    st.switch_page("app_pages/training.py")

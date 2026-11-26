@@ -63,6 +63,7 @@ from evolver_studio.validation_stats import (
     verdict_counts,
 )
 
+FEASIBILITY_TAB = "Feasibility"
 TAB_NAMES = (
     "Verdict",
     "Wilcoxon",
@@ -128,6 +129,34 @@ def render_verdict(runs: pd.DataFrame, pivot: str, correction: str) -> None:
         return
     st.dataframe(pd.DataFrame(columns), width="stretch")
     st.markdown("\n".join(sentences))
+
+
+def render_feasibility(table: pd.DataFrame) -> None:
+    """How often each algorithm found feasible solutions, on the problems with constraints.
+
+    Args:
+        table: What `validation.feasibility` returns.
+    """
+    st.markdown(
+        "On a problem with constraints a run is only useful if it finds **feasible** solutions: "
+        "in how many of its runs each algorithm does. Fronts and Attainment show only the "
+        "feasible solutions."
+    )
+    groups = table.groupby(["problem", "contender"], sort=False)
+    found = groups["feasible"].agg(["sum", "count"])
+    shown = found.apply(lambda row: f"{row['sum']} / {row['count']}", axis=1).unstack()
+    st.dataframe(shown, width="stretch")
+    failed = table[~table["feasible"]]
+    if failed.empty:
+        return
+    st.markdown(
+        "Where runs failed, how far they stayed: the **median violation** of their least violating "
+        "solution, in the units of each problem's constraints."
+    )
+    st.dataframe(
+        failed.groupby(["problem", "contender"], sort=False)["violation"].median().unstack(),
+        width="stretch",
+    )
 
 
 def render_wilcoxon(
@@ -397,6 +426,7 @@ def render_fronts(
             continue
         front = read_study_front(study.directory, study.manifest, contender, problem, run)
         if front is None:
+            st.caption(f"{contender} · run {run}: no feasible solution, or no front kept.")
             continue
         value = runs.loc[
             (runs["problem"] == problem) & (runs["contender"] == contender) & (runs["Run"] == run),
@@ -404,7 +434,10 @@ def render_fronts(
         ].iloc[0]
         fronts[f"{contender} · run {run} ({indicator} = {value:.3g})"] = front
     if not fronts:
-        st.info("No front to show: the runs of these algorithms kept none.")
+        st.info(
+            "No front to show: the runs of these algorithms kept none, or found no feasible "
+            "solution."
+        )
         return
     reference = read_study_reference_front(study.manifest, problem, working_directory)
     objectives = len(next(iter(fronts.values())).columns)

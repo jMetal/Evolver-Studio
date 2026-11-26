@@ -1,0 +1,993 @@
+"""Run algorithm: run one of Evolver's configurable algorithms on a problem.
+
+The page builds a solve request (a problem, an algorithm with a configuration, a budget), launches
+Evolver's cli.solving as a detached subprocess, and shows the fronts and the indicators of the runs.
+The configuration starts from the algorithm's default one and can be adjusted within its parameter
+space. Every run is kept under solve-runs/, so a past one can be reopened.
+"""
+
+import datetime as dt
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
+
+from evolver_studio import running_badge
+from evolver_studio.app_state import (
+    registered_problem_names,
+    registered_problems,
+    require_evolver_jar,
+    warn_if_jar_older_than_catalogue,
+)
+from evolver_studio.catalogue import (
+    BASE_ALGORITHMS,
+    BaseAlgorithm,
+    is_at_least,
+    quality_indicator,
+)
+from evolver_studio.configuration import (
+    complete_values,
+    configuration_string,
+    modified_values,
+    parse_configuration,
+    starting_values,
+    values_outside_the_space,
+)
+from evolver_studio.evolver_client import (
+    EVOLVER_VERSION,
+    WORKING_DIRECTORY,
+    cancel_training,
+    read_pid,
+    read_status,
+    start_solve,
+    write_pid_file,
+)
+from evolver_studio.figure_export import render_chart
+from evolver_studio.parameter_form import render_configuration_form
+from evolver_studio.parameter_space import parse_parameter_space
+from evolver_studio.problem_catalogue import (
+    WITH_CONSTRAINTS,
+    WITHOUT_CONSTRAINTS,
+    ArgumentValue,
+    Problem,
+    number_of_objectives,
+)
+from evolver_studio.problem_form import defaults_help, render_argument_inputs
+from evolver_studio.problems import (
+    default_reference_front,
+    normalized_hypervolume_warning,
+    reference_front_candidates,
+    reference_front_dimension,
+    reference_front_for_objectives,
+)
+from evolver_studio.progress import running_label
+from evolver_studio.resource_files import (
+    default_configuration_text,
+    jar_evolver_version,
+    parameter_space_text,
+)
+from evolver_studio.runs import (
+    SOLVE_RUNS_DIRECTORY_NAME,
+    RunPhase,
+    find_run_in_progress,
+    mark_cancelled,
+    run_phase,
+)
+from evolver_studio.solve_figures import build_front_figure
+from evolver_studio.solve_form import (
+    ALGORITHM_KEY,
+    CONFIGURATION_VERSION_KEY,
+    CONSTRAINTS_KEY,
+    EVALUATIONS_KEY,
+    FIX_SEED_KEY,
+    LIVE_FRONT_DELAY_KEY,
+    LIVE_FRONT_KEY,
+    LOADED_CONFIGURATION_KEY,
+    NO_REFERENCE_FRONT,
+    POPULATION_CHOICE_KEY,
+    POPULATION_KEY,
+    PROBLEM_KEY,
+    RUNS_KEY,
+    SEED_KEY,
+    WEIGHT_VECTORS_KEY,
+    encoding_key,
+    form_state_from_request,
+    indicators_key,
+    offered_indicators,
+    problem_argument_key,
+    problem_arguments_key,
+    reference_front_key,
+)
+from evolver_studio.solve_live import read_current_front
+from evolver_studio.solve_request import SolveRequest, solve_request_to_yaml
+from evolver_studio.solve_results import (
+    SolveRunInfo,
+    feasible_runs,
+    filter_by_objectives,
+    indicator_summary,
+    is_permutation,
+    list_solve_runs,
+    objective_columns,
+    read_front,
+    read_indicators,
+    read_request,
+    read_run_fronts,
+    read_run_violations,
+    read_solutions,
+    zip_fronts,
+)
+from evolver_studio.weight_vectors import available_population_sizes
+
+RUNS_DIRECTORY = WORKING_DIRECTORY / SOLVE_RUNS_DIRECTORY_NAME
+DEFAULT_INDICATORS = ("Epsilon", "NormalizedHypervolume")
+DEFAULT_CONSTRAINED_INDICATORS = ("ConstrainedMultiobjectiveIndicator", "ConstrainedEpsilon")
+DEFAULT_WEIGHT_VECTORS_DIRECTORY = "resources/weightVectors"
+DEFAULT_POPULATION_SIZE = 100
+# How often the page looks at the run in progress. With the pause after each front shorter than
+# this, some fronts go by unseen.
+POLL_EVERY_SECONDS = 0.5
+LOG_LINES_SHOWN = 15
+# Every how many evaluations a run updates its status, for the page to show the evaluation it is
+# at: often enough to follow it, and seldom enough to cost little (a few percent at most).
+STATUS_FREQUENCY = 1000
+# The Evolver release from which a run reports its progress, and writes its front, while it runs.
+PROGRESS_WITHIN_A_RUN_SINCE = "2.3"
+# How many fronts of a run in progress Evolver writes (one every 1/20 of the evaluations), and how
+# long the run pauses after each unless the user chooses: a fast run (a few seconds) then lasts long
+# enough to see the front take shape, and a long one is slowed by the same few seconds.
+LIVE_FRONT_COUNT = 20
+LIVE_FRONT_DELAY = 300
+# The Evolver release from which a run can pause after writing each front.
+FRONT_DELAY_SINCE = "2.4"
+LIVE_FRONT_DELAY_STEP = 50
+LIVE_FRONT_HEIGHT = 380
+
+
+@dataclass(slots=True, frozen=True)
+class ProblemChoice:
+    """What section 1 chooses.
+
+    Attributes:
+        name: The problem's name.
+        arguments: Its constructor's arguments, all of them in order, or empty for none.
+        encoding: Its encoding, or None when the jar does not describe the problems.
+        reference_front: Its reference front file, or None for no indicators.
+        constrained: Whether it has constraints: the algorithm then runs with its parameter space
+            for them.
+    """
+
+    name: str
+    arguments: tuple[ArgumentValue, ...]
+    encoding: str | None
+    reference_front: str | None
+    constrained: bool
+
+
+def _render_problem() -> ProblemChoice | None:
+    """Section 1: the problem, its arguments and its reference front.
+
+    Returns:
+        The choice, or None while the problem, its arguments or its reference front are not
+        chosen yet.
+    """
+    st.subheader("1. Problem")
+    names = registered_problem_names(str(jar))
+    if names is None:
+        st.warning("Could not list the problems (is Java installed?).")
+        return None
+    problems = registered_problems(str(jar)) or {}
+    if any(described.has_constraints for described in problems.values()):
+        names = _render_constraints_filter(names, problems)
+    problem = st.selectbox(
+        "Problem",
+        names,
+        index=None,
+        placeholder="Choose a problem",
+        format_func=lambda name: _problem_label(problems.get(name), name),
+        key=PROBLEM_KEY,
+    )
+    if problem is None:
+        return None
+    described = problems.get(problem)
+    arguments = _render_problem_arguments(described) if described is not None else ()
+    if arguments is None:
+        return None
+    objectives = number_of_objectives(described, arguments) if described is not None else None
+    encoding = described.encoding if described is not None else None
+    constrained = described is not None and described.has_constraints
+    if constrained:
+        count = described.number_of_constraints
+        st.caption(
+            f"With {count} constraint{'' if count == 1 else 's'}: the algorithms handle them with "
+            "the technique chosen in the configuration."
+        )
+    candidates = reference_front_candidates(problem)
+    if not candidates:
+        st.info("This problem has no reference front among the resources: no indicators.")
+        return ProblemChoice(problem, arguments, encoding, None, constrained)
+    choice = st.selectbox(
+        "Reference front",
+        [*candidates, NO_REFERENCE_FRONT],
+        index=_default_front_index(candidates, objectives),
+        placeholder="Choose the reference front",
+        key=reference_front_key(problem),
+        help="The indicators compare each front with it. Fronts with a dimension suffix (3D) "
+        "belong to the problem with that number of objectives: it must match the problem's.",
+    )
+    if choice is None:
+        return None
+    if choice != NO_REFERENCE_FRONT and objectives is not None:
+        dimension = reference_front_dimension(WORKING_DIRECTORY / choice)
+        if dimension is not None and dimension != objectives:
+            st.warning(
+                f"This front has {dimension} objectives, but the problem has {objectives}: the "
+                "indicators would fail."
+            )
+    return ProblemChoice(
+        problem,
+        arguments,
+        encoding,
+        None if choice == NO_REFERENCE_FRONT else choice,
+        constrained,
+    )
+
+
+def _render_constraints_filter(names: list[str], problems: dict[str, Problem]) -> list[str]:
+    """Choose between the problems without constraints and those with them.
+
+    Args:
+        names: The problems the jar resolves.
+        problems: Their descriptions.
+
+    Returns:
+        The problems of the chosen group.
+    """
+    groups = {
+        label: [n for n in names if (n in problems and problems[n].has_constraints) == constrained]
+        for label, constrained in ((WITHOUT_CONSTRAINTS, False), (WITH_CONSTRAINTS, True))
+    }
+    group = st.radio(
+        "Problems",
+        list(groups),
+        format_func=lambda label: f"{label} ({len(groups[label])})",
+        horizontal=True,
+        key=CONSTRAINTS_KEY,
+        # The problem chosen is not in the other group.
+        on_change=lambda: st.session_state.pop(PROBLEM_KEY, None),
+    )
+    return groups[group]
+
+
+def _problem_label(problem: Problem | None, name: str) -> str:
+    """A problem's name in the selector, with its encoding when it is not real-valued."""
+    if problem is None or problem.encoding == "Double":
+        return name
+    return f"{name} ({problem.encoding.lower()})"
+
+
+def _render_problem_arguments(problem: Problem) -> tuple[ArgumentValue, ...] | None:
+    """Offer to set a problem's arguments (all of them, or none: Evolver builds it with either).
+
+    Args:
+        problem: The chosen problem.
+
+    Returns:
+        The arguments (empty to build it with none), or None while one of them has no value.
+    """
+    if not problem.arguments:
+        return ()
+    custom = st.checkbox(
+        "Set its arguments",
+        key=problem_arguments_key(problem.name),
+        help=defaults_help(problem),
+    )
+    if not custom:
+        return ()
+    values = render_argument_inputs(
+        problem,
+        lambda argument: problem_argument_key(problem.name, argument),
+        [argument.default for argument in problem.arguments],
+    )
+    if any(value is None for value in values):
+        st.warning("Give every argument a value: Evolver takes all of them, or none.")
+        return None
+    return tuple(value for value in values if value is not None)
+
+
+def _default_front_index(candidates: list[str], objectives: int | None) -> int | None:
+    default = default_reference_front(candidates)
+    if default is None and objectives is not None:
+        default = reference_front_for_objectives(candidates, objectives, WORKING_DIRECTORY)
+    return candidates.index(default) if default is not None else None
+
+
+def _render_algorithm(
+    problem_encoding: str | None, constrained: bool
+) -> tuple[BaseAlgorithm, str, dict[str, str] | None] | None:
+    """Section 2: the algorithm, its encoding and what it needs besides.
+
+    Args:
+        problem_encoding: The problem's encoding, which the algorithm must support; None when it
+            is not known (the encoding is then chosen).
+        constrained: Whether the problem has constraints, which the algorithm must handle.
+
+    Returns:
+        The algorithm, the encoding and the extra configuration (None if it needs none), or None
+        while no algorithm is chosen.
+    """
+    st.subheader("2. Algorithm")
+    runnable = [
+        algorithm
+        for algorithm in BASE_ALGORITHMS
+        if algorithm.runnable_today
+        and (problem_encoding is None or problem_encoding in algorithm.runnable_encodings)
+        and (not constrained or algorithm.handles_constraints(problem_encoding))
+    ]
+    if not runnable:
+        st.warning(f"No algorithm of this app solves {problem_encoding} problems.")
+        return None
+    name = st.selectbox(
+        "Algorithm",
+        [algorithm.name for algorithm in runnable],
+        index=None,
+        placeholder="Choose an algorithm",
+        help=None
+        if problem_encoding is None
+        else f"The algorithms that solve {problem_encoding} problems.",
+        key=ALGORITHM_KEY,
+    )
+    if name is None:
+        return None
+    algorithm = next(algorithm for algorithm in runnable if algorithm.name == name)
+    if problem_encoding is not None:
+        encoding = problem_encoding
+    elif len(algorithm.runnable_encodings) == 1:
+        (encoding,) = algorithm.runnable_encodings
+    else:
+        encoding = st.selectbox(
+            "Encoding", algorithm.runnable_encodings, key=encoding_key(algorithm.name)
+        )
+    extra_config = None
+    if "weightVectorFilesDirectory" in algorithm.required_extra_config_keys:
+        directory = st.text_input(
+            "Weight vector files directory",
+            DEFAULT_WEIGHT_VECTORS_DIRECTORY,
+            help="The population size must match one of its files (W<objectives>D_<size>.dat).",
+            key=WEIGHT_VECTORS_KEY,
+        )
+        extra_config = {"weightVectorFilesDirectory": directory}
+    return algorithm, encoding, extra_config
+
+
+def _render_configuration(algorithm: BaseAlgorithm, encoding: str, constrained: bool) -> str:
+    """Section 3: the default configuration, adjustable within the parameter space.
+
+    Args:
+        algorithm: The chosen algorithm.
+        encoding: The chosen encoding.
+        constrained: Whether the problem has constraints.
+
+    Returns:
+        The configuration string, "--parameter value ...".
+    """
+    st.subheader("3. Configuration")
+    variant = "_constrained" if constrained else ""
+    space_file = algorithm.parameter_space_file(encoding, constrained)
+    parameters = parse_parameter_space(parameter_space_text(jar, space_file))
+    defaults = algorithm.defaults(encoding, constrained)
+    if defaults:
+        labels = [label for label, _ in defaults]
+        label = (
+            st.radio(
+                "Default configuration",
+                labels,
+                horizontal=True,
+                key=f"solve_default_{algorithm.name}_{encoding}{variant}",
+            )
+            if len(labels) > 1
+            else labels[0]
+        )
+        filename = dict(defaults)[label]
+        reference = parse_configuration(default_configuration_text(jar, filename))
+        st.caption(f"Starting from `{filename}`; adjust the parameters below if you want.")
+    else:
+        label = "starting values"
+        reference = starting_values(parameters)
+        st.caption(
+            "Evolver has no default configuration for this algorithm and encoding: starting from "
+            "the first value of each choice and the middle of each range of the parameter space."
+        )
+    loaded = st.session_state.get(LOADED_CONFIGURATION_KEY)
+    if loaded and (loaded["algorithm"], loaded["encoding"]) == (algorithm.name, encoding):
+        st.caption(
+            "Starting from the configuration of the run you chose; the marks show what "
+            "differs from the default one."
+        )
+        values = complete_values(parameters, loaded["values"])
+    else:
+        values = complete_values(parameters, reference)
+    version = st.session_state.setdefault(CONFIGURATION_VERSION_KEY, 0)
+    key_prefix = f"solve_configuration_{algorithm.name}_{encoding}{variant}_{label}_{version}"
+    with st.expander("Adjust the parameters"):
+        if st.button("Reset to the default configuration"):
+            st.session_state[CONFIGURATION_VERSION_KEY] = version + 1
+            st.session_state.pop(LOADED_CONFIGURATION_KEY, None)
+            st.rerun()
+        edited = render_configuration_form(parameters, values, reference, key_prefix)
+    outside = values_outside_the_space(parameters, edited)
+    if outside:
+        st.warning("Outside the parameter space: " + ", ".join(f"`{name}`" for name in outside))
+    changed = modified_values(parameters, edited, reference)
+    st.caption(f"{len(changed)} parameter(s) changed from the starting configuration.")
+    configuration = configuration_string(parameters, edited)
+    st.code(configuration, language=None, wrap_lines=True)
+    return configuration
+
+
+def _render_population_size(column, population_sizes: list[int] | None) -> int:
+    """Choose the population size: any, or one a weight vector file exists for.
+
+    Args:
+        column: The column to draw it in.
+        population_sizes: The sizes the weight vector files allow (MOEA/D and RVEA need a file
+            that matches), an empty list when there is none for the problem's objectives, or None
+            when the algorithm does not read weight vectors or the objectives are not known.
+
+    Returns:
+        The population size.
+    """
+    if population_sizes:
+        default = DEFAULT_POPULATION_SIZE
+        return column.selectbox(
+            "Population size",
+            population_sizes,
+            index=population_sizes.index(default) if default in population_sizes else 0,
+            help="These sizes have a weight vector file for the problem's number of objectives.",
+            key=POPULATION_CHOICE_KEY,
+        )
+    population_size = column.number_input(
+        "Population size", 2, value=DEFAULT_POPULATION_SIZE, key=POPULATION_KEY
+    )
+    if population_sizes is not None:
+        column.warning("No weight vector file for this number of objectives in that directory.")
+    return int(population_size)
+
+
+@dataclass(slots=True, frozen=True)
+class Budget:
+    """What section 4 chooses.
+
+    Attributes:
+        population_size: The population size.
+        max_evaluations: The evaluations of each run.
+        runs: The number of independent runs.
+        seed: The seed of the first run, or None to draw one.
+        indicators: The quality indicators to compute.
+        live_front_every: Every how many evaluations to show the front while a run is in
+            progress, or None not to.
+        live_front_delay_millis: How long the run pauses after writing each front, or None for no
+            pause.
+    """
+
+    population_size: int
+    max_evaluations: int
+    runs: int
+    seed: int | None
+    indicators: list[str]
+    live_front_every: int | None = None
+    live_front_delay_millis: int | None = None
+
+
+def _render_budget(
+    has_reference_front: bool, population_sizes: list[int] | None, constrained: bool
+) -> Budget:
+    """Section 4: the population, the budget, the runs, the seed and the indicators.
+
+    Args:
+        has_reference_front: Whether the problem has a reference front (indicators need one).
+        population_sizes: The population sizes the weight vector files allow, if the algorithm
+            reads them (see `_render_population_size`).
+        constrained: Whether the problem has constraints.
+
+    Returns:
+        What was chosen.
+    """
+    st.subheader("4. Budget")
+    columns = st.columns(4)
+    population_size = _render_population_size(columns[0], population_sizes)
+    max_evaluations = columns[1].number_input(
+        "Evaluations per run", 100, value=25000, step=1000, key=EVALUATIONS_KEY
+    )
+    runs = columns[2].number_input("Independent runs", 1, value=1, key=RUNS_KEY)
+    with columns[3]:
+        fix_seed = st.checkbox("Fix the seed", key=FIX_SEED_KEY)
+        seed = st.number_input("Seed", 0, value=1, disabled=not fix_seed, key=SEED_KEY)
+    defaults = DEFAULT_CONSTRAINED_INDICATORS if constrained else DEFAULT_INDICATORS
+    indicators = st.multiselect(
+        "Quality indicators",
+        offered_indicators(constrained),
+        default=list(defaults) if has_reference_front else [],
+        disabled=not has_reference_front,
+        help="Computed on each run's front, normalized with the reference front. Run `i` uses "
+        "the seed + i - 1.",
+        key=indicators_key(has_reference_front, constrained),
+    )
+    unaware = [name for name in indicators if not quality_indicator(name).for_constraints]
+    if constrained and unaware:
+        st.info(
+            f"{', '.join(unaware)}: if a run finds no feasible solution, measured as if its "
+            "solutions were feasible. The indicators for constraints tell the difference."
+        )
+    live_front_every, live_front_delay_millis = _render_live_front(int(max_evaluations))
+    return Budget(
+        population_size=int(population_size),
+        max_evaluations=int(max_evaluations),
+        runs=int(runs),
+        seed=int(seed) if fix_seed else None,
+        indicators=indicators,
+        live_front_every=live_front_every,
+        live_front_delay_millis=live_front_delay_millis,
+    )
+
+
+def _render_live_front(max_evaluations: int) -> tuple[int | None, int | None]:
+    """The options to follow the front while a run is in progress.
+
+    Args:
+        max_evaluations: The evaluations of each run, over which the fronts are spread.
+
+    Returns:
+        Every how many evaluations to show the front, or None not to (the user chose not to, or
+        the jar cannot write it), and how long the run pauses after each front, or None for no
+        pause.
+    """
+    supported = _live_front_supported()
+    live_column, delay_column = st.columns(2)
+    live = live_column.checkbox(
+        "Show the front while it runs",
+        value=True,
+        disabled=not supported,
+        help="Evolver writes the non-dominated solutions of the run while it runs and this page "
+        "draws them, so you can see the front take shape.",
+        key=LIVE_FRONT_KEY,
+    )
+    can_pause = live and supported and _front_delay_supported()
+    delay = delay_column.number_input(
+        "Pause after each front (ms)",
+        0,
+        value=LIVE_FRONT_DELAY,
+        step=LIVE_FRONT_DELAY_STEP,
+        disabled=not can_pause,
+        help="A fast run can end before the page has drawn more than a few of the "
+        f"{LIVE_FRONT_COUNT} fronts it shows. Pausing the run after each one lets you see them "
+        "all, at the price of a slower run: every front adds this pause. 0 does not pause.",
+        key=LIVE_FRONT_DELAY_KEY,
+    )
+    if not supported:
+        st.caption(
+            f"Showing the front while a run is in progress needs Evolver "
+            f"{PROGRESS_WITHIN_A_RUN_SINCE} or later."
+        )
+    elif live and not _front_delay_supported():
+        st.caption(f"Pausing after each front needs Evolver {FRONT_DELAY_SINCE} or later.")
+    every = max(1, max_evaluations // LIVE_FRONT_COUNT) if live and supported else None
+    return every, int(delay) if can_pause and delay > 0 else None
+
+
+def _front_delay_supported() -> bool:
+    """Whether the jar can pause a run after it writes each front."""
+    version = jar_evolver_version(jar)
+    return version is None or is_at_least(version, FRONT_DELAY_SINCE)
+
+
+def _live_front_supported() -> bool:
+    """Whether the jar can write the front while a run is in progress."""
+    version = jar_evolver_version(jar)
+    return version is None or is_at_least(version, PROGRESS_WITHIN_A_RUN_SINCE)
+
+
+def _launch(request_for: Callable[[str], SolveRequest]) -> None:
+    """Write the request of a new run, start it and remember it."""
+    run_id = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir = RUNS_DIRECTORY / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    request = request_for(f"{SOLVE_RUNS_DIRECTORY_NAME}/{run_id}/output")
+    (run_dir / "request.yaml").write_text(solve_request_to_yaml(request))
+    process = start_solve(
+        WORKING_DIRECTORY,
+        jar,
+        run_dir / "request.yaml",
+        run_dir / "status.yaml",
+        run_dir / "runner.log",
+    )
+    write_pid_file(run_dir / "pid.txt", process.pid)
+    st.session_state.pop("solve_history", None)
+
+
+def _weight_vector_population_sizes(
+    extra_config: dict[str, str] | None, reference_front: str | None
+) -> list[int] | None:
+    """The population sizes the algorithm's weight vector files allow, when it reads them.
+
+    Args:
+        extra_config: The algorithm's extra configuration (None if it reads no weight vectors).
+        reference_front: The chosen reference front, whose columns give the objectives.
+
+    Returns:
+        The sizes (an empty list if there is no file for those objectives), or None when the
+        algorithm reads no weight vectors or the number of objectives is not known.
+    """
+    if extra_config is None or reference_front is None:
+        return None
+    objectives = reference_front_dimension(WORKING_DIRECTORY / reference_front)
+    if objectives is None:
+        return None
+    directory = WORKING_DIRECTORY / extra_config["weightVectorFilesDirectory"]
+    return available_population_sizes(directory, objectives)
+
+
+def _render_form(can_run: bool) -> None:
+    """The five sections that build and launch a run, each shown once the previous is chosen.
+
+    The form stays on screen while a run is in progress (unmounting its widgets would lose what
+    the user chose), with the Run button disabled.
+
+    Args:
+        can_run: Whether a run can be started: none is in progress.
+    """
+    problem = _render_problem()
+    if problem is None:
+        return
+    reference_front = problem.reference_front
+    constrained = problem.constrained
+    algorithm_choice = _render_algorithm(problem.encoding, constrained)
+    if algorithm_choice is None:
+        return
+    algorithm, encoding, extra_config = algorithm_choice
+    configuration = _render_configuration(algorithm, encoding, constrained)
+    budget = _render_budget(
+        reference_front is not None,
+        _weight_vector_population_sizes(extra_config, reference_front),
+        constrained,
+    )
+
+    def request_for(output_directory: str) -> SolveRequest:
+        return SolveRequest(
+            algorithm_name=algorithm.registry_name,
+            encoding=encoding,
+            population_size=budget.population_size,
+            yaml_parameter_space_file=algorithm.parameter_space_file(encoding, constrained),
+            extra_config=extra_config,
+            configuration=configuration,
+            problem=problem.name,
+            problem_arguments=problem.arguments,
+            reference_front_file_name=reference_front,
+            max_evaluations=budget.max_evaluations,
+            number_of_independent_runs=budget.runs,
+            seed=budget.seed,
+            indicator_names=budget.indicators,
+            status_frequency=_status_frequency(),
+            front_frequency=budget.live_front_every,
+            front_delay_millis=budget.live_front_delay_millis,
+            # The non-dominated solutions alone would hide how feasible the population is.
+            write_population=constrained and budget.live_front_every is not None,
+            output_directory=output_directory,
+        )
+
+    slow = normalized_hypervolume_warning(
+        budget.indicators, [reference_front] if reference_front else [], WORKING_DIRECTORY
+    )
+    if slow is not None:
+        st.warning(slow)
+    errors = request_for("").validation_errors()
+    for error in errors:
+        st.warning(error)
+    if st.button("Run", type="primary", disabled=bool(errors) or not can_run):
+        _launch(request_for)
+        st.rerun()
+
+
+def _status_frequency() -> int | None:
+    """How often a run updates its status, when the jar can do it while a run is in progress."""
+    return STATUS_FREQUENCY if _live_front_supported() else None
+
+
+def _cancel(run_dir: Path) -> None:
+    """Stop a run's process and mark it cancelled."""
+    pid = read_pid(run_dir / "pid.txt")
+    if pid is not None:
+        cancel_training(pid)
+    mark_cancelled(run_dir)
+
+
+def _render_run_in_progress(run_dir: Path) -> None:
+    """Show that a run is in progress, at which evaluation, and move on to its results when it
+    ends."""
+    request = read_request(run_dir) or {}
+    runs = int(request.get("numberOfIndependentRuns", 1))
+    output_directory = WORKING_DIRECTORY / request.get("outputDirectory", "")
+    reference_file = request.get("referenceFrontFileName")
+    reference = read_front(WORKING_DIRECTORY / reference_file) if reference_file else None
+    running_badge.inject_style()
+
+    @st.fragment(run_every=POLL_EVERY_SECONDS, key=f"solve_poll_{run_dir.name}")
+    def _poll() -> None:
+        label = running_label(read_status(run_dir / "status.yaml"), runs)
+        running_badge.render(label)
+        _render_live_front_of(output_directory, reference)
+        if run_phase(run_dir) not in (RunPhase.STARTING, RunPhase.RUNNING):
+            st.session_state["solve_history"] = run_dir.name
+            st.rerun()
+
+    _poll()
+    if st.button("Cancel"):
+        _cancel(run_dir)
+        st.rerun()
+
+
+def _render_live_front_of(output_directory: Path, reference: pd.DataFrame | None) -> None:
+    """The front the run in progress has written so far, if it was asked to write one."""
+    front = read_current_front(output_directory)
+    if front is None:
+        return
+    violations = {front.run: front.violations} if front.violations is not None else None
+    figure = build_front_figure({front.run: front.objectives}, reference, violations)
+    figure.update_layout(height=LIVE_FRONT_HEIGHT, margin={"l": 0, "r": 0, "t": 10, "b": 0})
+    st.plotly_chart(figure, config={"displayModeBar": False}, width="stretch")
+    feasibility = (
+        f", {int((front.violations <= 0).sum())} of them feasible"
+        if front.violations is not None
+        else ""
+    )
+    st.caption(
+        f"Run {front.run}, {front.evaluations:,} evaluations: {len(front.objectives)} solutions"
+        f"{feasibility}."
+    )
+
+
+def _render_results(run: SolveRunInfo) -> None:
+    """Show a run's outcome: its fronts and indicators, or why it has none."""
+    phase = run_phase(run.run_dir)
+    if phase == RunPhase.CANCELLED:
+        st.info("This run was cancelled.")
+        return
+    if phase in (RunPhase.FAILED, RunPhase.LOST):
+        status = read_status(run.run_dir / "status.yaml")
+        st.error(
+            status.error_message
+            if status is not None and status.error_message
+            else "The run ended without writing its results."
+        )
+        _render_runner_log(run.run_dir / "runner.log")
+        return
+    if phase != RunPhase.FINISHED:
+        st.info("This run is still in progress.")
+        return
+    tabs = st.tabs(["Front", "Indicators", "Solutions", "Details"])
+    with tabs[0]:
+        _render_front(run)
+    with tabs[1]:
+        _render_indicators(run)
+    with tabs[2]:
+        _render_solutions(run)
+    with tabs[3]:
+        _render_details(run)
+
+
+def _render_runner_log(log_file: Path) -> None:
+    if log_file.is_file() and (text := log_file.read_text().strip()):
+        with st.expander("Runner output"):
+            st.code("\n".join(text.splitlines()[-LOG_LINES_SHOWN:]), language=None)
+
+
+def _render_front(run: SolveRunInfo) -> None:
+    fronts = read_run_fronts(run.output_directory)
+    violations = read_run_violations(run.output_directory, fronts)
+    _render_feasibility(violations)
+    chosen = st.multiselect(
+        "Runs", list(fronts), default=list(fronts), format_func=lambda number: f"Run {number}"
+    )
+    reference_file = run.request.get("referenceFrontFileName")
+    reference = read_front(WORKING_DIRECTORY / reference_file) if reference_file else None
+    render_chart(
+        build_front_figure({n: fronts[n] for n in chosen}, reference, violations),
+        f"solve_front_{run.run_id}",
+        f"front_{run.run_id}",
+        width="stretch",
+    )
+
+
+def _render_feasibility(violations: dict[int, pd.Series]) -> None:
+    """Say in how many runs a problem with constraints was solved, if it has them."""
+    if not violations:
+        return
+    feasible, runs = feasible_runs(violations), len(violations)
+    message = f"Feasible solutions found in {feasible} of {runs} run{'' if runs == 1 else 's'}."
+    (st.success if feasible == runs else st.warning)(message)
+
+
+def _render_solutions(run: SolveRunInfo) -> None:
+    """Show the solutions of one run, with their objectives and variables.
+
+    The table can be filtered by a range for each objective, sorted by any column, downloaded, and
+    a row can be selected to see that solution's decision variables.
+    """
+    numbers = list(read_run_fronts(run.output_directory))
+    number = st.selectbox(
+        "Run",
+        numbers,
+        format_func=lambda n: f"Run {n}",
+        key=f"solve_solutions_run_{run.run_id}",
+    )
+    solutions = read_solutions(run.output_directory, number)
+    shown = filter_by_objectives(solutions, _objective_ranges(run, number, solutions))
+    if "violation" in solutions and st.checkbox(
+        "Only the feasible solutions", key=f"solve_feasible_{run.run_id}_{number}"
+    ):
+        shown = shown[shown["violation"] <= 0]
+    st.caption(f"{len(shown)} of {len(solutions)} solutions.")
+    selection = st.dataframe(
+        shown,
+        width="stretch",
+        on_select="rerun",
+        selection_mode="single-row",
+        key=f"solve_solutions_table_{run.run_id}_{number}",
+    )
+    if selection.selection.rows:
+        position = selection.selection.rows[0]
+        _render_solution(shown.iloc[position], shown.index[position])
+    st.download_button(
+        "Download this table (CSV)",
+        shown.to_csv(index_label="solution"),
+        file_name=f"{run.run_id}-run-{number}-solutions.csv",
+        mime="text/csv",
+        key=f"solve_solutions_download_{run.run_id}_{number}",
+    )
+
+
+def _objective_ranges(
+    run: SolveRunInfo, number: int, solutions: pd.DataFrame
+) -> dict[str, tuple[float, float]]:
+    """Let the user restrict each objective to a range; only the restricted ones are returned."""
+    ranges: dict[str, tuple[float, float]] = {}
+    objectives = objective_columns(solutions)
+    with st.expander("Filter by objective"):
+        columns = st.columns(min(len(objectives), 4))
+        for index, objective in enumerate(objectives):
+            lower, upper = float(solutions[objective].min()), float(solutions[objective].max())
+            if lower == upper:
+                continue
+            ranges[objective] = columns[index % len(columns)].slider(
+                objective,
+                lower,
+                upper,
+                (lower, upper),
+                format="%.4g",
+                key=f"solve_filter_{run.run_id}_{number}_{objective}",
+            )
+    return ranges
+
+
+def _render_solution(solution: pd.Series, identifier: int) -> None:
+    """Show one solution: its objectives, and its decision variables."""
+    st.markdown(f"**Solution {identifier}**")
+    st.caption(
+        ", ".join(f"{name} = {solution[name]:.6g}" for name in solution.index if name[0] in "fv")
+    )
+    variables = solution[[name for name in solution.index if name[0] == "x"]]
+    if variables.empty:
+        return
+    if is_permutation(variables):
+        st.caption("A permutation of 0 to n-1:")
+        st.code(" ".join(str(int(value)) for value in variables), language=None, wrap_lines=True)
+    else:
+        st.caption("Decision variables:")
+        figure = go.Figure(go.Bar(x=list(variables.index), y=list(variables.to_numpy())))
+        figure.update_layout(height=300, margin={"t": 20}, yaxis_title="Value")
+        render_chart(
+            figure, f"solve_solution_{identifier}", f"solution_{identifier}", width="stretch"
+        )
+
+
+def _render_indicators(run: SolveRunInfo) -> None:
+    if not run.request.get("indicatorNames"):
+        st.info("This run computed no indicators.")
+        return
+    indicators = read_indicators(run.output_directory)
+    _render_feasibility(read_run_violations(run.output_directory, indicators["Run"]))
+    st.dataframe(indicators, hide_index=True, width="stretch")
+    if len(indicators) > 1:
+        st.markdown("**Over the runs**")
+        st.dataframe(indicator_summary(indicators), width="stretch")
+
+
+def _load_run(run: SolveRunInfo) -> None:
+    """Set the form to the settings of a past run (a button's callback, so it runs before the
+    form's widgets are created and may set their values)."""
+    names = registered_problem_names(str(jar)) or []
+    state = form_state_from_request(
+        run.request,
+        BASE_ALGORITHMS,
+        names,
+        st.session_state.get(CONFIGURATION_VERSION_KEY, 0),
+        registered_problems(str(jar)),
+    )
+    if state is None:
+        st.session_state["solve_load_error"] = run.run_id
+        return
+    st.session_state.pop("solve_load_error", None)
+    st.session_state.update(state)
+
+
+def _render_details(run: SolveRunInfo) -> None:
+    st.write(f"Results folder: `{run.output_directory}`")
+    st.markdown("**Configuration**")
+    st.code(run.request["configuration"], language=None, wrap_lines=True)
+    with st.expander("METADATA.txt"):
+        st.text((run.output_directory / "METADATA.txt").read_text())
+    st.button(
+        "Use this configuration for a new run",
+        on_click=_load_run,
+        args=(run,),
+        help="Fills the form above with this run's problem, algorithm, configuration and budget.",
+        key=f"solve_load_{run.run_id}",
+    )
+    if st.session_state.get("solve_load_error") == run.run_id:
+        st.warning(
+            "This run's settings cannot be restored: its algorithm, its problem or the "
+            "problem's arguments are not offered."
+        )
+    st.download_button(
+        "Download request.yaml",
+        (run.run_dir / "request.yaml").read_text(),
+        file_name="request.yaml",
+        mime="application/x-yaml",
+        help="To run it outside Evolver-Studio: "
+        f"java -cp Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar "
+        "org.uma.evolver.cli.solving.SolveRunnerMain request.yaml, from the directory that holds "
+        "resources/ (adjust outputDirectory).",
+        key=f"solve_download_request_{run.run_id}",
+    )
+    st.download_button(
+        "Download the fronts and indicators (zip)",
+        zip_fronts(run.output_directory),
+        file_name=f"{run.run_id}.zip",
+        mime="application/zip",
+        key=f"solve_download_{run.run_id}",
+    )
+
+
+def _render_history() -> None:
+    """Choose a past run and show its results."""
+    runs = {run.run_id: run for run in list_solve_runs(RUNS_DIRECTORY, WORKING_DIRECTORY)}
+    if not runs:
+        return
+    st.subheader("Results")
+    chosen = st.selectbox(
+        "Previous runs",
+        list(runs),
+        index=None,
+        placeholder="Choose a run to see its results",
+        format_func=lambda run_id: (
+            f"{run_id} · {runs[run_id].algorithm} · {runs[run_id].problem}"
+            + (f" · {runs[run_id].state.value}" if runs[run_id].state else "")
+        ),
+        key="solve_history",
+    )
+    if chosen is not None:
+        _render_results(runs[chosen])
+
+
+st.title("Run algorithm")
+
+jar = require_evolver_jar()
+warn_if_jar_older_than_catalogue(jar)
+
+run_in_progress = find_run_in_progress(RUNS_DIRECTORY)
+_render_form(can_run=run_in_progress is None)
+if run_in_progress is not None:
+    _render_run_in_progress(run_in_progress)
+_render_history()

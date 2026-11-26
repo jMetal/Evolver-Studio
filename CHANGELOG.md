@@ -6,7 +6,94 @@ version works with.
 
 ## 0.1.0 (unreleased)
 
-Works with Evolver 2.5.
+Works with Evolver 2.7.
+
+### Evolver 2.7
+
+- The app runs **Evolver 2.7** and its resources. The catalogue has each algorithm's parameter space
+  and default configuration for **problems with constraints**, and the indicators for them, ICMOP
+  (`ConstrainedMultiobjectiveIndicator`) and CEP (`ConstrainedEpsilon`). RDE-MOEA has a default
+  configuration only for those problems.
+- The values that *Solving a problem with a configurable algorithm* announces are those of Evolver
+  2.7, which differ from those of 2.5 with the same seed, and the tutorials name those of Evolver
+  with their new numbers.
+
+### Fixes
+
+- A page opened **by its URL** before any other showed Streamlit's own sidebar instead of the menu:
+  the folder of the pages is now `app_pages/`.
+- Run algorithm, Training and Validation **warn** when NormalizedHypervolume may take minutes, or not
+  finish: with reference fronts of 6 objectives or more, or of 4 and 5 with many points.
+
+### Explore
+
+- **Problems** shows the number of constraints of each problem and filters those with or without
+  them; Training and Validation, which share the listing, have the filter too.
+- **Base algorithms** shows, for the Double encoding, the parameter space for problems with
+  constraints, and what each constraint-handling technique does.
+- **Quality indicators** explains what happens on problems with constraints.
+
+### Run algorithm
+
+- **Problems with constraints**, listed apart from the others: the algorithms run with their
+  parameter space and default configuration for them, and are measured with ICMOP and CEP by
+  default. The live front draws the whole population, the infeasible solutions in red, and counts
+  the feasible ones; the results say in how many runs feasible solutions were found and how much
+  each solution violates the constraints. The home page draws only feasible solutions.
+- **The front while it runs**, right below the Run button: a run in progress draws the
+  non-dominated solutions it has found so far (Evolver's `CURRENT_FRONT.csv`), over the problem's
+  reference front, with the run and the evaluation they belong to. It shows 20 fronts spread over
+  the run, can be turned off in the budget, is restored when a past run is reopened, and needs
+  Evolver 2.3 or later. A fast run can end before the page has drawn more than a few of them, so
+  the run **pauses 300 ms after each front** (the budget asks only for that pause, in milliseconds;
+  0 does not pause; Evolver 2.4 or later): every front adds that pause, a few seconds in all, and
+  every one can be seen.
+
+### Training and Training analysis
+
+- A training asks for an **experiment name**, and keeps its results in
+  `results/<algorithm>/<name>.<date-time>` (the folder can be changed). Until now the suggested
+  folder was that of ZDT4, whatever was trained. The name identifies the training in Training
+  analysis and in Validation.
+- **Problems with constraints**: the training set is chosen among the problems without constraints,
+  with them or both, before the parameter space, which is then the one that handles constraints.
+  The meta-objectives are restricted to those that make sense: ICMOP, EP, NHV and IGD+ with constraints
+  (ICMOP and EP by default), all but ICMOP and CEP without them. A **Feasibility** tab, in the
+  monitor and in the analysis, tells how many configurations find feasible solutions in all their
+  runs, and on which problems they fail; the population draws those that fail in red.
+
+### Validation and Validation analysis
+
+- **Problems with constraints**: a study chooses its problems among those without constraints, with
+  them or both. With constraints every algorithm uses its parameter space and default configuration
+  for them, the tuned configuration must say how it handles them, and ICMOP and CEP are the default
+  indicators. The analysis has a **Feasibility** tab (in how many runs each algorithm found feasible
+  solutions); the hypervolume, the fronts and the attainment use only the feasible solutions.
+
+### Installation
+
+- `make env` installs **Java 21** (`openjdk` from conda-forge) in the Conda environment, so Java
+  need not be installed beforehand. The README lists what to have first (git, make and Conda), says
+  that the `make` targets run inside the environment and how to activate it to use its tools
+  directly, and the "Java was not found" messages point to `make env`.
+
+### Design
+
+
+- The **menu is at the top** of the page (Home, and a dropdown each for Explore, Solve,
+  Meta-optimization and Learn) instead of on the left.
+- A **theme** of its own (`.streamlit/config.toml`): the colors of the logo, Montserrat for
+  headings, light and dark variants, and no developer options in the toolbar.
+- There is **no sidebar**: the jar's status (a missing jar with its download button, a missing
+  Java) is shown at the top of the page, and only when there is something to say.
+- The **home page** is a panel of the studio: a first action (run an algorithm, start a training,
+  take the tour) beside the front of the latest result of either use — or the run in progress —,
+  a band with what Evolver offers (read from the jar) and the tutorials written, the three steps
+  (Explore, Solve, Meta-optimization) as numbered columns with their pages and how many runs there
+  are, and the tutorials by level below. It takes the colors of the logo. Under the title it says
+  which Evolver and which Java are in use, it lists the newest runs of either use, and each figure
+  of the band has examples read from the jar (algorithms, meta-optimizers, problem families,
+  indicators).
 
 ### Data directory
 
@@ -24,6 +111,11 @@ Works with Evolver 2.5.
 
 ### Tutorials
 
+- **Tutorial S9, *Problems with constraints*** (pairs with E12): the constraint-handling techniques;
+  how ICMOP measures a run that may find no feasible solution; NSGA-II without a technique, with
+  cdp and with push and pull on DASCMOP2 and DASCMOP5; and a training that chooses the technique,
+  with how it reaches the configurations that find feasible solutions. Its text is computed from
+  the reader's runs.
 - **Tutorial S1, *A tour of Evolver-Studio*** (pairs with E4): how the app connects to Evolver (Java
   and the jar, checked live), what Evolver offers (read from the jar's manifest), what each page is
   for, and where runs and results are kept.

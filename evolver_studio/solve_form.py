@@ -7,13 +7,21 @@ request to form state is testable on its own.
 
 from collections.abc import Collection, Iterable, Mapping
 
-from evolver_studio.catalogue import BaseAlgorithm
+from evolver_studio.catalogue import BaseAlgorithm, evolver_indicators
 from evolver_studio.configuration import parse_configuration
-from evolver_studio.problem_catalogue import Problem, problem_spec_arguments, problem_spec_name
+from evolver_studio.problem_catalogue import (
+    WITH_CONSTRAINTS,
+    WITHOUT_CONSTRAINTS,
+    Problem,
+    problem_spec_arguments,
+    problem_spec_name,
+)
 
 NO_REFERENCE_FRONT = "(none: no indicators)"
 
 PROBLEM_KEY = "solve_problem"
+# Whether the problems offered are those with constraints or those without.
+CONSTRAINTS_KEY = "solve_constraints"
 ALGORITHM_KEY = "solve_algorithm"
 WEIGHT_VECTORS_KEY = "solve_weight_vectors"
 POPULATION_KEY = "solve_population"
@@ -22,6 +30,8 @@ EVALUATIONS_KEY = "solve_evaluations"
 RUNS_KEY = "solve_runs"
 FIX_SEED_KEY = "solve_fix_seed"
 SEED_KEY = "solve_seed"
+LIVE_FRONT_KEY = "solve_live_front"
+LIVE_FRONT_DELAY_KEY = "solve_live_front_delay"
 # A new version gives the configuration widgets new keys, so they start from their values again.
 CONFIGURATION_VERSION_KEY = "solve_configuration_version"
 # The configuration a past run used, for the form to start from:
@@ -49,9 +59,22 @@ def encoding_key(algorithm_name: str) -> str:
     return f"solve_encoding_{algorithm_name}"
 
 
-def indicators_key(has_reference_front: bool) -> str:
-    """The key of the indicators selector, which differs with and without a reference front."""
-    return f"solve_indicators_{has_reference_front}"
+def indicators_key(has_reference_front: bool, constrained: bool = False) -> str:
+    """The key of the indicators selector, which differs with and without a reference front, and
+    for a problem with constraints."""
+    return f"solve_indicators_{has_reference_front}" + ("_constrained" if constrained else "")
+
+
+def offered_indicators(constrained: bool) -> list[str]:
+    """The indicators offered for a problem: those for constraints, only if it has them.
+
+    Args:
+        constrained: Whether the problem has constraints.
+
+    Returns:
+        Their registry names.
+    """
+    return [i.registry_name for i in evolver_indicators() if constrained or not i.for_constraints]
 
 
 def form_state_from_request(
@@ -104,12 +127,20 @@ def form_state_from_request(
     state.update(arguments_state)
     reference_front = request.get("referenceFrontFileName")
     state[reference_front_key(problem)] = reference_front or NO_REFERENCE_FRONT
-    state[indicators_key(bool(reference_front))] = list(request.get("indicatorNames") or [])
+    described = problems.get(problem) if problems is not None else None
+    constrained = described is not None and described.has_constraints
+    offered = offered_indicators(constrained)
+    state[CONSTRAINTS_KEY] = WITH_CONSTRAINTS if constrained else WITHOUT_CONSTRAINTS
+    state[indicators_key(bool(reference_front), constrained)] = [
+        name for name in request.get("indicatorNames") or [] if name in offered
+    ]
     if len(algorithm.runnable_encodings) > 1:
         state[encoding_key(algorithm.name)] = encoding
     weight_vectors = (request.get("extraConfig") or {}).get("weightVectorFilesDirectory")
     if weight_vectors:
         state[WEIGHT_VECTORS_KEY] = weight_vectors
+    state[LIVE_FRONT_KEY] = request.get("frontFrequency") is not None
+    state[LIVE_FRONT_DELAY_KEY] = request.get("frontDelayMillis") or 0
     state[FIX_SEED_KEY] = request.get("seed") is not None
     if request.get("seed") is not None:
         state[SEED_KEY] = request["seed"]

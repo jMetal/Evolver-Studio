@@ -9,10 +9,15 @@ Evolver releases up to 2.3 have no `problemCatalogue`: `parse_problem_catalogue`
 None, and the pages fall back to the plain list of problem names.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 ArgumentValue = int | float | bool
+
+# The two groups the pages tell the problems apart by.
+WITHOUT_CONSTRAINTS = "Without constraints"
+WITH_CONSTRAINTS = "With constraints"
+BOTH_CONSTRAINTS = "Both"
 
 
 @dataclass(slots=True, frozen=True)
@@ -41,6 +46,9 @@ class Problem:
         number_of_objectives: Of the problem built with no arguments, or None if unknown.
         number_of_variables: Of the problem built with no arguments, or None if unknown.
         arguments: The arguments of its constructor with arguments, in order; empty for none.
+        number_of_constraints: Of the problem built with no arguments; 0 for a problem without
+            constraints, and when the jar does not say (Evolver 2.5 or older, whose algorithms do
+            not handle them).
     """
 
     name: str
@@ -49,6 +57,12 @@ class Problem:
     number_of_objectives: int | None
     number_of_variables: int | None
     arguments: tuple[ProblemArgument, ...]
+    number_of_constraints: int = 0
+
+    @property
+    def has_constraints(self) -> bool:
+        """Whether a solution of it can be infeasible."""
+        return self.number_of_constraints > 0
 
 
 def parse_problem_catalogue(manifest: dict) -> dict[str, Problem] | None:
@@ -76,6 +90,7 @@ def parse_problem_catalogue(manifest: dict) -> dict[str, Problem] | None:
             number_of_objectives=entry.get("numberOfObjectives"),
             number_of_variables=entry.get("numberOfVariables"),
             arguments=arguments,
+            number_of_constraints=entry.get("numberOfConstraints") or 0,
         )
     return problems
 
@@ -97,17 +112,30 @@ def number_of_objectives(problem: Problem, arguments: Sequence[ArgumentValue]) -
     return problem.number_of_objectives
 
 
-def problems_with_encoding(problems: dict[str, Problem], encoding: str) -> list[str]:
+def problems_with_encoding(
+    problems: Mapping[str, Problem], encoding: str, group: str = BOTH_CONSTRAINTS
+) -> list[str]:
     """The names of the problems of an encoding, sorted.
 
     Args:
         problems: The problems by name.
         encoding: An encoding, e.g. "Double".
+        group: `WITHOUT_CONSTRAINTS` or `WITH_CONSTRAINTS` for only those, `BOTH_CONSTRAINTS` for
+            all.
 
     Returns:
         Their names.
     """
-    return sorted(name for name, problem in problems.items() if problem.encoding == encoding)
+    return sorted(
+        name
+        for name, problem in problems.items()
+        if problem.encoding == encoding and in_group(problem, group)
+    )
+
+
+def in_group(problem: Problem, group: str) -> bool:
+    """Whether a problem is of a group: those without constraints, with them, or both."""
+    return group == BOTH_CONSTRAINTS or problem.has_constraints == (group == WITH_CONSTRAINTS)
 
 
 def problem_spec(name: str, arguments: Sequence[ArgumentValue | str] | None) -> str | dict:

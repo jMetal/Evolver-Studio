@@ -9,6 +9,8 @@ from evolver_studio.solve_form import (
     CONFIGURATION_VERSION_KEY,
     EVALUATIONS_KEY,
     FIX_SEED_KEY,
+    LIVE_FRONT_DELAY_KEY,
+    LIVE_FRONT_KEY,
     LOADED_CONFIGURATION_KEY,
     NO_REFERENCE_FRONT,
     POPULATION_CHOICE_KEY,
@@ -100,6 +102,34 @@ class TestFormStateFromRequest:
         # Assert
         assert nsgaii[encoding_key("NSGA-II")] == "Permutation"
         assert encoding_key("RVEA") not in rvea
+
+    def test_should_restore_the_live_front_and_its_pause(self):
+        # Act
+        shown = form_state_from_request(
+            _request(frontFrequency=1000, frontDelayMillis=150), BASE_ALGORITHMS, PROBLEMS, 0
+        )
+        hidden = form_state_from_request(_request(), BASE_ALGORITHMS, PROBLEMS, 0)
+
+        # Assert
+        assert shown[LIVE_FRONT_KEY] is True
+        assert shown[LIVE_FRONT_DELAY_KEY] == 150
+        assert hidden[LIVE_FRONT_KEY] is False
+        assert hidden[LIVE_FRONT_DELAY_KEY] == 0
+
+    @pytest.mark.parametrize("constraints", [0, 2])
+    def test_should_restore_only_the_indicators_offered_for_the_problem(self, constraints: int):
+        # Arrange
+        problem = Problem("ZDT1", "ZDT", "Double", 2, 30, (), constraints)
+        request = _request(indicatorNames=["Epsilon", "ConstrainedEpsilon"])
+
+        # Act
+        state = form_state_from_request(request, BASE_ALGORITHMS, PROBLEMS, 0, {"ZDT1": problem})
+
+        # Assert
+        expected = ["Epsilon", "ConstrainedEpsilon"] if constraints else ["Epsilon"]
+        assert state[indicators_key(True, constraints > 0)] == expected
+        group = "With constraints" if constraints else "Without constraints"
+        assert state["solve_constraints"] == group
 
     def test_should_fix_the_seed_only_when_the_run_had_one(self):
         # Act

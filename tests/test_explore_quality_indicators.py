@@ -6,7 +6,7 @@ from streamlit.testing.v1 import AppTest
 
 from evolver_studio.catalogue import QUALITY_INDICATORS
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore_quality_indicators.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "explore_quality_indicators.py"
 
 
 class TestQualityIndicatorsPage:

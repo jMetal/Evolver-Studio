@@ -13,7 +13,7 @@ from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
 from evolver_studio.problem_catalogue import parse_problem_catalogue
 from evolver_studio.resource_files import default_configuration_text
 from evolver_studio.runs import RunPhase, run_phase
-from evolver_studio.validation_view import TAB_NAMES
+from evolver_studio.validation_view import FEASIBILITY_TAB, TAB_NAMES
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
 RESOURCES = Path(__file__).resolve().parent.parent / "resources"
@@ -29,7 +29,7 @@ def _open_page() -> AppTest:
     """The page, through the app so that its links to other pages resolve."""
     return (
         AppTest.from_file(str(APP_SCRIPT), default_timeout=60)
-        .switch_page("pages/validation.py")
+        .switch_page("app_pages/validation.py")
         .run()
     )
 
@@ -240,7 +240,7 @@ class TestRunAStudy:
         while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
             assert time.monotonic() < deadline, "the study did not finish"
             time.sleep(0.3)
-        app.switch_page("pages/validation_analysis.py")
+        app.switch_page("app_pages/validation_analysis.py")
         app.session_state["validation_analysis_study"] = study_dir.name
         app.run()
 
@@ -257,6 +257,85 @@ class TestRunAStudy:
         labels = [button.proto.label for button in app.get("download_button")]
         assert "Download the table (LaTeX)" in labels
         assert "Results for SAES (CSV)" in labels
+
+
+class TestProblemsWithConstraints:
+    def _options(self, app: AppTest) -> set[str]:
+        return set(app.multiselect(key="validation_problems_Double").options)
+
+    def test_should_offer_the_problems_without_constraints_with_them_or_both(self, app: AppTest):
+        # Act
+        without = self._options(app)
+        app.radio(key="validation_constraints").set_value("With constraints").run()
+        constrained = self._options(app)
+        app.radio(key="validation_constraints").set_value("Both").run()
+
+        # Assert
+        assert "ZDT1" in without and "MW1" in constrained and not without & constrained
+        assert self._options(app) == without | constrained
+
+    def test_should_keep_only_the_chosen_problems_of_the_group(self, app: AppTest):
+        # Arrange
+        app.radio(key="validation_constraints").set_value("Both").run()
+        app.multiselect(key="validation_problems_Double").select("ZDT1").select("MW1").run()
+
+        # Act
+        app.radio(key="validation_constraints").set_value("With constraints").run()
+
+        # Assert
+        assert not app.exception
+        assert app.multiselect(key="validation_problems_Double").value == ["MW1"]
+
+    def test_should_reject_a_tuned_configuration_that_would_ignore_the_constraints(
+        self, app: AppTest
+    ):
+        # Arrange
+        app.radio(key="validation_constraints").set_value("With constraints").run()
+        app.radio(key="validation_tuned_source").set_value("A configuration I paste").run()
+
+        # Act
+        app.text_area(key="validation_pasted_configuration").input("--crossover SBX").run()
+
+        # Assert
+        assert any("does not say how it handles constraints" in e.value for e in app.error)
+
+    def test_should_run_a_study_on_problems_with_and_without_constraints(
+        self, app: AppTest, working_directory: Path
+    ):
+        # Arrange
+        tuned = default_configuration_text(jar_path(), "NSGAIIDoubleConstrainedDefault.txt")
+        app.radio(key="validation_constraints").set_value("Both").run()
+        app.multiselect(key="validation_problems_Double").select("ZDT1").select("DASCMOP5").run()
+        app.radio(key="validation_tuned_source").set_value("A configuration I paste").run()
+        app.text_area(key="validation_pasted_configuration").input(tuned.strip()).run()
+        app.multiselect(key="validation_defaults_Double_constrained").select("MOEA/D").run()
+        assert app.multiselect(key="validation_indicators_constrained").value == [
+            "ConstrainedMultiobjectiveIndicator",
+            "ConstrainedEpsilon",
+        ]
+        app.multiselect(key="validation_indicators_constrained").select("Hypervolume")
+        app.number_input(key="validation_evaluations").set_value(1000)
+        app.number_input(key="validation_runs").set_value(3)
+        app.number_input(key="validation_processes").set_value(3).run()
+        assert not app.exception
+
+        # Act
+        next(b for b in app.button if b.label == "Run the study").click().run()
+        study_dir = next((working_directory / "validation-runs").iterdir())
+        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
+        while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
+            assert time.monotonic() < deadline, "the study did not finish"
+            time.sleep(0.3)
+        app.switch_page("app_pages/validation_analysis.py")
+        app.session_state["validation_analysis_study"] = study_dir.name
+        app.run()
+
+        # Assert
+        assert not app.exception
+        assert run_phase(study_dir) is RunPhase.FINISHED
+        assert [tab.label for tab in app.tabs][:2] == ["Verdict", FEASIBILITY_TAB]
+        rates = next(d.value for d in app.dataframe if list(d.value.index) == ["DASCMOP5"])
+        assert all(str(cell).endswith("/ 3") for cell in rates.iloc[0])
 
 
 class TestProblemArguments:

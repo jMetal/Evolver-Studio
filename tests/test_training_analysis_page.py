@@ -60,7 +60,7 @@ def working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _open(timeout: int = 60) -> AppTest:
     return AppTest.from_file(str(APP_SCRIPT), default_timeout=timeout).switch_page(
-        "pages/training_analysis.py"
+        "app_pages/training_analysis.py"
     )
 
 

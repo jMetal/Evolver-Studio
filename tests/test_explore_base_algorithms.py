@@ -9,7 +9,7 @@ from evolver_studio.catalogue import is_older_than_catalogue
 from evolver_studio.evolver_client import jar_path
 from evolver_studio.resource_files import jar_evolver_version
 
-PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "pages" / "explore_base_algorithms.py"
+PAGE_SCRIPT = Path(__file__).resolve().parent.parent / "app_pages" / "explore_base_algorithms.py"
 ALGORITHM_KEY = "explorer_algorithm"
 BASE_FILTER_KEY = "explorer_base_filter"
 
@@ -84,6 +84,42 @@ class TestNSGAIIDouble:
 
         # Assert
         assert "Parameter space of NSGA-II (Double) — NSGAIIDouble.yaml" in captions
+
+
+class TestConstraints:
+    @pytest.mark.parametrize(
+        ("algorithm", "parameter", "file"),
+        [
+            ("NSGA-II", "constraintHandling", "NSGAIIDoubleConstrained.yaml"),
+            ("MOEA/D", "subproblemUpdateCriterion", "MOEADDoubleConstrained.yaml"),
+        ],
+    )
+    def test_should_show_the_space_for_problems_with_constraints(
+        self, app: AppTest, algorithm: str, parameter: str, file: str
+    ):
+        # Arrange
+        app.selectbox(key=ALGORITHM_KEY).select(algorithm).run()
+        before = _parameter_names(app)
+
+        # Act
+        app.radio[0].set_value("With constraints").run()
+
+        # Assert
+        assert not app.exception
+        assert parameter not in before and parameter in _parameter_names(app)
+        assert any(file in caption.value for caption in app.caption)
+        assert any(f"`{parameter}` chooses how" in m.value for m in app.markdown)
+        assert not any("not described yet" in m.value for m in app.markdown)
+
+    def test_should_not_offer_it_for_an_encoding_without_problems_with_constraints(
+        self, app: AppTest
+    ):
+        # Act
+        app.selectbox(key=ALGORITHM_KEY).select("NSGA-II").run()
+        app.selectbox(key="explorer_encoding_NSGA-II").select("Permutation").run()
+
+        # Assert
+        assert len(app.radio) == 0
 
 
 class TestSingleEncodingAlgorithm:

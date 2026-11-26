@@ -10,7 +10,15 @@ from collections.abc import Mapping
 import pandas as pd
 import streamlit as st
 
-from evolver_studio.problem_catalogue import Problem, format_arguments
+from evolver_studio.problem_catalogue import (
+    BOTH_CONSTRAINTS,
+    WITH_CONSTRAINTS,
+    WITHOUT_CONSTRAINTS,
+    Problem,
+    format_arguments,
+    in_group,
+    problems_with_encoding,
+)
 from evolver_studio.problems import reference_front_candidates
 
 ALL = "All"
@@ -20,6 +28,7 @@ COLUMNS = (
     "Encoding",
     "Objectives",
     "Variables",
+    "Constraints",
     "Arguments",
     "Reference fronts",
 )
@@ -41,6 +50,7 @@ def problem_frame(problems: list[Problem]) -> pd.DataFrame:
             "Encoding": problem.encoding,
             "Objectives": problem.number_of_objectives,
             "Variables": problem.number_of_variables,
+            "Constraints": problem.number_of_constraints,
             "Arguments": format_arguments(problem),
             "Reference fronts": ", ".join(
                 path.rsplit("/", 1)[-1] for path in reference_front_candidates(problem.name)
@@ -54,11 +64,12 @@ def problem_frame(problems: list[Problem]) -> pd.DataFrame:
 def render_filters(
     catalogue: Mapping[str, Problem], key_prefix: str, fixed_encoding: str | None = None
 ) -> list[Problem]:
-    """Show the filters (encoding, family, name) and apply them.
+    """Show the filters (encoding, constraints, family, name) and apply them.
 
     Args:
         catalogue: The problem catalogue.
-        key_prefix: Prefixes the filters' widget keys: `<prefix>_encoding`, `_family`, `_filter`.
+        key_prefix: Prefixes the filters' widget keys: `<prefix>_encoding`, `_constraints`,
+            `_family`, `_filter`.
         fixed_encoding: The encoding to show the problems of, without offering to choose it; None
             to offer it.
 
@@ -67,11 +78,16 @@ def render_filters(
     """
     candidates = [p for p in catalogue.values() if fixed_encoding in (None, p.encoding)]
     families = sorted({problem.family for problem in candidates})
-    columns = st.columns(2 if fixed_encoding else 3)
+    columns = st.columns(3 if fixed_encoding else 4)
     encoding = fixed_encoding or ALL
     if fixed_encoding is None:
         encodings = sorted({problem.encoding for problem in catalogue.values()})
         encoding = columns[0].selectbox("Encoding", [ALL, *encodings], key=f"{key_prefix}_encoding")
+    constraints = columns[-3].selectbox(
+        "Constraints",
+        [ALL, WITHOUT_CONSTRAINTS, WITH_CONSTRAINTS],
+        key=f"{key_prefix}_constraints",
+    )
     family = columns[-2].selectbox("Family", [ALL, *families], key=f"{key_prefix}_family")
     text = columns[-1].text_input(
         "Filter by name", key=f"{key_prefix}_filter", placeholder="e.g. DTLZ"
@@ -81,6 +97,7 @@ def render_filters(
         for problem in sorted(catalogue.values(), key=lambda p: (p.family, p.name))
         if encoding in (ALL, problem.encoding)
         and family in (ALL, problem.family)
+        and (constraints == ALL or problem.has_constraints == (constraints == WITH_CONSTRAINTS))
         and text.strip().lower() in problem.name.lower()
     ]
 
@@ -169,6 +186,45 @@ def render_problem_adder(
     )
 
 
+def render_group(
+    catalogue: Mapping[str, Problem] | None, encoding: str, key: str, selector_key: str
+) -> str:
+    """Let the user choose which problems of an encoding to offer: without constraints, with them
+    or both. An encoding whose problems have none offers no choice.
+
+    Args:
+        catalogue: The problem catalogue, or None when the jar does not describe the problems.
+        encoding: The encoding of the problems.
+        key: The widget's key.
+        selector_key: The widget key of the selector of the problems: those of it that are not of
+            the group chosen are dropped.
+
+    Returns:
+        The group.
+    """
+    if catalogue is None or not problems_with_encoding(catalogue, encoding, WITH_CONSTRAINTS):
+        return WITHOUT_CONSTRAINTS
+
+    def drop_the_others() -> None:
+        st.session_state[selector_key] = [
+            name
+            for name in st.session_state.get(selector_key) or []
+            if name not in catalogue or in_group(catalogue[name], st.session_state[key])
+        ]
+
+    return st.radio(
+        "Problems to choose from",
+        (WITHOUT_CONSTRAINTS, WITH_CONSTRAINTS, BOTH_CONSTRAINTS),
+        format_func=lambda g: f"{g} ({len(problems_with_encoding(catalogue, encoding, g))})",
+        horizontal=True,
+        key=key,
+        on_change=drop_the_others,
+        help="With constraints, or with both, every algorithm uses its parameter space for "
+        "problems with constraints: on a problem without them its technique changes nothing, "
+        "since all the solutions are feasible.",
+    )
+
+
 def render_problem_selector(
     catalogue: Mapping[str, Problem] | None,
     options: list[str],
@@ -179,6 +235,7 @@ def render_problem_selector(
     default: list[str] | None = None,
     help_text: str | None = None,
     accept_class_names: bool = False,
+    group: str = BOTH_CONSTRAINTS,
 ) -> list[str]:
     """Let the user choose problems: from a list, or with their details in a listing.
 
@@ -198,6 +255,7 @@ def render_problem_selector(
         help_text: The selector's help.
         accept_class_names: Whether a fully-qualified class name can be typed to add a problem
             that is not in the list.
+        group: The problems offered: without constraints, with them or both.
 
     Returns:
         The names chosen.
@@ -214,5 +272,6 @@ def render_problem_selector(
         help=help_text,
     )
     if catalogue is not None:
-        render_problem_adder(catalogue, encoding, selector_key, key_prefix)
+        offered = {name: p for name, p in catalogue.items() if in_group(p, group)}
+        render_problem_adder(offered, encoding, selector_key, key_prefix)
     return names

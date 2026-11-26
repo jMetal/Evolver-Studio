@@ -7,13 +7,11 @@ what it can resolve, and what the text says about Evolver comes from that answer
 written down.
 """
 
-import shutil
-import subprocess
 from pathlib import Path
 
 import streamlit as st
 
-from evolver_studio.app_state import _manifest
+from evolver_studio.app_state import _manifest, java_version
 from evolver_studio.evolver_client import EVOLVER_VERSION, is_jar_overridden
 from evolver_studio.resource_files import jar_evolver_version
 from evolver_studio.runs import RUNS_DIRECTORY_NAME, SOLVE_RUNS_DIRECTORY_NAME
@@ -24,15 +22,6 @@ from evolver_studio.validation_runner import VALIDATION_RUNS_DIRECTORY_NAME
 
 E4_TUTORIAL_URL = "https://github.com/jMetal/Evolver/blob/develop/docs/quick_start.rst"
 KEY_PREFIX = "tutorial_tour"
-
-
-def _java_version() -> str | None:
-    """The first line `java -version` prints, or None when Java is not on the PATH."""
-    if shutil.which("java") is None:
-        return None
-    result = subprocess.run(["java", "-version"], capture_output=True, text=True)
-    lines = (result.stderr or result.stdout).strip().splitlines()
-    return lines[0] if lines else None
 
 
 def _render_introduction(jar: Path) -> None:
@@ -59,14 +48,15 @@ def _render_introduction(jar: Path) -> None:
 
 
 def _render_connection(jar: Path) -> None:
-    java = _java_version()
+    java = java_version()
     version = jar_evolver_version(jar)
     st.markdown(
-        "Evolver-Studio needs two things on your computer, and the **sidebar** reports on "
-        "both:\n\n"
-        "1. **Java 21 or newer**, which runs Evolver.\n"
+        "Evolver-Studio needs two things on your computer, and the app "
+        "checks both:\n\n"
+        "1. **Java 21 or newer**, which runs Evolver (`make env` installs it in the app's "
+        "Conda environment).\n"
         "2. **Evolver's jar**, one file with the framework and its configurations. The app "
-        f"follows the release **Evolver {EVOLVER_VERSION}**; if the jar is missing, the sidebar "
+        f"follows the release **Evolver {EVOLVER_VERSION}**; if the jar is missing, the app "
         "offers to download it from Maven Central into the app's `lib/` folder. Nothing else of "
         "Evolver is needed: the parameter spaces and the meta-optimizers' configurations are "
         "read from the jar.\n\nYours:"
@@ -75,7 +65,10 @@ def _render_connection(jar: Path) -> None:
     columns[0].metric("Java", java or "not found", help="The first line of `java -version`.")
     columns[1].metric("Evolver jar", version or "unknown version", help=f"`{jar.name}`")
     if java is None:
-        st.warning("Java was not found on the PATH: install Java 21 or newer to run Evolver.")
+        st.warning(
+            "Java was not found: run `make env` and start the app with `make run`, or install "
+            "Java 21 or newer."
+        )
     if is_jar_overridden():
         st.info(
             "The jar in use is the one named by the `EVOLVER_JAR` environment variable, "
@@ -114,7 +107,9 @@ def _render_what_evolver_offers(jar: Path) -> None:
         "- **Problems** are the benchmark and real-world problems to solve or to train on.\n"
         "- **Quality indicators** measure how good a front is; a training minimizes them."
     )
-    st.page_link("pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬")
+    st.page_link(
+        "app_pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬"
+    )
 
 
 def _render_pages(jar: Path) -> None:

@@ -248,10 +248,14 @@ def _render_next_steps(jar: Path) -> None:
         "learned to read. For the same concepts with Java code, see Evolver's tutorial "
         f"[E1]({E1_TUTORIAL_URL})."
     )
-    st.page_link("pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬")
-    st.page_link("pages/explore_meta_optimizers.py", label="Explore the meta-optimizers", icon="🎛️")
     st.page_link(
-        "pages/explore_quality_indicators.py", label="See the quality indicators", icon="📏"
+        "app_pages/explore_base_algorithms.py", label="Explore the base algorithms", icon="🧬"
+    )
+    st.page_link(
+        "app_pages/explore_meta_optimizers.py", label="Explore the meta-optimizers", icon="🎛️"
+    )
+    st.page_link(
+        "app_pages/explore_quality_indicators.py", label="See the quality indicators", icon="📏"
     )
     st.button(
         "All the tutorials",

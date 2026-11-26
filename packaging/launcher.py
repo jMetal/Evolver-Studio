@@ -19,7 +19,7 @@ DATA_DIRECTORY_VARIABLE = "EVOLVER_STUDIO_DATA"
 
 
 def bundle_root() -> Path:
-    """The directory holding app.py, pages/, resources/..., frozen or not."""
+    """The directory holding app.py, app_pages/, resources/..., frozen or not."""
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS)
     return Path(__file__).resolve().parent.parent

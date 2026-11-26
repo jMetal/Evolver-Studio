@@ -15,6 +15,7 @@ from evolver_studio.app_state import (
     registered_problem_names,
     registered_problems,
 )
+from evolver_studio.catalogue import configuration_handles_constraints
 from evolver_studio.configuration import parse_configuration
 from evolver_studio.figure_export import render_chart
 from evolver_studio.front_analysis import (
@@ -125,7 +126,7 @@ def render_configurations(training: FinishedTraining, jar: Path, hand_off: bool 
             st.warning("Validation does not offer this algorithm.")
         else:
             st.session_state.update(state)
-            st.switch_page("pages/validation.py")
+            st.switch_page("app_pages/validation.py")
     _render_run_it(training, chosen, jar, columns[2])
 
 
@@ -155,7 +156,7 @@ def _render_run_it(training: FinishedTraining, chosen, jar: Path, column) -> Non
             st.warning("Run algorithm cannot take this configuration or this problem.")
         else:
             st.session_state.update(state)
-            st.switch_page("pages/solve.py")
+            st.switch_page("app_pages/solve.py")
 
 
 def _space_of(training: FinishedTraining, jar: Path) -> list[ParameterSpec] | None:
@@ -166,13 +167,22 @@ def _space_of(training: FinishedTraining, jar: Path) -> list[ParameterSpec] | No
     algorithm = base_algorithm(training.algorithm)
     if algorithm is None or training.encoding not in algorithm.encodings:
         return None
-    return parse_parameter_space(parameter_space_text(jar, algorithm.encodings[training.encoding]))
+    return parse_parameter_space(
+        parameter_space_text(
+            jar, algorithm.parameter_space_file(training.encoding, _constrained(training))
+        )
+    )
+
+
+def _constrained(training: FinishedTraining) -> bool:
+    """Whether the training searched the parameter space for problems with constraints."""
+    return any(configuration_handles_constraints(c.configuration) for c in training.configurations)
 
 
 def _default_values(training: FinishedTraining, jar: Path) -> dict[str, str] | None:
     """The values of the algorithm's default configuration, when it has a single one."""
     algorithm = base_algorithm(training.algorithm)
-    defaults = algorithm.default_configurations.get(training.encoding, ()) if algorithm else ()
+    defaults = algorithm.defaults(training.encoding, _constrained(training)) if algorithm else ()
     if len(defaults) != 1:
         return None
     return parse_configuration(default_configuration_text(jar, defaults[0][1]))

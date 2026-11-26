@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB.svg?logo=python&logoColor=white">
-  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.5" src="https://img.shields.io/badge/Evolver-2.5-blue.svg"></a>
+  <a href="https://github.com/jMetal/Evolver"><img alt="Evolver 2.7" src="https://img.shields.io/badge/Evolver-2.7-blue.svg"></a>
   <img alt="Java 21+" src="https://img.shields.io/badge/java-21%2B-5382A1.svg?logo=openjdk&logoColor=white">
   <a href="https://streamlit.io/"><img alt="Built with Streamlit" src="https://img.shields.io/badge/built%20with-Streamlit-555555.svg?logo=streamlit"></a>
 </p>
@@ -35,7 +35,10 @@ analyze the results with the statistics a paper needs — without writing Java o
   critical difference plots, a Bayesian signed-rank test, attainment surfaces and EAF differences;
   tables in LaTeX, every chart in PNG or PDF, and the files [SAES](https://github.com/jMetal/SAES)
   reads.
-- **Learn by doing.** Eight interactive tutorials, each paired with a tutorial of Evolver's
+- **Problems with constraints.** 127 of them, from benchmarks and real-world suites: every
+  algorithm runs with its parameter space for them, a training chooses how they are handled, and
+  the results tell whether a run found feasible solutions, besides how good they are.
+- **Learn by doing.** Nine interactive tutorials, each paired with a tutorial of Evolver's
   documentation, run real examples inside the app.
 - **In step with Evolver.** Parameter spaces, problems and indicators are read from Evolver's own
   release jar, and tests check the app against every new release.
@@ -52,12 +55,13 @@ analyze the results with the statistics a paper needs — without writing Java o
 ## The workflow
 
 **Solving a problem**: pick a problem in *Explore › Problems*, then configure and run an algorithm
-on it in *Run algorithm*, and inspect its fronts, solutions and quality indicators.
+on it in *Run algorithm*, follow its front while it runs, and inspect its fronts, solutions and
+quality indicators.
 
 **Meta-optimization** has four steps, a page each:
 
 1. **Training** — choose the algorithm to configure, the problems to tune it for, the
-   meta-objectives (quality indicators) and the meta-optimizer, and launch it.
+   meta-objectives (quality indicators) and the meta-optimizer, name the experiment, and launch it.
 2. **Training analysis** — read what it found: convergence, the front of configurations, what
    they have in common and how they differ from the default configuration.
 3. **Validation** — run a configuration it found many times, next to the default configurations
@@ -72,15 +76,15 @@ algorithm*, to be used on a new problem.
 
 | Section | Page | What it does |
 |---|---|---|
-| Explore | Base algorithms | Browse the parameter space of every configurable algorithm, per encoding |
+| Explore | Base algorithms | Browse the parameter space of every configurable algorithm, per encoding, and how each one handles constraints |
 | Explore | Meta-optimizers | The meta-optimizers, their encodings (flat, tree) and their operators |
 | Explore | Quality indicators | The indicators, what each one measures, and which way is better |
-| Explore | Problems | Every problem: encoding, objectives, variables, arguments, reference fronts |
-| Solve | Run algorithm | Run an algorithm from its default configuration, adjusted as you like; fronts, indicators, `VAR`/`FUN` |
+| Explore | Problems | Every problem: encoding, objectives, variables, constraints, arguments, reference fronts |
+| Solve | Run algorithm | Run an algorithm from its default configuration, adjusted as you like; its front as it evolves, fronts, indicators, `VAR`/`FUN` |
 | Meta-optimization | Training | Configure, launch, monitor and cancel a training run |
-| Meta-optimization | Training analysis | Convergence, fronts, population and configurations of a finished training |
+| Meta-optimization | Training analysis | Convergence, fronts, population, feasibility and configurations of a finished training |
 | Meta-optimization | Validation | Design a validation study, run it in the background and follow it |
-| Meta-optimization | Validation analysis | Verdicts, Wilcoxon table, effect sizes, rankings, Bayesian test, fronts, attainment, cost |
+| Meta-optimization | Validation analysis | Verdicts, feasibility, Wilcoxon table, effect sizes, rankings, Bayesian test, fronts, attainment, cost |
 | Learn | Tutorials | Interactive tutorials, paired with Evolver's documentation |
 
 ## Tutorials
@@ -95,6 +99,7 @@ algorithm*, to be used on a new problem.
 | S6 | Analyzing training results | Meta-optimization | E7 |
 | S7 | Validating a configuration | Meta-optimization | E8 |
 | S8 | Analyzing a validation | Meta-optimization | E8 |
+| S9 | Problems with constraints | Both | E12 |
 
 E1, E2… are the [tutorials of Evolver's documentation](https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/index.rst),
 which cover the same ground with Java code. More tutorials are planned (comparing configurations,
@@ -115,24 +120,35 @@ MOPSO is browsable only, until Evolver's command-line runner supports it. See Ev
 
 ## Requirements
 
-- Python 3.11 or newer and [Conda](https://docs.conda.io/)
-- Java 21 or newer, on the `PATH`
+- `git` and `make` (Debian/Ubuntu: `sudo apt install git make`; macOS: `xcode-select --install`)
+- [Conda](https://docs.conda.io/) ([Miniforge](https://github.com/conda-forge/miniforge) is
+  recommended; Anaconda and Miniconda also work). `make env` installs Python 3.11 and **Java 21**
+  in an environment of its own, so you do not have to install them beforehand, and the Python and
+  Java already on the computer are not touched
 - Optionally, Google Chrome or Chromium, to save the charts as PNG or PDF
 
-No Evolver checkout and no Maven: the app downloads the jar of **Evolver 2.5** from Maven Central
+No Evolver checkout and no Maven: the app downloads the jar of **Evolver 2.7** from Maven Central
 the first time. Evolver-Studio has its own version numbers and works with one Evolver release at a
 time:
 
 | Evolver-Studio | Evolver |
 |---|---|
-| 1.0.0 (in preparation) | 2.5 |
+| 1.0.0 (in preparation) | 2.7 |
 
 ## Installation
 
 ```bash
 git clone https://github.com/jMetal/Evolver-Studio.git
 cd Evolver-Studio
-make env   # creates (or updates) the 'evolver-studio' Conda environment
+make env   # creates (or updates) the 'evolver-studio' Conda environment, with Python and Java
+```
+
+The `make` targets (`make run`, `make test`, ...) run inside that environment, so you do not need
+to activate it. To use its tools directly (`streamlit run app.py`, `pytest`, `ruff`), activate it
+first:
+
+```bash
+conda activate evolver-studio
 ```
 
 ## Quick start
@@ -141,7 +157,7 @@ make env   # creates (or updates) the 'evolver-studio' Conda environment
 make run   # opens Evolver-Studio in your browser
 ```
 
-1. The first time, click **Download Evolver 2.5** in the sidebar (about 130 MB, checksum verified).
+1. The first time, click **Download Evolver 2.7** at the top of the page (about 130 MB, checksum verified).
 2. Open **Tutorials** and start with **S1. A tour of Evolver-Studio**.
 3. To solve a problem right away, open **Run algorithm**, choose a problem (ZDT1, for instance),
    keep NSGA-II with its default configuration and click **Run**.
@@ -175,7 +191,7 @@ with any tool:
 | Folder | Contents |
 |---|---|
 | `cli-runner-runs/` | One folder per training: its request, status and log |
-| `results/` | What Evolver wrote for each training (`INDICATORS.csv`, `VAR_CONF.txt`, `METADATA.txt`…) |
+| `results/` | What Evolver wrote for each training, in `<algorithm>/<experiment>.<date-time>/` (`INDICATORS.csv`, `VAR_CONF.txt`, `METADATA.txt`…) |
 | `solve-runs/` | The runs of *Run algorithm* |
 | `validation-runs/` | The validation studies, with every run's front and indicators |
 
@@ -186,10 +202,11 @@ runs read into it the first time, and again when a new version changes them, lea
 
 ## Troubleshooting
 
-- **"Java was not found on the PATH"**: install Java 21 or newer (for example
-  [Temurin](https://adoptium.net/)) and restart the app.
+- **"Java was not found"**: run `make env` (it installs Java 21 in the Conda environment) and start
+  the app with `make run`, or with the environment activated. If you run the app another way,
+  install Java 21 or newer (for example [Temurin](https://adoptium.net/)) and restart it.
 - **The jar does not download**: check the connection to Maven Central, or download
-  `Evolver-2.5-jar-with-dependencies.jar` by hand into `lib/`.
+  `Evolver-2.7-jar-with-dependencies.jar` by hand into `lib/`.
 - **No PNG/PDF buttons under the charts**: they need Chrome or Chromium; the camera icon of each
   chart still saves it as PNG.
 - **Port 8501 in use**: `streamlit run app.py --server.port 8502`.

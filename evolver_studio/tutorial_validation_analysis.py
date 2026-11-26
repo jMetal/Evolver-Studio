@@ -291,7 +291,7 @@ def _render_reporting(jar: Path) -> None:
     )
     if st.button("Open the study in Validation analysis", icon="🔬", type="primary"):
         st.session_state[ANALYSIS_STUDY_KEY] = STUDY_ID
-        st.switch_page("pages/validation_analysis.py")
+        st.switch_page("app_pages/validation_analysis.py")
     st.button(
         "All the tutorials",
         icon="🎓",

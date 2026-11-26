@@ -37,12 +37,14 @@ from evolver_studio.solve_results import (
     read_front,
     read_indicators,
     read_run_fronts,
+    read_run_violations,
     read_solutions,
     variable_columns,
     zip_fronts,
 )
 from evolver_studio.tutorial_navigation import open_tutorial
 from evolver_studio.tutorials import TutorialStep
+from evolver_studio.validation import contender_space_file
 
 E2_TUTORIAL_URL = (
     "https://github.com/jMetal/Evolver/blob/develop/docs/tutorials/base_level_algorithms.rst"
@@ -85,6 +87,7 @@ class PreparedRun:
         runs: The number of independent runs.
         expected: The indicator values the text announces (the first run's, or the mean of the runs
             when there are several), by short name; empty when it announces none.
+        indicators: The quality indicators computed.
     """
 
     key: str
@@ -97,6 +100,7 @@ class PreparedRun:
     max_evaluations: int
     runs: int
     expected: dict[str, float]
+    indicators: tuple[str, ...] = ("Epsilon", "NormalizedHypervolume")
 
 
 DEFAULT_ON_ZDT1 = PreparedRun(
@@ -109,7 +113,7 @@ DEFAULT_ON_ZDT1 = PreparedRun(
     100,
     25000,
     1,
-    {"EP": 0.0103, "NHV": 0.0098},
+    {"EP": 0.0138, "NHV": 0.0107},
 )
 OTHER_ON_ZDT1 = PreparedRun(
     "other",
@@ -133,7 +137,7 @@ DEFAULT_ON_ZDT2_FIVE_RUNS = PreparedRun(
     100,
     25000,
     5,
-    {"EP": 0.0133, "NHV": 0.0197},
+    {"EP": 0.0135, "NHV": 0.0204},
 )
 MOEAD_ON_DTLZ2 = PreparedRun(
     "moead",
@@ -145,7 +149,7 @@ MOEAD_ON_DTLZ2 = PreparedRun(
     91,
     25000,
     1,
-    {"EP": 0.0767, "NHV": 0.1220},
+    {"EP": 0.0766, "NHV": 0.1223},
 )
 RVEA_VARIANTS = {
     "RVEA": PreparedRun(
@@ -196,7 +200,8 @@ def prepared_request(prepared: PreparedRun, jar: Path, output_directory: str) ->
         output_directory: Where the results are written.
 
     Returns:
-        The request: seed 1, and the indicators EP and NHV.
+        The request, with the seed 1. Its parameter space is the one for problems with constraints
+        when the configuration says how it handles them.
     """
     algorithm = next(a for a in BASE_ALGORITHMS if a.name == prepared.algorithm)
     configuration = prepared.configuration or default_configuration_text(jar, prepared.default_file)
@@ -209,7 +214,7 @@ def prepared_request(prepared: PreparedRun, jar: Path, output_directory: str) ->
         algorithm_name=algorithm.registry_name,
         encoding="Double",
         population_size=prepared.population_size,
-        yaml_parameter_space_file=algorithm.encodings["Double"],
+        yaml_parameter_space_file=contender_space_file(algorithm, "Double", configuration),
         extra_config=extra_config,
         configuration=configuration.strip().splitlines()[0],
         problem=prepared.problem,
@@ -217,7 +222,7 @@ def prepared_request(prepared: PreparedRun, jar: Path, output_directory: str) ->
         max_evaluations=prepared.max_evaluations,
         number_of_independent_runs=prepared.runs,
         seed=1,
-        indicator_names=["Epsilon", "NormalizedHypervolume"],
+        indicator_names=list(prepared.indicators),
         # The tutorial's runs are short and its steps wait for each one to end: no live progress
         status_frequency=None,
         front_frequency=None,
@@ -283,13 +288,17 @@ def remembered_run(prepared: PreparedRun) -> Path | None:
     return run_dir if run_phase(run_dir) is RunPhase.FINISHED else None
 
 
-def render_prepared_run(prepared: PreparedRun, jar: Path, show_front: bool = True) -> Path | None:
+def render_prepared_run(
+    prepared: PreparedRun, jar: Path, show_front: bool = True, can_open: bool = True
+) -> Path | None:
     """Offer a prepared run, run it on request, and show what it gave.
 
     Args:
         prepared: The run.
         jar: Path to Evolver's jar.
         show_front: Whether to plot the front the run found.
+        can_open: Whether to offer opening it in Run algorithm, which does not offer every run (one
+            that ignores the constraints of its problem, for instance).
 
     Returns:
         The run's directory if it has been run, else None.
@@ -309,7 +318,7 @@ def render_prepared_run(prepared: PreparedRun, jar: Path, show_front: bool = Tru
                 st.error("The run did not finish: see the Run algorithm page for its log.")
             else:
                 st.session_state[f"{KEY_PREFIX}_run_{prepared.key}"] = run_dir.name
-        if columns[1].button(
+        if can_open and columns[1].button(
             "Open in Run algorithm",
             key=f"{KEY_PREFIX}_open_{prepared.key}",
             help="Fills the form of Run algorithm with this run, to repeat it by hand.",
@@ -328,10 +337,11 @@ def _open_in_run_algorithm(request: SolveRequest, jar: Path) -> None:
         BASE_ALGORITHMS,
         registered_problem_names(str(jar)) or [],
         st.session_state.get(CONFIGURATION_VERSION_KEY, 0),
+        registered_problems(str(jar)),
     )
     if state is not None:
         st.session_state.update(state)
-    st.switch_page("pages/solve.py")
+    st.switch_page("app_pages/solve.py")
 
 
 def _render_outcome(prepared: PreparedRun, run_dir: Path, show_front: bool) -> None:
@@ -340,7 +350,7 @@ def _render_outcome(prepared: PreparedRun, run_dir: Path, show_front: bool) -> N
         fronts = read_run_fronts(output)
         reference = read_front(evolver_client.WORKING_DIRECTORY / prepared.reference_front)
         render_chart(
-            build_front_figure(fronts, reference),
+            build_front_figure(fronts, reference, read_run_violations(output, fronts)),
             f"{KEY_PREFIX}_front_{prepared.key}",
             f"front_{prepared.key}",
             width="stretch",
@@ -356,7 +366,7 @@ def _check_expected(prepared: PreparedRun, indicators: pd.DataFrame) -> None:
     """Say whether the indicator values are the ones the text announces (if it announces any)."""
     if not prepared.expected:
         return
-    values = {"EP": indicators["EP"], "NHV": indicators["NHV"]}
+    values = {name: indicators[name] for name in prepared.expected}
     measured = {
         name: series.mean() if len(series) > 1 else series.iloc[0]
         for name, series in values.items()
@@ -410,7 +420,7 @@ def _render_introduction(jar: Path) -> None:
         f"The runs of this tutorial take a few seconds or less each. Timings measured on: "
         f"{TIMINGS_MEASURED_ON}."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
 
 
 def _render_choosing_a_problem(jar: Path) -> None:
@@ -433,7 +443,7 @@ def _render_choosing_a_problem(jar: Path) -> None:
     )
     if catalogue is None:
         st.info("This needs an Evolver that describes its problems (2.4 or later).")
-        st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
+        st.page_link("app_pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
         return
     shown = render_filters(catalogue, f"{KEY_PREFIX}_problems")
     render_table(shown, len(catalogue), f"{KEY_PREFIX}_problems_table")
@@ -459,7 +469,7 @@ def _render_choosing_a_problem(jar: Path) -> None:
             )
         elif answer is not None:
             st.error("Not quite: look at the *Objectives* column of DTLZ2 in the listing.")
-    st.page_link("pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
+    st.page_link("app_pages/explore_problems.py", label="Open Explore › Problems", icon="🧩")
 
 
 def _render_default_run(jar: Path) -> None:
@@ -575,7 +585,7 @@ def _render_other_configuration(jar: Path) -> None:
         "the ✏️ that marks each changed parameter and the count of parameters changed. "
         "**Reset to the default configuration** undoes everything."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
     st.markdown("Or run the prepared one here:")
     other = render_prepared_run(OTHER_ON_ZDT1, jar, show_front=False)
     standard = remembered_run(DEFAULT_ON_ZDT1)
@@ -703,7 +713,7 @@ def _render_next_steps(jar: Path) -> None:
         "problem; running your own problem and comparing configurations rigorously come in "
         "later tutorials."
     )
-    st.page_link("pages/solve.py", label="Open Run algorithm", icon="▶️")
+    st.page_link("app_pages/solve.py", label="Open Run algorithm", icon="▶️")
     st.button(
         "All the tutorials",
         icon="🎓",

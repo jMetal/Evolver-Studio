@@ -33,9 +33,9 @@ DATA_DIRECTORY = Path(os.environ.get(DATA_DIRECTORY_VARIABLE) or STUDIO_HOME).ex
 # so it must hold the resources/ directory copied from Evolver.
 WORKING_DIRECTORY = DATA_DIRECTORY
 
-# Evolver release this app is built against (the `v2.5` tag of jMetal/Evolver). Only stable
+# Evolver release this app is built against (the `v2.7` tag of jMetal/Evolver). Only stable
 # releases: evolver_studio/catalogue.py mirrors this one.
-EVOLVER_VERSION = "2.5"
+EVOLVER_VERSION = "2.7"
 JAR_FILE_NAME = f"Evolver-{EVOLVER_VERSION}-jar-with-dependencies.jar"
 JAR_DIRECTORY = DATA_DIRECTORY / "lib"
 MAVEN_CENTRAL_JAR_URL = (

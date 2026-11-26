@@ -1,6 +1,9 @@
 """Evolver-Studio entrypoint: navigation shell over the app's sections.
 
-Each page is its own script under pages/ (Streamlit's st.navigation model —
+The folder of the pages is not called pages/, which Streamlit would serve by itself, without this
+script and so without the menu, when the first thing opened is the URL of a page.
+
+Each page is its own script under app_pages/ (Streamlit's st.navigation model —
 nothing at Python module level survives between pages, only st.session_state
 does). The home page leads to the others, which are grouped (see
 evolver_studio/sections.py) by purpose: Explore (what is available), Solve
@@ -38,6 +41,12 @@ def prepare_data_directory() -> None:
 
 prepare_data_directory()
 
+# The menu runs along the top, so the page needs less room above its content than Streamlit's
+# default (which leaves space for a taller header).
+st.html(
+    '<style>[data-testid="stMainBlockContainer"] { padding-top: 4.5rem; }</style>',
+)
+
 pg = st.navigation(
     {
         "": [st.Page(HOME_PAGE, title="Home", icon="🏠", default=True)],
@@ -47,6 +56,7 @@ pg = st.navigation(
             ]
             for section in SECTIONS
         },
-    }
+    },
+    position="top",
 )
 pg.run()

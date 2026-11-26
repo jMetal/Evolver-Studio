@@ -1,12 +1,12 @@
 """The app's pages, grouped by purpose: the single source of the menu and the home page.
 
-`app.py` builds `st.navigation` from `SECTIONS`, and the home page (`pages/home.py`) shows a card
-for each page, so the two cannot drift apart.
+`app.py` builds `st.navigation` from `SECTIONS`, and the home page (`app_pages/home.py`) shows a
+link for each page, so the two cannot drift apart.
 """
 
 from dataclasses import dataclass
 
-HOME_PAGE = "pages/home.py"
+HOME_PAGE = "app_pages/home.py"
 
 
 @dataclass(slots=True, frozen=True)
@@ -14,7 +14,7 @@ class Page:
     """A page of the app.
 
     Attributes:
-        path: Its script, relative to the app's root (e.g. "pages/training.py").
+        path: Its script, relative to the app's root (e.g. "app_pages/training.py").
         title: Its title in the menu and on its card.
         icon: Its icon in the menu and on its card.
         description: What it does, for its card on the home page.
@@ -35,10 +35,14 @@ class Section:
     Attributes:
         name: Its heading in the menu, and the label of its pages' cards on the home page.
         pages: Its pages, in menu order.
+        icon: Its icon, on its heading on the home page.
+        summary: One line on what the section is for, under its heading on the home page.
     """
 
     name: str
     pages: tuple[Page, ...]
+    icon: str = ""
+    summary: str = ""
 
 
 SECTIONS = (
@@ -46,7 +50,7 @@ SECTIONS = (
         "Explore",
         (
             Page(
-                "pages/explore_base_algorithms.py",
+                "app_pages/explore_base_algorithms.py",
                 "Base algorithms",
                 "🧬",
                 "Browse the parameter space of every configurable algorithm, for each encoding, "
@@ -54,7 +58,7 @@ SECTIONS = (
                 available=True,
             ),
             Page(
-                "pages/explore_meta_optimizers.py",
+                "app_pages/explore_meta_optimizers.py",
                 "Meta-optimizers",
                 "🎛️",
                 "See the encodings each meta-optimizer supports and the operators it can be "
@@ -62,14 +66,14 @@ SECTIONS = (
                 available=True,
             ),
             Page(
-                "pages/explore_quality_indicators.py",
+                "app_pages/explore_quality_indicators.py",
                 "Quality indicators",
                 "📏",
                 "The quality indicators a training run can minimize, and what each one measures.",
                 available=True,
             ),
             Page(
-                "pages/explore_problems.py",
+                "app_pages/explore_problems.py",
                 "Problems",
                 "🧩",
                 "The benchmark and real-world problems available for training and solving, with "
@@ -77,12 +81,14 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="🧭",
+        summary="See what Evolver offers: algorithms, meta-optimizers, indicators and problems.",
     ),
     Section(
         "Solve",
         (
             Page(
-                "pages/solve.py",
+                "app_pages/solve.py",
                 "Run algorithm",
                 "▶️",
                 "Choose a problem and an algorithm, start from its default configuration and "
@@ -91,12 +97,14 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="▶️",
+        summary="Run a configurable algorithm on a problem, as an alternative to writing a runner.",
     ),
     Section(
         "Meta-optimization",
         (
             Page(
-                "pages/training.py",
+                "app_pages/training.py",
                 "Training",
                 "🏋️",
                 "Configure, launch and monitor a training run, with a live view of the front of "
@@ -104,7 +112,7 @@ SECTIONS = (
                 available=True,
             ),
             Page(
-                "pages/training_analysis.py",
+                "app_pages/training_analysis.py",
                 "Training analysis",
                 "📊",
                 "Study a finished training run: how it converged, how its population evolved, the "
@@ -113,7 +121,7 @@ SECTIONS = (
                 available=True,
             ),
             Page(
-                "pages/validation.py",
+                "app_pages/validation.py",
                 "Validation",
                 "✅",
                 "Compare a tuned configuration with the default configurations of other algorithms "
@@ -122,7 +130,7 @@ SECTIONS = (
                 available=True,
             ),
             Page(
-                "pages/validation_analysis.py",
+                "app_pages/validation_analysis.py",
                 "Validation analysis",
                 "🔬",
                 "Study the results of a validation: whether the tuned configuration wins, where "
@@ -131,17 +139,21 @@ SECTIONS = (
                 available=True,
             ),
         ),
+        icon="🧬",
+        summary="Tune an algorithm automatically, then analyze and validate the result.",
     ),
     Section(
         "Learn",
         (
             Page(
-                "pages/tutorials.py",
+                "app_pages/tutorials.py",
                 "Tutorials",
                 "🎓",
                 "Interactive, step-by-step tutorials that pair with Evolver's documentation.",
                 available=True,
             ),
         ),
+        icon="🎓",
+        summary="Interactive tutorials that walk through every part of the app.",
     ),
 )

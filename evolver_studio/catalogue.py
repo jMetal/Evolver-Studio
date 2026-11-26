@@ -52,6 +52,11 @@ class BaseAlgorithm:
             for it, as (label, filename) pairs, under defaultConfigurations/ — the ones the Run
             algorithm page offers to start from. An encoding with none is missing (e.g. NSGA-II's
             Permutation).
+        constrained_encodings: Encoding name to its parameter space for problems with constraints:
+            the same space plus how it handles the constraints (see
+            `CONSTRAINT_HANDLING_PARAMETERS`). An encoding with none is missing.
+        constrained_default_configurations: As `default_configurations`, for the spaces of
+            `constrained_encodings`.
     """
 
     name: str
@@ -61,6 +66,38 @@ class BaseAlgorithm:
     runnable_encodings: tuple[str, ...] = ()
     required_extra_config_keys: tuple[str, ...] = ()
     default_configurations: dict[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
+    constrained_encodings: dict[str, str] = field(default_factory=dict)
+    constrained_default_configurations: dict[str, tuple[tuple[str, str], ...]] = field(
+        default_factory=dict
+    )
+
+    def parameter_space_file(self, encoding: str, constrained: bool = False) -> str:
+        """The file of its parameter space.
+
+        Args:
+            encoding: One of its encodings.
+            constrained: Whether it is the space for problems with constraints.
+
+        Raises:
+            KeyError: If it has no such space.
+        """
+        return (self.constrained_encodings if constrained else self.encodings)[encoding]
+
+    def defaults(self, encoding: str, constrained: bool = False) -> tuple[tuple[str, str], ...]:
+        """Its default configurations, as (label, filename) pairs; empty if it has none.
+
+        Args:
+            encoding: One of its encodings.
+            constrained: Whether they are those for problems with constraints.
+        """
+        configurations = (
+            self.constrained_default_configurations if constrained else self.default_configurations
+        )
+        return configurations.get(encoding, ())
+
+    def handles_constraints(self, encoding: str) -> bool:
+        """Whether it has a parameter space for problems of an encoding with constraints."""
+        return encoding in self.constrained_encodings
 
 
 @dataclass(slots=True, frozen=True)
@@ -123,6 +160,10 @@ class MetaAlgorithm:
     tree_operator_parameter_space_file: str | None = None
 
 
+# How an algorithm handles constraints is a parameter of its space: a constraint-handling technique
+# or, in MOEA/D, which does not rank its population, the criterion that updates the subproblems.
+CONSTRAINT_HANDLING_PARAMETERS = ("constraintHandling", "subproblemUpdateCriterion")
+
 BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
     # org.uma.evolver.algorithm.nsgaii.{Double,Binary,Permutation}NSGAII
     BaseAlgorithm(
@@ -140,6 +181,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
             "Binary": (("Default", "NSGAIIBinaryDefault.txt"),),
             "Permutation": (("Default", "NSGAIIPermutationDefault.txt"),),
         },
+        constrained_encodings={"Double": "NSGAIIDoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "NSGAIIDoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.moead.{Double,Binary,Permutation}MOEAD
     BaseAlgorithm(
@@ -155,6 +200,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         required_extra_config_keys=("weightVectorFilesDirectory",),
         # No default configuration for Binary and Permutation: the form starts from the space.
         default_configurations={"Double": (("Default", "MOEADDoubleDefault.txt"),)},
+        constrained_encodings={"Double": "MOEADDoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "MOEADDoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.smsemoa.{Double,Binary,Permutation}SMSEMOA
     BaseAlgorithm(
@@ -168,6 +217,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         registry_name="SMS-EMOA",
         runnable_encodings=("Double", "Binary", "Permutation"),
         default_configurations={"Double": (("Default", "SMSEMOADoubleDefault.txt"),)},
+        constrained_encodings={"Double": "SMSEMOADoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "SMSEMOADoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.rdemoea.{Double,Permutation}RDEMOEA (no Binary variant)
     BaseAlgorithm(
@@ -176,6 +229,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         runnable_today=True,
         registry_name="RDEMOEA",
         runnable_encodings=("Double", "Permutation"),
+        constrained_encodings={"Double": "RDEMOEADoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "RDEMOEADoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.agemoea.DoubleAGEMOEA (Double only)
     BaseAlgorithm(
@@ -190,6 +247,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
                 ("AGE-MOEA", "AGEMOEADoubleDefault.txt"),
                 ("AGE-MOEA-II", "AGEMOEAIIDoubleDefault.txt"),
             )
+        },
+        constrained_encodings={"Double": "AGEMOEADoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "AGEMOEADoubleConstrainedDefault.txt"),)
         },
     ),
     # org.uma.evolver.algorithm.rvea.DoubleRVEA (Double only)
@@ -208,9 +269,21 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
                 ("iRVEA", "IRVEADoubleDefault.txt"),
             )
         },
+        constrained_encodings={"Double": "RVEADoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "RVEADoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.mopso.BaseMOPSO (Double only, particle swarm)
-    BaseAlgorithm(name="MOPSO", encodings={"Double": "MOPSO.yaml"}, runnable_today=False),
+    BaseAlgorithm(
+        name="MOPSO",
+        encodings={"Double": "MOPSO.yaml"},
+        runnable_today=False,
+        constrained_encodings={"Double": "MOPSOConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "MOPSOConstrainedDefault.txt"),)
+        },
+    ),
     # org.uma.evolver.algorithm.nsgaiii.DoubleNSGAIII (Double only)
     BaseAlgorithm(
         name="NSGA-III",
@@ -219,6 +292,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         registry_name="NSGA-III",
         runnable_encodings=("Double",),
         default_configurations={"Double": (("Default", "NSGAIIIDoubleDefault.txt"),)},
+        constrained_encodings={"Double": "NSGAIIIDoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "NSGAIIIDoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.paes.{Double,Binary,Permutation}PAES
     BaseAlgorithm(
@@ -236,6 +313,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
             "Binary": (("Default", "PAESBinaryDefault.txt"),),
             "Permutation": (("Default", "PAESPermutationDefault.txt"),),
         },
+        constrained_encodings={"Double": "PAESDoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "PAESDoubleConstrainedDefault.txt"),)
+        },
     ),
     # org.uma.evolver.algorithm.ssmoea.DoubleSSMOEA (Double only)
     BaseAlgorithm(
@@ -245,6 +326,10 @@ BASE_ALGORITHMS: tuple[BaseAlgorithm, ...] = (
         registry_name="SSMOEA",
         runnable_encodings=("Double",),
         default_configurations={"Double": (("Default", "SSMOEADoubleDefault.txt"),)},
+        constrained_encodings={"Double": "SSMOEADoubleConstrained.yaml"},
+        constrained_default_configurations={
+            "Double": (("Default", "SSMOEADoubleConstrainedDefault.txt"),)
+        },
     ),
 )
 
@@ -263,6 +348,9 @@ KNOWN_NON_ALGORITHM_PARAMETER_SPACE_FILES = frozenset(
         "RDEMOEADoubleReduced.yaml",
         "SMSEMOADoubleReduced.yaml",
         "MOPSOReduced.yaml",
+        # NSGAIIDoubleConstrained.yaml with the population and the offspring fixed at 100, used by
+        # an example of Evolver's (a training on the MW problems).
+        "NSGAIIDoubleConstrainedFixedSize.yaml",
         # Internal operator catalogues for the meta-optimizer itself (cli.training's
         # MetaAlgorithmRegistry and MetaSPEA2Builder), not a base-level algorithm's own parameter
         # space — not user-facing, hardcoded per registered meta-algorithm and encoding.
@@ -463,6 +551,7 @@ class QualityIndicator:
     maximized: bool = False
     in_validation: bool = True
     computed_by_studio: bool = False
+    for_constraints: bool = False
 
 
 # org.uma.evolver.cli.IndicatorRegistry. Evolver normalizes each front with the reference front of
@@ -535,12 +624,44 @@ QUALITY_INDICATORS: tuple[QualityIndicator, ...] = (
         "evenly they are distributed and how well they reach the extremes of the reference "
         "front; not convergence.",
     ),
+    # org.uma.jmetal.qualityindicator.impl.ConstrainedMultiobjectiveIndicator
+    QualityIndicator(
+        registry_name="ConstrainedMultiobjectiveIndicator",
+        short_name="ICMOP",
+        full_name="Constrained multiobjective indicator",
+        measures="For problems with constraints. With feasible solutions, minus the hypervolume of "
+        "those that dominate the nadir point or, if none does, their distance to the region of "
+        "interest, at most 1; without them, 1 plus the least violation. A value above 1 is a run "
+        "without feasible solutions.",
+        for_constraints=True,
+    ),
+    # org.uma.evolver.util.ConstrainedEpsilon
+    QualityIndicator(
+        registry_name="ConstrainedEpsilon",
+        short_name="CEP",
+        full_name="Constrained additive epsilon",
+        measures="For problems with constraints. The additive epsilon of the feasible solutions, "
+        "at most 1; without them, 1 plus the least violation. In a training it has the same "
+        "values as `Epsilon`.",
+        for_constraints=True,
+    ),
 )
 
 
 def quality_indicator(name: str) -> QualityIndicator | None:
     """A quality indicator by its registry name or its abbreviation (e.g. "Epsilon" or "EP")."""
     return next((i for i in QUALITY_INDICATORS if name in (i.registry_name, i.short_name)), None)
+
+
+def configuration_handles_constraints(configuration: str) -> bool:
+    """Whether a configuration says how it handles constraints, and so belongs to a parameter space
+    for problems with constraints.
+
+    Args:
+        configuration: The configuration, "--parameter value ...".
+    """
+    words = configuration.split()
+    return any(f"--{parameter}" in words for parameter in CONSTRAINT_HANDLING_PARAMETERS)
 
 
 def is_maximized(name: str) -> bool:
@@ -558,9 +679,15 @@ def evolver_indicators() -> tuple[QualityIndicator, ...]:
     return tuple(i for i in QUALITY_INDICATORS if not i.computed_by_studio)
 
 
-def validation_indicators() -> tuple[QualityIndicator, ...]:
-    """The quality indicators Validation offers."""
-    return tuple(i for i in QUALITY_INDICATORS if i.in_validation)
+def validation_indicators(constrained: bool = False) -> tuple[QualityIndicator, ...]:
+    """The quality indicators Validation offers.
+
+    Args:
+        constrained: Whether the study has problems with constraints, which have their own.
+    """
+    return tuple(
+        i for i in QUALITY_INDICATORS if i.in_validation and (constrained or not i.for_constraints)
+    )
 
 
 def is_older_than_catalogue(version: str) -> bool:

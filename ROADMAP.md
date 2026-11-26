@@ -88,13 +88,21 @@ below; revisit and reorder as real usage surfaces new ones.
   Training set takes arguments per problem and checks the encodings. With a 2.3 jar, which has no
   catalogue, the pages fall back to the plain list of names.
 
-- **A running label instead of a live view**: Run algorithm no longer offers the
-  progress bar and live front modes, which a benchmark run, over in a second or two, rarely gave
-  time to see. A run in progress shows a blinking label with the evaluation it is at (its status is
-  updated every 1000 evaluations, `pages/solve.py`'s `STATUS_FREQUENCY`) and the Cancel button.
-  `SolveRequest` still mirrors Evolver's `frontFrequency`, `writePopulation` and
-  `frontDelayMillis`, unused by the page.
+- **The front of a run while it runs (November 2026)**: Run algorithm draws the front Evolver writes
+  to `CURRENT_FRONT.csv` (`evolver_studio/solve_live.py`) below the Run button, twenty times a run
+  with a pause after each so that a run of a second or two can be seen. It replaces the blinking
+  label alone, which had replaced an earlier live view.
+- **Problems with constraints (November 2026)**: in Explore, Run algorithm, Training, Validation and
+  its analysis, always with the parameter space that handles them; a feasibility tab in the monitor
+  and the analyses (`evolver_studio/feasibility.py`, `validation.feasibility`) and tutorial S9.
+- **Home page and design (November 2026)**: the menu at the top, a theme of its own, no sidebar, and a
+  home page with the latest result, the recent runs and the steps (`evolver_studio/home_panel.py`).
+  The pages live in `app_pages/`: Streamlit serves a folder called `pages/` by itself, without the
+  menu.
 
+- **Moved to Evolver 2.7 (November 2026)**: the resources come from tag `v2.7`, and the catalogue
+  has, for each algorithm, its parameter space and default configuration for problems with
+  constraints (Evolver 2.6), and the indicators ICMOP and CEP.
 - **Moved to Evolver 2.5 (October 2026)**: the app downloads Evolver 2.5 and its resources come from
   tag `v2.5`. SPEA2 as a meta-optimizer is configured as NSGA-II (its operators from
   `SPEA2MetaDouble.yaml`, plus `knnNeighborhoodSize` and `knnNormalizeObjectives`) and gains the tree
@@ -126,7 +134,7 @@ below; revisit and reorder as real usage surfaces new ones.
   selector as base algorithms (they were a list of expanders). Quality indicators come from
   `catalogue.QUALITY_INDICATORS`, checked against the manifest's `indicators`.
 
-- **Run algorithm (solving track, first version)**: `pages/solve.py` builds a `cli.solving` request
+- **Run algorithm (solving track, first version)**: `app_pages/solve.py` builds a `cli.solving` request
   in five sections that appear as the previous one is chosen: problem (and its reference front,
   found by `problems.reference_front_candidates`), algorithm and encoding, configuration, budget
   (population, evaluations, independent runs, seed, indicators) and Run. The configuration starts
@@ -143,12 +151,11 @@ below; revisit and reorder as real usage surfaces new ones.
   is at (`progress.running_label`, from `statusFrequency` with Evolver 2.3 or later).
 
 - **Navigation grouped by purpose**: the menu has four sections — Explore; Solve (Run algorithm,
-  `pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
-  `pages/tutorials.py`).
-- **Home page**: the app opens on `pages/home.py`, which presents Evolver-Studio's two uses and
-  shows a card for each page (its section, what it does, whether it is available or coming soon,
-  and a link to it), plus a getting-started note while Evolver's jar is missing. The menu and the
-  cards are built from the same list of pages (`evolver_studio/sections.py`).
+  `app_pages/solve.py`); Meta-optimization (Training, Analysis, Validation); Learn (Tutorials,
+  `app_pages/tutorials.py`).
+- **Home page**: the app opens on `app_pages/home.py`, which presents Evolver-Studio's two uses and
+  leads to every page, plus a getting-started note while Evolver's jar is missing. The menu and the
+  home page are built from the same list of pages (`evolver_studio/sections.py`).
 - **Tutorials page with the first interactive tutorial**: the page lists Evolver-Studio's tutorials
   by level (`evolver_studio/tutorials.py`, each paired with tutorials of Evolver's documentation) and
   guides the selected one step by step. **S2, "Exploring a parameter space"**
@@ -165,7 +172,7 @@ below; revisit and reorder as real usage surfaces new ones.
   its results; the text about them is computed from the data. `tests/test_tutorials.py`,
   `tests/test_tutorial_solving.py` and `tests/test_tutorial_validation.py` walk through them with
   Streamlit's `AppTest`.
-- **No Evolver checkout needed to use the app**: the sidebar downloads the Evolver release's jar
+- **No Evolver checkout needed to use the app**: the app downloads the Evolver release's jar
   from Maven Central (checksum-verified) into `lib/`; parameter spaces and meta-optimizer
   configurations are read from the jar (`evolver_studio/resource_files.py`), and the reference
   fronts, weight vectors and TSP instances are copied into `resources/` (MaF's fronts left out) from
@@ -184,16 +191,16 @@ This already covers most of `CLAUDE.md`'s MVP operations list (`start_training`,
   configurations on a problem.
 - **Tutorials**: the remaining interactive tutorials for both tracks, catalogued (with their Evolver
   documentation counterparts) in `evolver_studio/tutorials.py` and developed one at a time. Every
-  section of the app has one for 1.0 (S1 to S8: tour, parameter spaces, solving with the
+  section of the app has one for 1.0 (S1 to S9: tour, parameter spaces, solving with the
   problems, first training, customizing a training, training analysis, validation, validation
-  analysis); the five planned ones (comparing configurations, using a tuned configuration, your
+  analysis, problems with constraints); the five planned ones (comparing configurations, using a tuned configuration, your
   own problem, meta-optimizers and encodings, long-running jobs) come after 1.0. As in Evolver, only
   the written ones are numbered, consecutively by level: writing a new one renumbers those after
   it.
 
 ## Phase 3 — Analysis layer
 
-First version shipped (`pages/training_analysis.py`, *Training analysis*): the history of finished trainings, and for one of them
+First version shipped (`app_pages/training_analysis.py`, *Training analysis*): the history of finished trainings, and for one of them
 its summary, convergence, front, population, final-front configurations (to download or send to
 Validation / Run algorithm) and a parameter analysis against the default configuration.
 
@@ -201,14 +208,14 @@ Validation / Run algorithm) and a parameter analysis against the default configu
   analysis-layer goal, not started yet).
 
 Meta-optimization has four steps, a page each: Training, Training analysis, Validation and
-**Validation analysis** (`pages/validation_analysis.py`, `evolver_studio/validation_view.py`): its
+**Validation analysis** (`app_pages/validation_analysis.py`, `evolver_studio/validation_view.py`): its
 tabs Verdict, Wilcoxon, Effect size, Ranking, Bayesian, Distributions, Fronts, Attainment,
 Indicators, Cost and Runs & details (`validation_stats.py`, `attainment.py`, `latex_tables.py`;
 the tests checked against SAES and baycomp, without depending on them).
 
 ## Phase 4 — Validation runs
 
-First version shipped (`pages/validation.py`, with the Evolver 2.4 sync): a study compares a
+First version shipped (`app_pages/validation.py`, with the Evolver 2.4 sync): a study compares a
 tuned configuration, the pivot (from a finished training run's `VAR_CONF.txt`, or pasted), with the
 default configurations of Evolver's algorithms for the encoding of the problems. It needs no change
 in Evolver: a study is a `cli.solving` request per algorithm and problem
@@ -228,7 +235,7 @@ Evolver's own scripts (`validation_stats.py`: medians and IQR, Wilcoxon rank-sum
 - Tests for the parameter-space explorer once Phase 2 lands. *(Explorer itself shipped; Streamlit
   `AppTest` coverage exists for the Tutorials and Explore pages, see `tests/test_tutorials.py` and
   `tests/test_explore_*.py`.)*
-- Track Evolver's releases: the app is built against Evolver 2.5 (`evolver_client.EVOLVER_VERSION`)
+- Track Evolver's releases: the app is built against Evolver 2.7 (`evolver_client.EVOLVER_VERSION`)
   and follows stable releases only; moving to a newer release is the `/bump-evolver` command
   (bumping that constant, `make sync-resources`, `/sync-catalogue` and the drift-detection tests).
   Work against a `develop` jar set by `EVOLVER_JAR` goes on an `experiment/*` branch. The rename

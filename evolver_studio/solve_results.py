@@ -8,6 +8,7 @@ directory, next to its request, holds `status.yaml`.
 import io
 import re
 import zipfile
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from evolver_studio.problem_catalogue import format_problem_spec
 RUN_DIRECTORY_PATTERN = re.compile(r"run-(\d+)")
 INDICATORS_FILE = "INDICATORS.csv"
 METADATA_FILE = "METADATA.txt"
+VIOLATIONS_FILE = "CV.csv"
 # INDICATORS.csv's columns that are not indicators.
 RUN_COLUMNS = ("Run", "Seed", "TimeMs")
 
@@ -82,6 +84,47 @@ def read_run_fronts(output_directory: Path) -> dict[int, pd.DataFrame]:
     return dict(sorted(fronts.items()))
 
 
+def read_violations(output_directory: Path, run: int) -> pd.Series | None:
+    """Read how much each solution of a run violates the constraints of the problem.
+
+    Args:
+        output_directory: A solve run's output directory.
+        run: The run's number (from 1).
+
+    Returns:
+        The overall violation of each solution, in the order of its FUN.csv: 0 if it is feasible,
+        positive if not; None for a problem without constraints (it has no CV.csv).
+    """
+    try:
+        table = pd.read_csv(output_directory / f"run-{run}" / VIOLATIONS_FILE, header=None)
+    except (OSError, pd.errors.EmptyDataError):
+        return None
+    return table[0].rename("violation")
+
+
+def read_run_violations(output_directory: Path, runs: Iterable[int]) -> dict[int, pd.Series]:
+    """Read the violations of several runs; those without them are left out.
+
+    Args:
+        output_directory: A solve run's output directory.
+        runs: The numbers of the runs.
+
+    Returns:
+        What `read_violations` returns for each run; empty for a problem without constraints.
+    """
+    found = {run: read_violations(output_directory, run) for run in runs}
+    return {run: violations for run, violations in found.items() if violations is not None}
+
+
+def feasible_runs(violations: Mapping[int, pd.Series]) -> int:
+    """How many runs found at least a feasible solution.
+
+    Args:
+        violations: The violations of each run, as `read_run_violations` returns them.
+    """
+    return sum(bool((values <= 0).any()) for values in violations.values())
+
+
 def read_front(front_file: Path) -> pd.DataFrame:
     """Read a front file: one solution per row, one objective per column, no header.
 
@@ -104,11 +147,14 @@ def read_solutions(output_directory: Path, run: int) -> pd.DataFrame:
         run: The run's number (from 1).
 
     Returns:
-        One row per solution, with the columns f1, f2, ... (its objectives) and x1, x2, ... (its
-        variables); only the objectives if the run has no VAR file.
+        One row per solution, with the columns f1, f2, ... (its objectives), `violation` (for a
+        problem with constraints) and x1, x2, ... (its variables, if the run has a VAR file).
     """
     run_directory = output_directory / f"run-{run}"
     solutions = read_front(run_directory / "FUN.csv")
+    violations = read_violations(output_directory, run)
+    if violations is not None:
+        solutions["violation"] = violations
     variables_file = run_directory / "VAR.csv"
     if not variables_file.is_file():
         return solutions

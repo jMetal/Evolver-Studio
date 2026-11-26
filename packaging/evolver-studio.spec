@@ -8,7 +8,7 @@ ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 datas = [
     (os.path.join(ROOT, "app.py"), "."),
-    (os.path.join(ROOT, "pages"), "pages"),
+    (os.path.join(ROOT, "app_pages"), "app_pages"),
     (os.path.join(ROOT, "assets"), "assets"),
     (os.path.join(ROOT, "resources"), "resources"),
     (os.path.join(ROOT, "evolver_studio", "tutorial_data"), "evolver_studio/tutorial_data"),
