@@ -20,6 +20,8 @@ Works with Evolver 2.7.
 
 ### Fixes
 
+- The **citation** of Evolver's article in the README gave a wrong volume and year: it is SoftwareX
+  24, 2023.
 - A page opened **by its URL** before any other showed Streamlit's own sidebar instead of the menu:
   the folder of the pages is now `app_pages/`.
 - Run algorithm, Training and Validation **warn** when NormalizedHypervolume may take minutes, or not
