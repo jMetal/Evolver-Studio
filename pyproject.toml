@@ -7,16 +7,20 @@ name = "evolver-studio"
 version = "0.1.0.dev0"
 description = "Streamlit GUI and analysis tool for Evolver"
 requires-python = ">=3.11"
+# Minimum versions: those the tests have passed with. There are no upper bounds: the continuous
+# integration installs the newest versions, and tells when one breaks something.
 dependencies = [
-    "streamlit",
-    "pyyaml",
-    "pandas",
-    "plotly",
+    # The menu at the top and the expanders with a key need a recent Streamlit.
+    "streamlit>=1.63",
+    "pyyaml>=6.0",
+    "pandas>=3.0",
+    "numpy>=2.0",
+    "plotly>=7.0",
     # Saves the charts as PNG and PDF, drawing them in the Chrome installed on the computer.
-    "kaleido>=1",
+    "kaleido>=1.0",
     # The hypervolume of a validation's fronts (Evolver registers no maximized one).
-    "moocore",
-    "scipy",
+    "moocore>=0.3",
+    "scipy>=1.17",
 ]
 
 [project.optional-dependencies]

@@ -84,6 +84,9 @@ Works with Evolver 2.7.
 
 ### Installation
 
+- The Python dependencies have **minimum versions**, those the tests have passed with: Streamlit
+  1.63, pandas 3.0, NumPy 2.0, Plotly 7.0, Kaleido 1.0, SciPy 1.17, moocore 0.3 and PyYAML 6.0. An
+  older environment is updated by `make env` instead of failing in unexpected ways.
 - `make env` installs **Java 21** (`openjdk` from conda-forge) in the Conda environment, so Java
   need not be installed beforehand. The README lists what to have first (git, make and Conda), says
   that the `make` targets run inside the environment and how to activate it to use its tools
