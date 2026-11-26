@@ -1,11 +1,11 @@
 """Tests for the Validation page, running real studies in a temporary working directory."""
 
-import time
 from pathlib import Path
 
 import pandas as pd
 import pytest
 import yaml
+from run_waiting import wait_for_run
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import evolver_client
@@ -236,10 +236,7 @@ class TestRunAStudy:
         # Act
         next(b for b in app.button if b.label == "Run the study").click().run()
         study_dir = next((working_directory / "validation-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the study did not finish"
-            time.sleep(0.3)
+        wait_for_run(study_dir, RUN_TIMEOUT_SECONDS, "the study")
         app.switch_page("app_pages/validation_analysis.py")
         app.session_state["validation_analysis_study"] = study_dir.name
         app.run()
@@ -322,10 +319,7 @@ class TestProblemsWithConstraints:
         # Act
         next(b for b in app.button if b.label == "Run the study").click().run()
         study_dir = next((working_directory / "validation-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(study_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the study did not finish"
-            time.sleep(0.3)
+        wait_for_run(study_dir, RUN_TIMEOUT_SECONDS, "the study")
         app.switch_page("app_pages/validation_analysis.py")
         app.session_state["validation_analysis_study"] = study_dir.name
         app.run()

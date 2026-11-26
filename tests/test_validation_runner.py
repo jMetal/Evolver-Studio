@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from run_waiting import wait_for_run
 
 from evolver_studio.evolver_client import WORKING_DIRECTORY, jar_path, read_status
 from evolver_studio.resource_files import default_configuration_text
@@ -41,10 +42,7 @@ def _study() -> ValidationStudy:
 
 
 def _wait(study_directory: Path, seconds: float = 120) -> None:
-    deadline = time.monotonic() + seconds
-    while run_phase(study_directory) in (RunPhase.STARTING, RunPhase.RUNNING):
-        assert time.monotonic() < deadline, "the study did not finish"
-        time.sleep(0.3)
+    wait_for_run(study_directory, seconds, "the study")
 
 
 @pytest.fixture

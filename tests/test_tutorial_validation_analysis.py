@@ -1,16 +1,15 @@
 """Tests for tutorial "Analyzing a validation", with the real study of "Validating a
 configuration"."""
 
-import time
 from pathlib import Path
 
 import pytest
+from run_waiting import wait_for_run
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import evolver_client, tutorial_validation_analysis
 from evolver_studio.evolver_client import WORKING_DIRECTORY, describe, jar_path
 from evolver_studio.problem_catalogue import parse_problem_catalogue
-from evolver_studio.runs import RunPhase, run_phase
 from evolver_studio.tutorial_validation import STUDY_ID
 
 APP_SCRIPT = Path(__file__).resolve().parent.parent / "app.py"
@@ -53,10 +52,7 @@ class TestWalkThrough:
         # Arrange: run the study from the introduction
         app.button(key="tutorial_validation_run").click().run()
         directory = tmp_path / "validation-runs" / STUDY_ID
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(directory) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the study did not finish"
-            time.sleep(0.3)
+        wait_for_run(directory, RUN_TIMEOUT_SECONDS, "the study")
         app.run()
 
         # Act

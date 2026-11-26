@@ -3,12 +3,12 @@
 import functools
 import subprocess
 import sys
-import time
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 import yaml
+from run_waiting import wait_for_run
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import catalogue, evolver_client
@@ -455,10 +455,7 @@ class TestProblemsWithConstraints:
         # Act
         next(button for button in app.button if button.label == "Run").click().run()
         run_dir = next((tmp_path / "solve-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the run did not finish"
-            time.sleep(0.2)
+        wait_for_run(run_dir, RUN_TIMEOUT_SECONDS, "the run", poll=0.2)
         app.run()
         app.selectbox(key="solve_history").select(run_dir.name).run()
 
@@ -489,10 +486,7 @@ class TestSolutions:
         app.number_input(key="solve_evaluations").set_value(500).run()
         next(button for button in app.button if button.label == "Run").click().run()
         run_dir = next((tmp_path / "solve-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the run did not finish"
-            time.sleep(0.2)
+        wait_for_run(run_dir, RUN_TIMEOUT_SECONDS, "the run", poll=0.2)
         app.run()
         app.selectbox(key="solve_history").select(run_dir.name).run()
         table = next(frame for frame in app.dataframe if "x1" in frame.value.columns)
@@ -529,10 +523,7 @@ class TestRepeatARun:
         app.number_input(key="solve_runs").set_value(2).run()
         next(button for button in app.button if button.label == "Run").click().run()
         run_dir = next((tmp_path / "solve-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the run did not finish"
-            time.sleep(0.2)
+        wait_for_run(run_dir, RUN_TIMEOUT_SECONDS, "the run", poll=0.2)
         app.run()
         app.selectbox(key="solve_history").select(run_dir.name).run()
 
@@ -571,10 +562,7 @@ class TestRepeatARun:
         # Act
         next(button for button in app.button if button.label == "Run").click().run()
         run_dir = next((tmp_path / "solve-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the run did not finish"
-            time.sleep(0.2)
+        wait_for_run(run_dir, RUN_TIMEOUT_SECONDS, "the run", poll=0.2)
         app.run()
         request = yaml.safe_load((run_dir / "request.yaml").read_text())
 
@@ -604,10 +592,7 @@ class TestRun:
         # Act
         next(button for button in app.button if button.label == "Run").click().run()
         run_dir = next((tmp_path / "solve-runs").iterdir())
-        deadline = time.monotonic() + RUN_TIMEOUT_SECONDS
-        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the run did not finish"
-            time.sleep(0.2)
+        wait_for_run(run_dir, RUN_TIMEOUT_SECONDS, "the run", poll=0.2)
         app.run()
         app.selectbox(key="solve_history").select(run_dir.name).run()
 

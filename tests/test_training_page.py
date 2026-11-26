@@ -2,10 +2,10 @@
 
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 import pytest
+from run_waiting import wait_for_run
 from streamlit.testing.v1 import AppTest
 
 from evolver_studio import evolver_client
@@ -655,10 +655,7 @@ class TestProblemsWithConstraints:
         # Act
         _launch_button(app).click().run()
         run_dir = next((tmp_path / "cli-runner-runs").iterdir())
-        deadline = time.monotonic() + 120
-        while run_phase(run_dir) in (RunPhase.STARTING, RunPhase.RUNNING):
-            assert time.monotonic() < deadline, "the training did not finish"
-            time.sleep(0.3)
+        wait_for_run(run_dir, 120, "the training")
 
         # Assert
         assert run_phase(run_dir) == RunPhase.FINISHED, (run_dir / "runner.log").read_text()[-800:]
